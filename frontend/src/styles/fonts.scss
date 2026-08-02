@@ -3,12 +3,12 @@
 // `$fonts` is injected by vite.config.ts from src/ts/constants/fonts.ts, so the
 // declared faces and the shipped files under static/webfonts/ cannot drift
 // (INV-064, INV-126).
-//
+
 // Monkeytype also emitted a "<font> Preview" face per family, served from a
-// build-time-subsetted `webfonts-preview` directory, so the settings-page font
-// picker could render each option in its own typeface. That picker is gone with
-// the settings page (C9) and the `font-preview` vite plugin goes with it, so
-// only the real faces are declared here.
+// build-time-subsetted directory, so the settings-page font picker could render
+// each option in its own typeface. That picker is gone with the settings page
+// (C9) and the `font-preview` vite plugin goes with it, so only the real faces
+// are declared here.
 @each $font, $config in $fonts {
   @font-face {
     font-family: "#{$font}";
