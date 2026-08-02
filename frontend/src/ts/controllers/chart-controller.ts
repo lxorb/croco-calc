@@ -1,4 +1,24 @@
-import * as ResultWordHighlight from "../elements/result-word-highlight";
+/**
+ * The results chart (WP-07). CP-111 … CP-121, master C7 and C27.
+ *
+ * chart.js is kept, and so is the `ChartWithUpdateColors` wrapper whose
+ * `updateColors(theme)` is what makes the chart re-paint when a theme is picked
+ * (CP-111). What changed is the vocabulary:
+ *
+ * - the canvas is `#resultChart`, not upstream's speed-named one (CP-112, C27);
+ * - the primary left axis is **score** — cumulative `correct − wrong` after each
+ *   second — because that is the metric the run is judged by and the PB
+ *   annotation has to sit on it (CP-114, §9.6);
+ * - the secondary left axis is **tpm**, dashed and hidden by default (CP-115);
+ * - the right axis is **wrong**, a `crossRot` scatter (CP-116);
+ * - upstream's `burst` dataset and axis are gone (CP-117).
+ *
+ * Series data comes straight off `result.chartData` (CP-113 … CP-116), which
+ * the test engine samples once per elapsed second and caps at
+ * `CHART_DATA_MAX_POINTS` (481 — master C7). Nothing here reads the event log:
+ * INV-089 rewrote it for the task vocabulary and the per-second series no longer
+ * has to be reconstructed post hoc.
+ */
 
 import {
   BarController,
@@ -22,8 +42,6 @@ import {
   type ChartType,
   type DefaultDataPoint,
   type PluginChartOptions,
-  type ScaleChartOptions,
-  TooltipItem,
 } from "chart.js";
 
 import chartAnnotation, {
@@ -56,17 +74,16 @@ Chart.defaults.elements.line.tension = 0.5;
 Chart.defaults.elements.line.fill = "origin";
 
 import "chartjs-adapter-date-fns";
-import { Config } from "../config/store";
 import { configEvent } from "../events/config";
-import * as Arrays from "../utils/arrays";
-import { blendTwoHexColors } from "../utils/colors";
 
 import { getTheme } from "../states/theme";
 import { Theme } from "../constants/themes";
 import { createDebouncedEffectOn } from "../hooks/effects";
-import { getWordIndexesForSecond } from "../test/events/stats";
-import { getLastEventLog } from "../states/test";
+import { qsa } from "../utils/dom";
 import { typedKeys } from "@croco-calc/util/objects";
+
+/** The three series the results chart plots (CP-114 … CP-116). */
+export type ResultChartSeries = "score" | "tpm" | "wrong";
 
 export class ChartWithUpdateColors<
   TType extends ChartType = ChartType,
@@ -106,50 +123,66 @@ export class ChartWithUpdateColors<
   }
 }
 
-let prevTi: TooltipItem<"line" | "scatter"> | undefined;
+/**
+ * CP-121 — upstream's `afterLabel` highlighted the input typed in the hovered
+ * second; here it highlights the **tasks committed in that second** in the
+ * CP-126 history list. The list carries `data-second` on every entry, so the
+ * lookup needs neither the result object nor an import of `test/result.ts`
+ * (which imports this module).
+ */
+function highlightTasksForSecond(second: number): void {
+  for (const entry of qsa("#resultTaskHistory .tasks .task")) {
+    const at = Number(entry.getAttribute("data-second"));
+    entry.toggleClass("highlighted", Number.isFinite(at) && at === second);
+  }
+}
+
 export const result = new ChartWithUpdateColors<
   "line" | "scatter",
   number[],
   string,
-  "wpm" | "raw" | "error" | "burst"
->(document.querySelector("#wpmChart") as HTMLCanvasElement, {
+  ResultChartSeries
+>(document.querySelector("#resultChart") as HTMLCanvasElement, {
   type: "line",
   data: {
     labels: [],
     datasets: [
       {
+        // CP-114 — cumulative score, solid, the axis the PB line sits on.
         //@ts-expect-error the type is defined incorrectly, have to ignore the error
         clip: false,
-        label: "wpm",
+        label: "score",
         data: [],
         borderColor: "rgba(125, 125, 125, 1)",
         borderWidth: 3,
-        yAxisID: "wpm",
+        yAxisID: "score",
         order: 2,
         pointRadius: 1,
       },
       {
+        // CP-115 — running-average tasks per minute, dashed, off by default.
         //@ts-expect-error the type is defined incorrectly, have to ignore the error
         clip: false,
-        label: "raw",
+        label: "tpm",
         data: [],
         borderColor: "rgba(125, 125, 125, 1)",
         borderWidth: 2,
-        yAxisID: "raw",
+        yAxisID: "tpm",
         borderDash: [8, 8],
         order: 3,
         pointRadius: 0,
       },
       {
+        // CP-116 — wrong answers committed in each second.
         //@ts-expect-error the type is defined incorrectly, have to ignore the error
         clip: false,
-        label: "errors",
+        label: "wrong",
         data: [],
         borderColor: "rgba(255, 125, 125, 1)",
         pointBackgroundColor: "rgba(255, 125, 125, 1)",
         borderWidth: 2,
         order: 1,
-        yAxisID: "error",
+        yAxisID: "wrong",
         type: "scatter",
         pointStyle: "crossRot",
         pointRadius: function (context): number {
@@ -163,23 +196,13 @@ export const result = new ChartWithUpdateColors<
           return (value ?? 0) <= 0 ? 0 : 5;
         },
       },
-      {
-        //@ts-expect-error the type is defined incorrectly, have to ignore the error
-        clip: false,
-        label: "burst",
-        data: [],
-        borderColor: "rgba(125, 125, 125, 1)",
-        borderWidth: 3,
-        yAxisID: "burst",
-        order: 4,
-        pointRadius: 1,
-      },
     ],
   },
   options: {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
+      // CP-113 — one point per elapsed second, exactly as upstream.
       x: {
         axis: "x",
         ticks: {
@@ -192,15 +215,15 @@ export const result = new ChartWithUpdateColors<
           text: "Seconds",
         },
       },
-      wpm: {
+      score: {
         axis: "y",
         display: true,
         title: {
           display: true,
-          text: "Words per Minute",
+          text: "Score",
         },
-        beginAtZero: true,
-        min: 0,
+        // CP-101 — score may be negative, so the axis floor is decided by
+        // `startGraphsAtZero` in `test/result.ts` (CP-120), never pinned here.
         ticks: {
           autoSkip: true,
           autoSkipPadding: 20,
@@ -209,12 +232,12 @@ export const result = new ChartWithUpdateColors<
           display: true,
         },
       },
-      raw: {
+      tpm: {
         axis: "y",
         display: false,
         title: {
           display: true,
-          text: "Raw Words per Minute",
+          text: "Tasks per Minute",
         },
         beginAtZero: true,
         min: 0,
@@ -226,30 +249,13 @@ export const result = new ChartWithUpdateColors<
           display: false,
         },
       },
-      burst: {
-        axis: "y",
-        display: false,
-        title: {
-          display: true,
-          text: "Burst Words per Minute",
-        },
-        beginAtZero: true,
-        min: 0,
-        ticks: {
-          autoSkip: true,
-          autoSkipPadding: 20,
-        },
-        grid: {
-          display: false,
-        },
-      },
-      error: {
+      wrong: {
         axis: "y",
         display: true,
         position: "right",
         title: {
           display: true,
-          text: "Errors",
+          text: "Wrong",
         },
         beginAtZero: true,
         ticks: {
@@ -272,33 +278,8 @@ export const result = new ChartWithUpdateColors<
         intersect: false,
         callbacks: {
           afterLabel: function (ti): string {
-            if (prevTi === ti) return "";
-            const eventLog = getLastEventLog();
-            if (eventLog === null) return "";
-
-            prevTi = ti;
-            try {
-              const keypressIndex = Math.round(parseFloat(ti.label)) - 1;
-              const wordsToHighlight = getWordIndexesForSecond(
-                eventLog,
-                keypressIndex,
-              );
-
-              const unique = [...new Set(wordsToHighlight)];
-              const firstHighlightWordIndex = unique[0];
-              const lastHighlightWordIndex =
-                Arrays.lastElementFromArray(unique);
-              if (
-                firstHighlightWordIndex === undefined ||
-                lastHighlightWordIndex === undefined
-              ) {
-                return "";
-              }
-              void ResultWordHighlight.highlightWordsInRange(
-                firstHighlightWordIndex,
-                lastHighlightWordIndex,
-              );
-            } catch {}
+            const second = Math.round(parseFloat(ti.label));
+            if (Number.isFinite(second)) highlightTasksForSecond(second);
             return "";
           },
         },
@@ -307,11 +288,11 @@ export const result = new ChartWithUpdateColors<
   },
 });
 
-export type OtherChartData = {
-  x: number;
-  y: number;
-};
-
+/**
+ * Re-paints the results chart for the active theme (CP-111). Every other chart
+ * in the app is a Solid component (`components/common/ChartJs.tsx`) and colours
+ * itself, so this only has the one shape to handle.
+ */
 async function updateColors<
   TType extends ChartType = "bar" | "line" | "scatter",
   TData = number[],
@@ -332,189 +313,37 @@ async function updateColors<
     scale.title.color = colors.sub;
   }
 
-  if (chart.id === result.id) {
-    const c = chart as unknown as typeof result;
+  const c = chart as unknown as typeof result;
 
-    const wpm = c.getDataset("wpm");
-    wpm.backgroundColor = "transparent";
-    wpm.borderColor = colors.main;
-    wpm.pointBackgroundColor = colors.main;
-    wpm.pointBorderColor = colors.main;
+  const score = c.getDataset("score");
+  score.backgroundColor = "transparent";
+  score.borderColor = colors.main;
+  score.pointBackgroundColor = colors.main;
+  score.pointBorderColor = colors.main;
 
-    const raw = c.getDataset("raw");
-    raw.backgroundColor = "transparent";
-    raw.borderColor = `${colors.main}99`;
-    raw.pointBackgroundColor = `${colors.main}99`;
-    raw.pointBorderColor = `${colors.main}99`;
+  const tpm = c.getDataset("tpm");
+  tpm.backgroundColor = "transparent";
+  tpm.borderColor = `${colors.main}99`;
+  tpm.pointBackgroundColor = `${colors.main}99`;
+  tpm.pointBorderColor = `${colors.main}99`;
 
-    const error = c.getDataset("error");
-    error.backgroundColor = colors.error;
-    error.borderColor = colors.error;
-    error.pointBackgroundColor = colors.error;
-    error.pointBorderColor = colors.error;
+  const wrong = c.getDataset("wrong");
+  wrong.backgroundColor = colors.error;
+  wrong.borderColor = colors.error;
+  wrong.pointBackgroundColor = colors.error;
+  wrong.pointBorderColor = colors.error;
 
-    const burst = c.getDataset("burst");
-    burst.backgroundColor = blendTwoHexColors(
-      colors.subAlt,
-      `${colors.subAlt}00`,
-      0.5,
-    );
-    burst.borderColor = colors.sub;
-    burst.pointBackgroundColor = colors.sub;
-    burst.pointBorderColor = colors.sub;
-
-    chart.update("resize");
-    return;
-  }
-
-  //@ts-expect-error it's too difficult to figure out these types, but this works
-  chart.data.datasets[0].borderColor = (ctx): string => {
-    // oxlint-disable-next-line no-unsafe-member-access
-    const isPb = ctx.raw?.isPb as boolean;
-    const color = isPb ? colors.text : colors.main;
-    return color;
-  };
-
-  if (chart.data.datasets[1]) {
-    chart.data.datasets[1].borderColor = colors.sub;
-  }
-  if (chart.data.datasets[2]) {
-    chart.data.datasets[2].borderColor = colors.error;
-  }
-
-  const dataset0 = (
-    chart.data.datasets as ChartDataset<"line", TData>[]
-  )[0] as ChartDataset<"line", TData>;
-
-  if (chart?.data?.datasets[0]?.type === undefined) {
-    if (chart.config.type === "line") {
-      dataset0.pointBackgroundColor = (ctx): string => {
-        //@ts-expect-error not sure why raw comes out to unknown, but this works
-        const isPb = ctx.raw?.isPb as boolean;
-        const color = isPb ? colors.text : colors.main;
-        return color;
-      };
-    } else if (chart.config.type === "bar") {
-      dataset0.backgroundColor = colors.main;
-    }
-  } else if (chart.data.datasets[0].type === "bar") {
-    chart.data.datasets[0].backgroundColor = colors.main;
-  } else if (chart.data.datasets[0].type === "line") {
-    dataset0.pointBackgroundColor = colors.main;
-  }
-
-  const dataset1 = chart.data.datasets[1] as ChartDataset<"line", TData>;
-
-  if (dataset1 !== undefined) {
-    if (dataset1.type === undefined) {
-      if (chart.config.type === "line") {
-        dataset1.pointBackgroundColor = colors.sub;
-      } else if (chart.config.type === "bar") {
-        dataset1.backgroundColor = colors.sub;
-      }
-    } else if ((dataset1?.type as "bar" | "line") === "bar") {
-      dataset1.backgroundColor = colors.sub;
-    } else if (dataset1.type === "line") {
-      dataset1.pointBackgroundColor = colors.sub;
-    }
-  }
-  if (chart.data.datasets.length === 2) {
-    dataset1.borderColor = (): string => {
-      const color = colors.sub;
-      return color;
-    };
-  }
-
-  const dataset2 = chart.data.datasets[2] as ChartDataset<"line", TData>;
-
-  if (chart.data.datasets.length === 7) {
-    dataset2.borderColor = (): string => {
-      const color = colors.sub;
-      return color;
-    };
-    const avg10On = Config.accountChart[2] === "on";
-    const avg100On = Config.accountChart[3] === "on";
-
-    const text02 = blendTwoHexColors(colors.bg, colors.text, 0.2);
-    const main02 = blendTwoHexColors(colors.bg, colors.main, 0.2);
-    const main04 = blendTwoHexColors(colors.bg, colors.main, 0.4);
-
-    const sub02 = blendTwoHexColors(colors.bg, colors.sub, 0.2);
-    const sub04 = blendTwoHexColors(colors.bg, colors.sub, 0.4);
-
-    const [
-      wpmDataset,
-      pbDataset,
-      accDataset,
-      ao10wpmDataset,
-      ao10accDataset,
-      ao100wpmDataset,
-      ao100accDataset,
-    ] = chart.data.datasets as ChartDataset<"line", TData>[];
-
-    if (
-      wpmDataset === undefined ||
-      pbDataset === undefined ||
-      accDataset === undefined ||
-      ao10wpmDataset === undefined ||
-      ao10accDataset === undefined ||
-      ao100wpmDataset === undefined ||
-      ao100accDataset === undefined
-    ) {
-      return;
-    }
-
-    if (avg10On && avg100On) {
-      wpmDataset.pointBackgroundColor = main02;
-      pbDataset.borderColor = text02;
-      accDataset.pointBackgroundColor = sub02;
-      ao10wpmDataset.borderColor = main04;
-      ao10accDataset.borderColor = sub04;
-      ao100wpmDataset.borderColor = colors.main;
-      ao100accDataset.borderColor = colors.sub;
-    } else if ((avg10On && !avg100On) || (!avg10On && avg100On)) {
-      pbDataset.borderColor = text02;
-      wpmDataset.pointBackgroundColor = main04;
-      accDataset.pointBackgroundColor = sub04;
-      ao10wpmDataset.borderColor = colors.main;
-      ao100wpmDataset.borderColor = colors.main;
-      ao10accDataset.borderColor = colors.sub;
-      ao100accDataset.borderColor = colors.sub;
-    } else {
-      pbDataset.borderColor = text02;
-      wpmDataset.pointBackgroundColor = colors.main;
-      accDataset.pointBackgroundColor = colors.sub;
-    }
-  }
-
-  const chartScaleOptions = chart.options as ScaleChartOptions<TType>;
-  Object.keys(chartScaleOptions.scales).forEach((scaleID) => {
-    const axis = chartScaleOptions.scales[scaleID] as CartesianScaleOptions;
-    axis.ticks.color = colors.sub;
-    axis.title.color = colors.sub;
-    axis.grid.color = gridcolor;
-    axis.grid.tickColor = gridcolor;
-    axis.grid.borderColor = gridcolor;
-  });
-
-  try {
-    (
-      dataset0.trendlineLinear as TrendlineLinearPlugin.TrendlineLinearOptions
-    ).style = colors.sub;
-  } catch {}
-
+  // CP-118 — the PB annotation keeps upstream's line + label styling.
   (
     (chart.options as PluginChartOptions<TType>).plugins.annotation
       .annotations as AnnotationOptions<"line">[]
   ).forEach((annotation) => {
-    if (annotation.id !== "funbox-label") {
-      annotation.borderColor = colors.sub;
-    }
+    annotation.borderColor = colors.sub;
     (annotation.label as LabelOptions).backgroundColor = colors.sub;
     (annotation.label as LabelOptions).color = colors.bg;
   });
 
-  chart.update("none");
+  chart.update("resize");
 }
 
 function setDefaultFontFamily(font: string): void {

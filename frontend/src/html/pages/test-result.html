@@ -1,81 +1,85 @@
+<!--
+  Results screen (WP-07). CP-090 … CP-131.
+
+  Icons are Iconify placeholders: every `[data-icon]` span is filled in by
+  `frontend/src/ts/test/result.ts` at module load, which renders the shared
+  `Icon` component into it (C10, CP-001). Writing the ids here rather than in
+  the module keeps them auditable by `frontend/vite-plugins/icons.ts`, which
+  scans `.html` as well as `.ts` (CP-002).
+
+  The eight CP-188 hooks (`data-score`, `data-correct`, `data-wrong`,
+  `data-acc`, `data-tpm`, `data-answered`, `data-consistency`, `data-afk`)
+  live on `#result` and are written by `result.ts` on every render.
+-->
 <div id="result" class="content-grid full-width hidden" tabindex="-1">
   <div class="wrapper">
     <div class="stats">
-      <!-- <div class="info">words 10<br>punctuation</div> -->
-
-      <div class="group wpm">
+      <!-- CP-091.1 / CP-092 — the main metric, in the upstream headline scale. -->
+      <div class="group score">
         <div class="top">
-          <div class="text">wpm</div>
+          <div class="text">score</div>
+          <!-- CP-095 — the PB crown, now measured in score. -->
           <div
             class="crown hidden"
             aria-label=""
             data-balloon-pos="up"
             data-balloon-length="medium"
           >
-            <i class="fas fa-question"></i>
-            <i class="fas fa-crown"></i>
-            <i class="fas fa-slash"></i>
-            <i class="fas fa-exclamation-triangle"></i>
+            <span
+              class="crownIcon question"
+              data-icon="ph:question-bold"
+            ></span>
+            <span class="crownIcon normal" data-icon="ph:crown-bold"></span>
+            <span class="crownIcon slash" data-icon="ph:prohibit-bold"></span>
+            <span class="crownIcon warning" data-icon="ph:warning-bold"></span>
           </div>
         </div>
         <div class="bottom" aria-label="" data-balloon-pos="up">-</div>
       </div>
+
+      <!-- CP-091.2 / CP-093 — correct and wrong, adjacent, below the score. -->
+      <div class="group correctwrong">
+        <div class="subgroup correct">
+          <div class="top">correct</div>
+          <div class="bottom">-</div>
+        </div>
+        <div class="subgroup wrong">
+          <div class="top">wrong</div>
+          <div class="bottom">-</div>
+        </div>
+      </div>
+
+      <!-- CP-091.3 / CP-094 -->
       <div class="group acc">
         <div class="top">acc</div>
         <div class="bottom" aria-label="" data-balloon-pos="up">-</div>
       </div>
     </div>
+
+    <!-- CP-096 — test type, tpm, tasks, avg time, consistency, time, daily
+         leaderboard. `other` is upstream's `.group.info`, kept last: it is the
+         only home for the C37 idle flag, CP-109's invalid marker and the
+         repeated-run marker, none of which CP-096 places elsewhere. -->
     <div class="stats morestats">
       <div class="group testType">
         <div class="top">test type</div>
         <div class="bottom">-</div>
-        <div class="tags hidden" style="margin-top: 0.5rem">
-          <div class="top">
-            <span>tags</span>
-            <div
-              class="textButton editTagsButton"
-              result-id=""
-              active-tag-ids=""
-              aria-label="Edit tags"
-              role="button"
-              data-balloon-pos="right"
-            >
-              <i class="fas fa-pen fa-fw"></i>
-            </div>
-          </div>
-          <div class="bottom">-</div>
-        </div>
       </div>
-      <!-- <div class="group infoAndTags"> -->
-      <div class="group info">
-        <div class="top">other</div>
-        <div class="bottom">-</div>
-      </div>
-
-      <!-- </div> -->
-      <!-- <div class="subgroup"> -->
-      <div class="group raw">
-        <div class="top">raw</div>
+      <div class="group tpm">
+        <div class="top">tpm</div>
         <div class="bottom" aria-label="" data-balloon-pos="up">-</div>
       </div>
-      <div class="group key">
-        <div class="top">characters</div>
-        <div
-          class="bottom"
-          aria-label="correct&NewLine;incorrect&NewLine;extra&NewLine;missed"
-          data-balloon-break=""
-          data-balloon-pos="up"
-        >
-          -
-        </div>
+      <div class="group tasks">
+        <div class="top">tasks</div>
+        <div class="bottom" aria-label="" data-balloon-pos="up">-</div>
       </div>
-
-      <!-- </div> -->
-
-      <!-- <div class="subgroup"> -->
+      <div class="group avgTime">
+        <div class="top">avg time</div>
+        <div class="bottom" aria-label="" data-balloon-pos="up">-</div>
+      </div>
       <div class="group flat consistency">
         <div class="top">consistency</div>
-        <div class="bottom" aria-label="" data-balloon-pos="up">2 -</div>
+        <div class="bottom" aria-label="" data-balloon-pos="up">-</div>
       </div>
       <div class="group time">
         <div class="top">time</div>
@@ -85,8 +89,6 @@
           <div class="timeToday"></div>
         </div>
       </div>
-      <!-- </div> -->
-
       <div class="group dailyLeaderboard hidden">
         <div class="top">daily leaderboard</div>
         <div
@@ -98,138 +100,72 @@
           -
         </div>
       </div>
-
-      <div class="group source hidden">
-        <div class="top">
-          <span style="margin-right: 0.5em">source</span>
-          <span
-            id="reportQuoteButton"
-            class="textButton hidden"
-            aria-label="Report quote"
-            data-balloon-pos="up"
-          >
-            <i class="icon fas fa-fw fa-flag"></i>
-          </span>
-          <span
-            id="favoriteQuoteButton"
-            class="textButton hidden"
-            aria-label="Favorite quote"
-            data-balloon-pos="up"
-          >
-            <i class="icon far fa-fw fa-heart"></i>
-          </span>
-          <span
-            id="rateQuoteButton"
-            class="textButton hidden"
-            aria-label="Rate quote"
-            data-balloon-pos="up"
-          >
-            <i class="icon far fa-fw fa-star"></i>
-            <span class="rating"></span>
-          </span>
-        </div>
+      <div class="group info hidden">
+        <div class="top">other</div>
         <div class="bottom">-</div>
       </div>
     </div>
+
     <div class="chart">
+      <!-- CP-119 as amended by master C15 (tags deleted): four buttons. -->
       <div class="chartLegend">
         <button class="text active" tabindex="-1" data-id="scale">
-          <i class="fas fa-chart-line"></i>
+          <span data-icon="ph:chart-line-bold"></span>
           <div class="text">scale</div>
         </button>
-        <button class="text" tabindex="-1" data-id="pbLine">
-          <i class="fas fa-crown"></i>
+        <button class="text" tabindex="-1" data-id="pb">
+          <span data-icon="ph:crown-bold"></span>
           <div class="text">pb</div>
         </button>
-        <button class="text" tabindex="-1" data-id="tagPbLine">
-          <i class="fas fa-tag"></i>
-          <div class="text">tag pb</div>
-        </button>
-        <button class="text" tabindex="-1" data-id="raw">
+        <button class="text" tabindex="-1" data-id="tpm">
           <div class="line dashed"></div>
-          <div class="text">raw</div>
+          <div class="text">tpm</div>
         </button>
-        <button class="text" tabindex="-1" data-id="burst">
-          <div class="line"></div>
-          <div class="text">burst</div>
-        </button>
-        <button class="text" tabindex="-1" data-id="errors">
-          <!-- <div class="line"></div> -->
-          <i class="fas fa-times"></i>
-          <div class="text">errors</div>
+        <button class="text" tabindex="-1" data-id="wrong">
+          <span data-icon="ph:x-bold"></span>
+          <div class="text">wrong</div>
         </button>
       </div>
-      <!-- <div class="title">wpm over time</div> -->
-      <canvas id="wpmChart"></canvas>
+      <!-- CP-112 / master C27 — the canvas is kept, its id is not. -->
+      <canvas id="resultChart"></canvas>
     </div>
+
     <div class="bottom">
-      <div id="resultWordsHistory" class="hidden">
+      <!-- CP-126 — every committed task as `<prompt> = <your answer>`. -->
+      <div id="resultTaskHistory" class="hidden">
         <div class="title">
-          <span>input history</span>
+          <span>task history</span>
           <button
-            id="copyWordsListButton"
+            id="copyTaskListButton"
             class="textButton"
-            aria-label="Copy words list"
+            aria-label="Copy list"
             data-balloon-pos="up"
             style="display: inline-block"
             tabindex="-1"
           >
-            <i class="fas fa-fw fa-align-left"></i>
+            <span data-icon="ph:text-align-left-bold"></span>
           </button>
           <button
-            id="copyMissedWordsListButton"
+            id="copyMissedTaskListButton"
             class="textButton"
-            aria-label="Copy missed words list"
+            aria-label="Copy missed list"
             data-balloon-pos="up"
             tabindex="-1"
           >
-            <i class="fas fa-fw fa-times"></i>
+            <span data-icon="ph:x-bold"></span>
           </button>
-          <button
-            id="toggleBurstHeatmap"
-            class="textButton"
-            aria-label="Toggle burst heatmap"
-            data-balloon-pos="up"
-            style="display: inline-block"
-            tabindex="-1"
-          >
-            <i class="fas fa-fw fa-fire-alt"></i>
-          </button>
-          <div class="heatmapLegend hidden">
-            <div class="boxes">
-              <div class="box box0"></div>
-              <div class="box box1"></div>
-              <div class="box box2"></div>
-              <div class="box box3"></div>
-              <div class="box box4"></div>
-            </div>
-          </div>
         </div>
-        <div class="words"></div>
+        <div class="tasks"></div>
       </div>
-      <div id="resultReplay" class="hidden">
-        <div class="title">
-          watch replay
-          <button
-            id="playpauseReplayButton"
-            class="textButton"
-            aria-label="Start replay"
-            data-balloon-pos="up"
-            style="display: inline-block"
-            tabindex="-1"
-          >
-            <i class="fas fa-play"></i>
-          </button>
-          <p id="replayStats">0s</p>
-        </div>
-        <div id="replayWordsWrapper">
-          <div id="replayWords" class="words"></div>
-        </div>
-      </div>
+
+      <!-- CP-128 -->
       <button id="retrySavingResultButton" class="danger hidden">
-        <i class="fas fa-redo"></i>
+        <span data-icon="ph:arrow-counter-clockwise-bold"></span>
         Retry saving result
       </button>
+
+      <!-- CP-122 / CP-123 as amended by master C19: four buttons, no
+           `practise mistakes`. -->
       <div class="buttons">
         <button
           class="text"
@@ -238,43 +174,25 @@
           role="button"
           data-balloon-pos="down"
         >
-          <i class="fas fa-fw fa-chevron-right"></i>
+          <span data-icon="ph:caret-right-bold" data-icon-fw></span>
         </button>
         <button
           class="text"
-          id="restartTestButtonWithSameWordset"
+          id="repeatTestButton"
           aria-label="Repeat test"
           role="button"
           data-balloon-pos="down"
         >
-          <i class="fas fa-fw fa-sync-alt"></i>
+          <span data-icon="ph:arrows-clockwise-bold" data-icon-fw></span>
         </button>
         <button
           class="text"
-          id="practiseWordsButton"
-          aria-label="Practice words"
+          id="toggleTaskHistoryButton"
+          aria-label="Toggle task history"
           role="button"
           data-balloon-pos="down"
         >
-          <i class="fas fa-fw fa-exclamation-triangle"></i>
-        </button>
-        <button
-          class="text"
-          id="showWordHistoryButton"
-          aria-label="Toggle words history"
-          role="button"
-          data-balloon-pos="down"
-        >
-          <i class="fas fa-fw fa-align-left"></i>
-        </button>
-        <button
-          class="text"
-          id="watchReplayButton"
-          aria-label="Watch replay"
-          role="button"
-          data-balloon-pos="down"
-        >
-          <i class="fas fa-fw fa-backward"></i>
+          <span data-icon="ph:list-bullets-bold" data-icon-fw></span>
         </button>
         <button
           class="text"
@@ -284,36 +202,22 @@
           data-balloon-pos="down"
           data-balloon-break
         >
-          <i class="far fa-fw fa-image"></i>
+          <span class="idle" data-icon="ph:image-bold" data-icon-fw></span>
+          <span
+            class="shift hidden"
+            data-icon="ph:download-simple-bold"
+            data-icon-fw
+          ></span>
         </button>
-        <!-- <button
-          class="text"
-          id="watchVideoAdButton"
-          aria-label="Watch video ad"
-          role="button"
-          data-balloon-pos="down"
-        >
-          <i class="fas fa-fw fa-ad"></i>
-        </button> -->
       </div>
     </div>
+
+    <!-- CP-127 -->
     <div class="loginTip">
       <a href="/login" router-link>Sign in</a>
       to save your result
     </div>
-    <div class="ssWatermark hidden">monkeytype.com</div>
-  </div>
-  <div class="full-width" style="margin-top: 1rem">
-    <div id="ad-result-wrapper" class="ad full-width advertisement ad-h">
-      <div class="iconAndText">
-        <div class="icon"><i class="fas fa-ad"></i></div>
-        <div class="text textRight"></div>
-      </div>
-      <div id="ad-result"></div>
-    </div>
-    <div id="ad-result-small-wrapper" class="ad advertisement ad-h-s">
-      <div class="icon small"><i class="fas fa-ad"></i></div>
-      <div id="ad-result-small"></div>
-    </div>
+    <!-- CP-129 — filled in from the shared domain constant by result.ts. -->
+    <div class="ssWatermark hidden"></div>
   </div>
 </div>
