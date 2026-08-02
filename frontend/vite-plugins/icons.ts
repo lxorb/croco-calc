@@ -509,7 +509,8 @@ export function icons(options: IconsPluginOptions = {}): Plugin {
     name: "croco-calc:icons",
     configResolved(config) {
       srcDir ??= path.resolve(config.root, "src");
-      strict = options.strict ?? config.command === "build";
+      const isProductionBuild = config.command === "build";
+      strict = options.strict ?? isProductionBuild;
     },
     async buildStart() {
       if (srcDir === undefined) return;
