@@ -1,13 +1,10 @@
 // Results-page styles (WP-07). CP-090 … CP-131.
-//
 // Split out of `test.scss` by WP-06 (§6 "First action") and adapted here:
 // the headline group is `score` rather than upstream's speed metric, `correct`
 // and `wrong` sit side by side beneath it (CP-093), and the source, key-count,
 // replay and burst-heatmap blocks are gone (CP-097, CP-117, CP-124, CP-126).
-//
-// NOTE for WP-04: `frontend/src/styles/index.scss` still has to add `"result"`
-// to its `@import` list — index.scss is WP-04-owned, so that one line is a
-// cross-package hand-off (see the comment WP-04 already left there).
+// `index.scss` (WP-04) carries the matching `"result"` entry in its `@import`
+// list; without it none of this ships.
 
 #result {
   &:focus-visible {
