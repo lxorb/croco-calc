@@ -1,8 +1,9 @@
 /**
  * Seeded PRNG (ME-166 … ME-172).
  *
- * monkeytype's word generator is explicitly unseeded (`const random = Math.random;`
- * in `frontend/src/ts/test/words-generator.ts`). croco calc cannot do that: the
+ * monkeytype's word generator is explicitly unseeded — it aliases the platform's
+ * built-in unseeded generator at module scope in
+ * `frontend/src/ts/test/words-generator.ts`. croco calc cannot do that: the
  * backend has to regenerate the exact task sequence from `(mathSeed, mathSettings)`
  * to revalidate a submitted result (ME-171, ME-174).
  *
@@ -10,7 +11,10 @@
  * the frontend and the backend produce byte-identical streams. Do not substitute
  * another PRNG — the constants are part of the wire contract.
  *
- * ME-166: `Math.random` MUST NOT appear anywhere in this package.
+ * ME-166 bans the platform's unseeded generator from this package as a **token**,
+ * not merely as a call: DoD-10 greps for it, so the identifier pair is not spelled
+ * out anywhere here, comments included. `.oxlintrc.json` enforces the call site;
+ * `__tests__/purity.spec.ts` enforces the token.
  */
 
 const MULBERRY32_INCREMENT = 0x6d2b79f5;
@@ -48,7 +52,7 @@ export type Prng = {
  *
  * `nextInt` reproduces the semantics of monkeytype's `randomIntFromRange`
  * (`packages/util/src/numbers.ts`) — inclusive on both ends — but sourced from
- * this seeded stream instead of `Math.random` (ME-168).
+ * this seeded stream instead of the platform's unseeded generator (ME-168).
  */
 export function createPrng(seed: number): Prng {
   let state = seed | 0;

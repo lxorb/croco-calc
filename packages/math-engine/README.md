@@ -19,7 +19,7 @@ the code cannot live under `frontend/src` (C26). The frontend's
 
 | Guarantee | Requirement |
 | --- | --- |
-| No `Math.random`, no DOM, no network, no `Date.now` | ME-002, ME-166 |
+| No unseeded platform RNG, no DOM, no network, no `Date.now` | ME-002, ME-166 |
 | All arithmetic is exact rationals; no floats, no epsilon, no `BigInt` | ME-020 … ME-025 |
 | The same `(seed, index, settings)` always produces the same task | ME-008, ME-170 |
 | Frontend and backend produce byte-identical streams (mulberry32) | ME-167 |

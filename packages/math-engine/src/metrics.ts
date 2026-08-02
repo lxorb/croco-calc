@@ -5,8 +5,8 @@
  *
  * `roundTo2` and `kogasa` are transcribed verbatim from
  * `packages/util/src/numbers.ts` rather than imported, so this package stays
- * dependency-free (ME-002) — `numbers.ts` pins `Math.random` at module scope and
- * ME-166 forbids that symbol anywhere near this package. The formulas are
+ * dependency-free (ME-002) — `numbers.ts` pins the platform's unseeded generator
+ * at module scope and ME-166 bans that symbol here. The formulas are
  * identical, which is what keeps the results page, the charts and the about-page
  * wording honest (C5).
  */
