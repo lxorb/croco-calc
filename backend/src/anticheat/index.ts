@@ -32,6 +32,7 @@ import {
   checkEngineVersion,
   checkPlausibility,
   revalidateResult,
+  roundTo2,
   MAX_PLAUSIBLE_TPM,
   TASK_LOG_TOOLONG,
   type MathSettings,
@@ -175,15 +176,32 @@ function checkAllPlausibility(
     }).violations;
   }
 
-  // ME-176's degraded path: the per-task timings are gone, so the interval
-  // checks cannot run. The tpm ceiling still can, from the committed count —
-  // and in practice always fires, because >1000 tasks inside the longest
-  // possible run (480 s) is already >120 tpm.
+  // ME-176's degraded path: the per-task timings are gone, so the *interval*
+  // checks (ME-180, ME-181) and the log-extent checks (ME-182b) cannot run.
+  //
+  // ME-182(a) and ME-182(c) do not look at the log at all — they compare
+  // `testDuration` to `settings.time * 60` and bound `timestamp` against the
+  // server clock. Running the shared checker over an **empty** log is what keeps
+  // them alive here: with no entries the tpm, interval, median and extent checks
+  // are all vacuous by construction, so exactly the two log-independent checks
+  // survive. Reimplementing them locally instead would leave `"toolong"` as a
+  // free bypass of the duration and timestamp windows — the whole degraded path
+  // is attacker-selectable, since the client decides when to send it.
+  const violations = checkPlausibility({
+    taskLog: [],
+    testDuration: input.testDuration,
+    timestamp: input.timestamp,
+    serverNow: input.serverNow,
+    settings: input.mathSettings,
+  }).violations;
+
+  // ME-179 still applies, measured against the committed count rather than the
+  // absent entries — and in practice always fires, because >1000 tasks inside
+  // the longest possible run (480 s) is already >120 tpm.
   const minutes = input.testDuration / 60;
-  const tpm = minutes > 0 ? input.answered / minutes : 0;
-  const violations: PlausibilityViolation[] = [];
+  const tpm = minutes > 0 ? roundTo2(input.answered / minutes) : 0;
   if (tpm > MAX_PLAUSIBLE_TPM) {
-    violations.push({
+    violations.unshift({
       code: "tpm-too-high",
       message: `tasksPerMinute ${tpm} exceeds the ceiling of ${MAX_PLAUSIBLE_TPM} (ME-179)`,
       value: tpm,

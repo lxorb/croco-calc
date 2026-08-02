@@ -24,6 +24,7 @@ import {
   MILLISECONDS_IN_DAY,
 } from "@croco-calc/util/date-and-time";
 import CrocoError from "../utils/error";
+import { rowNumberStage } from "../dal/leaderboards";
 
 export const WEEKLY_XP_LEADERBOARD_COLLECTION = "weeklyXpLeaderboards";
 
@@ -195,12 +196,10 @@ export class WeeklyXpLeaderboard {
   private rankPipeline(): Document[] {
     return [
       { $match: this.periodMatch() },
-      {
-        $setWindowFields: {
-          sortBy: RANK_SORT,
-          output: { rank: { $documentNumber: {} } },
-        },
-      },
+      // Not `$documentNumber`: MongoDB rejects every rank-type window operator
+      // unless `sortBy` has exactly one element, and `RANK_SORT` has two.
+      // See `rowNumberStage`.
+      rowNumberStage(RANK_SORT),
       { $sort: { rank: 1 } },
     ];
   }

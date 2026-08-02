@@ -34,6 +34,65 @@ function getCollectionName(mode: string, mode2: string): string {
   return `leaderboards.${mode}.${mode2}`;
 }
 
+/**
+ * MongoDB's `QueryPlanKilled`. It is raised when the collection an aggregation
+ * is reading disappears mid-flight, which happens routinely here: `update()`
+ * rebuilds a board with `$out`, and `$out` swaps the collection underneath any
+ * read in progress. It is expected, not an error.
+ *
+ * Typed rather than reached for on an `any`, so the file needs no lint escape
+ * hatch to touch a driver error.
+ */
+const QUERY_PLAN_KILLED = 175;
+
+function isQueryPlanKilled(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    (e as { error?: unknown }).error === QUERY_PLAN_KILLED
+  );
+}
+
+/**
+ * A 1-based row number over `sortOrder`, as one `$setWindowFields` stage.
+ *
+ * The obvious spelling is `$documentNumber`, and it is the one INF-064's
+ * technique note reaches for — but MongoDB rejects every rank-type window
+ * operator (`$documentNumber`, `$rank`, `$denseRank`) unless `sortBy` has
+ * **exactly one element**:
+ *
+ *   `$documentNumber must be specified with a top level sortBy expression with
+ *    exactly one element`
+ *
+ * All three croco calc boards break ties, so all three sort on two or three
+ * keys, so all three would throw that error on every single read. `$sum: 1` over
+ * a `["unbounded", "current"]` **document** window is the same number — a
+ * running count of the rows up to and including this one — and carries no such
+ * restriction. Verified against `mongo:5.0.13`, the version the integration
+ * harness runs: identical ranks, multi-key sort accepted.
+ *
+ * Nothing here needs `$function`, `$accumulator`, `$merge` or server-side JS, so
+ * it still runs on Atlas M0 (the constraint that removed monkeytype's
+ * `row_number` closure in the first place).
+ *
+ * The caller MUST have already `$sort`ed by `sortOrder`, or must `$sort` on
+ * `rank` afterwards: `$setWindowFields` computes the number in sort order but
+ * does not reorder its output.
+ */
+export function rowNumberStage(
+  sortOrder: Document,
+  as: string = "rank",
+): Document {
+  return {
+    $setWindowFields: {
+      sortBy: sortOrder,
+      output: {
+        [as]: { $sum: 1, window: { documents: ["unbounded", "current"] } },
+      },
+    },
+  };
+}
+
 export const getCollection = (
   mode: string,
   mode2: string,
@@ -91,11 +150,8 @@ export async function get(
     }
     return leaderboard;
   } catch (e) {
-    // oxlint-disable-next-line no-unsafe-member-access
-    if (e.error === 175) {
-      //QueryPlanKilled, collection was removed during the query
-      return false;
-    }
+    //QueryPlanKilled, collection was removed during the query
+    if (isQueryPlanKilled(e)) return false;
     throw e;
   }
 }
@@ -159,11 +215,8 @@ export async function getRank(
       return results[0] ?? null;
     }
   } catch (e) {
-    // oxlint-disable-next-line no-unsafe-member-access
-    if (e.error === 175) {
-      //QueryPlanKilled, collection was removed during the query
-      return false;
-    }
+    //QueryPlanKilled, collection was removed during the query
+    if (isQueryPlanKilled(e)) return false;
     throw e;
   }
 }
@@ -175,9 +228,9 @@ export async function getRank(
  *
  *  * the rank was assigned by a `$function` stage holding a mutable `row_number`
  *    in server-side JavaScript. Server-side JS is **disabled** on M0 and on
- *    Atlas Flex, so it is replaced with `$setWindowFields` + `$documentNumber`,
- *    which is the technique INF-064 mandates and which the friends-only paths
- *    above already use.
+ *    Atlas Flex, so it is replaced with the `$setWindowFields` row number INF-064
+ *    mandates — see `rowNumberStage` for why it is spelled `$sum` and not
+ *    `$documentNumber`.
  *  * the score histogram was written with `$merge`. It is now read back and
  *    written with an ordinary upsert, so the whole pipeline needs nothing beyond
  *    `$out` — see the note on `updateScoreHistogram` below.
@@ -198,11 +251,12 @@ export async function update(
   const minTimeSpent = (await getCachedConfiguration(true)).leaderboards
     .minTimeSpent;
 
-  const sortOrder = {
-    [`${key}.score`]: -1,
-    [`${key}.acc`]: -1,
-    [`${key}.timestamp`]: -1,
-  } as const;
+  /** AC-119 tie-break: score, then accuracy, then most recent. */
+  const entrySortOrder: Document = {
+    score: -1,
+    acc: -1,
+    timestamp: -1,
+  };
 
   const lb = db.collection<DBUser>("users").aggregate<LeaderboardEntry>(
     [
@@ -228,13 +282,8 @@ export async function update(
           },
         },
       },
-      { $sort: sortOrder },
-      {
-        $setWindowFields: {
-          sortBy: sortOrder,
-          output: { rank: { $documentNumber: {} } },
-        },
-      },
+      // Slimmed before the sort, not after: only these nine fields reach the
+      // sort and the window stage, instead of whole user documents.
       {
         $replaceWith: {
           score: `$${key}.score`,
@@ -245,9 +294,10 @@ export async function update(
           timestamp: `$${key}.timestamp`,
           uid: "$uid",
           name: "$name",
-          rank: "$rank",
         },
       },
+      { $sort: entrySortOrder },
+      rowNumberStage(entrySortOrder),
       { $out: lbCollectionName },
     ],
     { allowDiskUse: true },
@@ -398,9 +448,12 @@ async function createIndex(
     ) {
       Logger.warning(`Index ${key} not matching, dropping and recreating...`);
 
-      const existingIndex = (await getUsersCollection().listIndexes().toArray())
-        // oxlint-disable-next-line no-unsafe-member-access
-        .map((it) => it.name as string)
+      const existingIndex = (
+        (await getUsersCollection().listIndexes().toArray()) as {
+          name: string;
+        }[]
+      )
+        .map((it) => it.name)
         .find((it) => it.startsWith(key));
 
       if (existingIndex !== undefined && existingIndex !== null) {

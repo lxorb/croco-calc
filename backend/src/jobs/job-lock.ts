@@ -43,6 +43,24 @@ export const LOCK_TTL_SECONDS = 24 * 60 * 60;
 /** Refresh interval for jobs that can run longer than a minute (INF-152). */
 export const HEARTBEAT_INTERVAL_MS = 30 * 1000;
 
+/**
+ * MongoDB's duplicate-key code. Hitting it on `insertOne` is the **success**
+ * path of the contention case: another replica already owns this occurrence.
+ *
+ * Narrowed rather than read off an `any`, so acquisition needs no lint escape
+ * hatch — and so a driver error with no `code` at all can never be mistaken for
+ * contention and swallowed.
+ */
+const DUPLICATE_KEY_ERROR = 11000;
+
+function isDuplicateKeyError(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    (e as { code?: unknown }).code === DUPLICATE_KEY_ERROR
+  );
+}
+
 export type JobLockState = "running" | "done" | "failed";
 
 export type DBJobLock = {
@@ -121,8 +139,7 @@ export async function acquireLock(
     });
     return true;
   } catch (e) {
-    // oxlint-disable-next-line no-unsafe-member-access
-    if (e?.code !== 11000) throw e;
+    if (!isDuplicateKeyError(e)) throw e;
   }
 
   // INF-152 — someone holds it. Reclaim only if their heartbeat has gone stale.
@@ -238,12 +255,29 @@ export function weekPeriodKey(timestamp: number): string {
   return `${date.getFullYear()}-W${`${week}`.padStart(2, "0")}`;
 }
 
-/** The run time floored to the job's own interval, for recurring jobs. */
+/**
+ * The occurrence identifier for a plain recurring job: the run time snapped to
+ * the **nearest** multiple of the job's own interval.
+ *
+ * INF-151 words this as "the floor of the run time to the job's interval", and
+ * floor is wrong at exactly the moment it matters. `delete-old-logs` fires on
+ * `0 0 0 * * *` with `INTERVAL_MS = 24 h`, so its fire time *is* a grid
+ * boundary: a replica whose clock is one millisecond behind floors into
+ * yesterday's bucket, derives a different `periodKey`, and both replicas acquire
+ * — the lock fails open on the one schedule most likely to hit it.
+ * `update-leaderboards` fires 30 s before each 15-minute boundary, so floor
+ * gives it 30 s of skew tolerance and no more.
+ *
+ * Rounding keeps everything INF-151 actually asks for — deterministic, derived
+ * from the run time, one key per occurrence — and widens the tolerance to half
+ * an interval either side (±7.5 min and ±12 h respectively). It cannot merge two
+ * occurrences, because consecutive occurrences are a whole interval apart.
+ */
 export function intervalPeriodKey(
   timestamp: number,
   intervalMs: number,
 ): string {
-  return `${Math.floor(timestamp / intervalMs) * intervalMs}`;
+  return `${Math.round(timestamp / intervalMs) * intervalMs}`;
 }
 
 export const __testing = {

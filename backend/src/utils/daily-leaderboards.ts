@@ -34,6 +34,7 @@ import {
   getCurrentDayTimestamp,
   MILLISECONDS_IN_DAY,
 } from "@croco-calc/util/date-and-time";
+import { rowNumberStage } from "../dal/leaderboards";
 
 export const DAILY_LEADERBOARD_COLLECTION = "dailyLeaderboards";
 
@@ -266,12 +267,12 @@ export class DailyLeaderboard {
   private rankPipeline(maxResults: number): Document[] {
     return [
       { $match: this.periodMatch() },
-      {
-        $setWindowFields: {
-          sortBy: RANK_SORT,
-          output: { rank: { $documentNumber: {} } },
-        },
-      },
+      // Not `$documentNumber`: MongoDB rejects every rank-type window operator
+      // unless `sortBy` has exactly one element, and `RANK_SORT` has three.
+      // See `rowNumberStage`.
+      rowNumberStage(RANK_SORT),
+      // `$setWindowFields` computes in sort order but does not promise to emit
+      // in it, and `$limit` below is order-sensitive.
       { $sort: { rank: 1 } },
       { $limit: maxResults },
     ];
