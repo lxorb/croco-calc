@@ -96,7 +96,6 @@ describe("middlewares/auth", () => {
       expect(decodedToken?.email).toBe(mockDecodedToken.email);
       expect(decodedToken?.uid).toBe(mockDecodedToken.uid);
       expect(nextFunction).toHaveBeenCalledOnce();
-
     });
     it("should allow the request with authentation on public endpoint", async () => {
       //WHEN
@@ -119,7 +118,6 @@ describe("middlewares/auth", () => {
       expect(decodedToken?.email).toBe("");
       expect(decodedToken?.uid).toBe("");
       expect(nextFunction).toHaveBeenCalledTimes(1);
-
     });
     it("should allow request with Uid on dev", async () => {
       //WHEN
@@ -215,7 +213,6 @@ describe("middlewares/auth", () => {
       expect(decodedToken?.email).toBe("");
       expect(decodedToken?.uid).toBe("");
       expect(nextFunction).toHaveBeenCalledTimes(1);
-
     });
     it("should allow the request with authentation on dev public endpoint in production", async () => {
       //WHEN

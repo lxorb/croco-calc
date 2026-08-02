@@ -103,10 +103,7 @@ function replaceLegacyValues(
   if (Array.isArray(configObj.accountChart)) {
     const stored = configObj.accountChart as ("on" | "off")[];
     if (stored.length === 4) {
-      configObj.accountChart = [
-        ...stored,
-        "on",
-      ] as ConfigSchemas.AccountChart;
+      configObj.accountChart = [...stored, "on"] as ConfigSchemas.AccountChart;
     } else if (stored.length !== 5) {
       configObj.accountChart = ["on", "on", "on", "on", "on"];
     }
