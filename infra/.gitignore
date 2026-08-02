@@ -1,0 +1,14 @@
+# Terraform working state and secrets (INF-075, INF-088).
+# The root .gitignore does not cover infra/, so this file does.
+**/.terraform/
+**/.terraform.tfstate.lock.info
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
