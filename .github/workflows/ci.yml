@@ -4,11 +4,13 @@ env:
   PNPM_VERSION: "10.28.1"
   NODE_VERSION: "24.11.0"
   # CI compiles the frontend but never deploys it, so these are deliberately
-  # throwaway values. Google's public reCAPTCHA test site key is fine here and
-  # only here (INF-107 forbids it in production). BACKEND_URL just has to be a
-  # real URL that is not monkeytype's, so the INF-013 guard is satisfied without
-  # pointing CI at anything live.
-  RECAPTCHA_SITE_KEY: "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+  # throwaway values. They still have to satisfy the two build guards, because
+  # `vite build` runs in production mode here as everywhere else:
+  #   - INF-107 rejects Google's public reCAPTCHA test key (prefix 6LeIxAcTAAAA)
+  #     outright — it validates every response, so it is worse than no captcha.
+  #     The stub below is the right shape and is not that key.
+  #   - INF-013 rejects an unset BACKEND_URL, or one containing monkeytype.com.
+  RECAPTCHA_SITE_KEY: "6LcCiStubAAAAAcrocoCalcCiOnlyNotARealSiteKey"
   BACKEND_URL: "http://localhost:5005"
 
 permissions:
@@ -228,13 +230,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [pre-ci, prime-cache]
     if: needs.pre-ci.outputs.should-build-be == 'true' || needs.pre-ci.outputs.should-build-pkg == 'true'
-    # TEMPORARY (wave 1 / WP-01). §6.2 has WP-01 delete packages and modules that
-    # backend/ still imports (@monkeytype/funbox, @monkeytype/challenges). Removing
-    # those imports is WP-10/WP-11's work, so this job cannot pass until they land.
-    # It still runs and reports; it just must not block. Residual as of WP-01:
-    # 3 x TS2307 in src/api/controllers/result.ts and src/utils/pb.ts.
-    # REMOVE this line once `pnpm ts-check-be` is clean.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
         with:
@@ -285,14 +280,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [pre-ci, prime-cache]
     if: needs.pre-ci.outputs.should-build-fe == 'true' || needs.pre-ci.outputs.should-build-pkg == 'true'
-    # TEMPORARY (wave 1 / WP-01). §6.2 has WP-01 delete the INV-118e controllers,
-    # the INV-097 keymap/mascot set and the funbox/challenges packages while their
-    # importers under frontend/src survive. Repointing those importers is
-    # WP-05..WP-09's work, so this job cannot pass until they land. It still runs
-    # and reports; it just must not block. Residual as of WP-01: 84 tsc errors,
-    # all dangling imports of deleted modules plus their implicit-any cascade.
-    # REMOVE this line once `pnpm ts-check-fe` is clean.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
         with:
