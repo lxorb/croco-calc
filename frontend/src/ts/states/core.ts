@@ -48,10 +48,6 @@ export function showCommandLineForConfig(
   showModal("Commandline");
 }
 
-export const [getCustomTextIndicator, setCustomTextIndicator] = createSignal<
-  { name: string; isLong: boolean } | undefined
->(undefined);
-
 export const getFormatting = createMemo(() => {
   return new Formatting({
     alwaysShowDecimalPlaces: getConfig.alwaysShowDecimalPlaces,

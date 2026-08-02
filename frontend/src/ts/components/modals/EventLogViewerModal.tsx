@@ -10,14 +10,13 @@ import {
 } from "solid-js";
 
 import type {
+  AnswerSubmittedEventNoMs,
   EventLog,
-  InputEventNoMs,
   TestEventNoMs,
   TestEventType,
 } from "../../test/events/types";
 
 import { hideModal } from "../../states/modals";
-import { getInputFromDom } from "../../test/events/helpers";
 import { EVENT_LOG_VERSION } from "../../test/events/types";
 import { cn } from "../../utils/cn";
 import { AnimatedModal } from "../common/AnimatedModal";
@@ -25,13 +24,7 @@ import { Button } from "../common/Button";
 
 type Stage = "input" | "preview";
 
-const EVENT_TYPES: TestEventType[] = [
-  "input",
-  "keydown",
-  "keyup",
-  "timer",
-  "composition",
-];
+const EVENT_TYPES: TestEventType[] = ["taskShown", "answerSubmitted", "timer"];
 
 const TIMELINE_TRACK_HEIGHT = 8;
 const TIMELINE_TRACK_GAP = 2;
@@ -39,11 +32,9 @@ const TIMELINE_LANE_GAP = 6;
 const TIMELINE_PADDING_MS = 125;
 
 const TYPE_BG: Record<TestEventType, string> = {
-  keydown: "bg-text",
-  keyup: "bg-error",
-  input: "bg-main",
+  taskShown: "bg-text",
+  answerSubmitted: "bg-main",
   timer: "bg-sub",
-  composition: "bg-sub-alt",
 };
 
 type TimelineSegment = {
@@ -65,74 +56,80 @@ function buildLanes(
   const byType = new Map<TestEventType, RawSegment[]>();
   for (const t of EVENT_TYPES) byType.set(t, []);
 
-  const pairKeys = visible.has("keydown") && visible.has("keyup");
-  const pendingDown = new Map<string, number>();
+  // Upstream paired `keydown` with `keyup` on the key code to draw a hold bar.
+  // The math analogue is the solve interval: a task is shown, then its answer
+  // is committed, and the span between the two is the time it took (ME-159).
+  // Pairing is on `taskIndex`.
+  const pairTasks = visible.has("taskShown") && visible.has("answerSubmitted");
+  const pendingShown = new Map<number, number>();
 
   for (const e of events) {
-    if (e.type === "keydown") {
-      if (pairKeys) {
-        pendingDown.set(e.data.code, e.testMs);
-      } else if (visible.has("keydown")) {
-        byType.get("keydown")?.push({
+    if (e.type === "taskShown") {
+      if (pairTasks) {
+        pendingShown.set(e.data.taskIndex, e.testMs);
+      } else if (visible.has("taskShown")) {
+        byType.get("taskShown")?.push({
           start: e.testMs,
           end: e.testMs,
           kind: "dot",
-          type: "keydown",
-          label: e.data.code,
+          type: "taskShown",
+          label: e.data.prompt,
         });
       }
-    } else if (e.type === "keyup") {
-      if (pairKeys) {
-        const start = pendingDown.get(e.data.code);
+    } else if (e.type === "answerSubmitted") {
+      const bg = e.data.correct ? undefined : "bg-error";
+      if (pairTasks) {
+        const start = pendingShown.get(e.data.taskIndex);
         if (start !== undefined) {
-          byType.get("keydown")?.push({
+          byType.get("taskShown")?.push({
             start,
             end: e.testMs,
             kind: "bar",
-            type: "keydown",
-            label: e.data.code,
+            type: "taskShown",
+            label: `#${e.data.taskIndex}`,
+            ...(bg !== undefined && { bg }),
           });
-          pendingDown.delete(e.data.code);
+          pendingShown.delete(e.data.taskIndex);
         } else {
-          byType.get("keyup")?.push({
+          byType.get("answerSubmitted")?.push({
             start: e.testMs,
             end: e.testMs,
             kind: "dot",
-            type: "keyup",
-            label: e.data.code,
+            type: "answerSubmitted",
+            label: `#${e.data.taskIndex}`,
+            ...(bg !== undefined && { bg }),
           });
         }
-      } else if (visible.has("keyup")) {
-        byType.get("keyup")?.push({
+      } else if (visible.has("answerSubmitted")) {
+        byType.get("answerSubmitted")?.push({
           start: e.testMs,
           end: e.testMs,
           kind: "dot",
-          type: "keyup",
-          label: e.data.code,
+          type: "answerSubmitted",
+          label: `#${e.data.taskIndex}`,
+          ...(bg !== undefined && { bg }),
         });
       }
     } else if (visible.has(e.type)) {
-      const seg: RawSegment = {
+      byType.get(e.type)?.push({
         start: e.testMs,
         end: e.testMs,
         kind: "dot",
         type: e.type,
-      };
-      if (e.type === "input" && e.data.inputType.startsWith("delete")) {
-        seg.bg = "bg-error";
-      }
-      byType.get(e.type)?.push(seg);
+        label: e.data.event,
+      });
     }
   }
 
-  if (pairKeys) {
-    for (const [code, start] of pendingDown) {
-      byType.get("keydown")?.push({
+  if (pairTasks) {
+    // A task that was shown but never answered (the test ended on it).
+    for (const [taskIndex, start] of pendingShown) {
+      byType.get("taskShown")?.push({
         start,
         end: start,
         kind: "dot",
-        type: "keydown",
-        label: code,
+        type: "taskShown",
+        label: `#${taskIndex}`,
       });
     }
   }
@@ -150,7 +147,7 @@ function buildLanes(
     const sorted = [...segs].sort((a, b) => a.start - b.start);
     let tracksUsed = 1;
 
-    if (t === "keydown") {
+    if (t === "taskShown") {
       const trackEnds: number[] = [];
       for (const seg of sorted) {
         let track = trackEnds.findIndex((end) => end < seg.start);
@@ -206,9 +203,9 @@ function parseContext(raw: string): EventLog {
   if (
     typeof ctx !== "object" ||
     ctx === null ||
-    !Array.isArray((ctx as { targetWords?: unknown }).targetWords)
+    !Array.isArray((ctx as { targetPrompts?: unknown }).targetPrompts)
   ) {
-    throw new Error("EventLog.context.targetWords must be a string array");
+    throw new Error("EventLog.context.targetPrompts must be a string array");
   }
   return parsed as EventLog;
 }
@@ -217,17 +214,23 @@ function visualizeWhitespace(s: string): string {
   return s.replace(/ /g, "␣").replace(/\t/g, "→").replace(/\n/g, "↵");
 }
 
-function inputsPerWord(events: TestEventNoMs[], wordCount: number): string[] {
-  const buckets = new Map<number, InputEventNoMs[]>();
+/**
+ * The answer committed for each task, or `undefined` where none was.
+ *
+ * Upstream had to replay every `input` event through `getInputFromDom` to
+ * reconstruct what the user had produced. croco calc commits whole answers
+ * (CP-036, CP-037), so the committed buffer is simply `event.data.given`.
+ */
+function answersPerTask(
+  events: TestEventNoMs[],
+  taskCount: number,
+): (AnswerSubmittedEventNoMs | undefined)[] {
+  const byTask = new Map<number, AnswerSubmittedEventNoMs>();
   for (const e of events) {
-    if (e.type !== "input") continue;
-    const bucket = buckets.get(e.data.wordIndex) ?? [];
-    bucket.push(e);
-    buckets.set(e.data.wordIndex, bucket);
+    if (e.type !== "answerSubmitted") continue;
+    byTask.set(e.data.taskIndex, e);
   }
-  return Array.from({ length: wordCount }, (_, i) =>
-    getInputFromDom(buckets.get(i) ?? []),
-  );
+  return Array.from({ length: taskCount }, (_, i) => byTask.get(i));
 }
 
 export function EventLogViewerModal(): JSXElement {
@@ -265,7 +268,7 @@ export function EventLogViewerModal(): JSXElement {
         <div class="flex flex-col gap-4">
           <textarea
             class="bg-bg-secondary h-64 w-full rounded p-2 font-mono text-xs text-text"
-            placeholder='{"version": 1, "events": [...], "context": {...}}'
+            placeholder='{"version": 2, "events": [...], "context": {...}}'
             value={raw()}
             onInput={(e) => setRaw(e.currentTarget.value)}
             autocomplete="off"
@@ -455,27 +458,30 @@ function PreviewContent(props: {
     props.ctx.events.filter((e) => e.testMs <= currentMs()),
   );
 
-  const finalInputs = untrack(() =>
-    inputsPerWord(props.ctx.events, props.ctx.context.targetWords.length),
+  const finalAnswers = untrack(() =>
+    answersPerTask(props.ctx.events, props.ctx.context.targetPrompts.length),
   );
 
-  const liveInputs = createMemo(() =>
-    inputsPerWord(visibleEvents(), props.ctx.context.targetWords.length),
+  const liveAnswers = createMemo(() =>
+    answersPerTask(visibleEvents(), props.ctx.context.targetPrompts.length),
   );
 
   const simulatedInput = createMemo(() =>
     visualizeWhitespace(
-      liveInputs()
-        .filter((w) => w.length > 0)
-        .join(""),
+      liveAnswers()
+        .filter((a) => a !== undefined)
+        .map((a) => a.data.given)
+        .join(" "),
     ),
   );
 
-  const currentWordIndex = createMemo(() => {
+  const currentTaskIndex = createMemo(() => {
     const ev = visibleEvents();
     for (let i = ev.length - 1; i >= 0; i--) {
       const e = ev[i];
-      if (e?.type === "input") return e.data.wordIndex;
+      if (e?.type === "taskShown" || e?.type === "answerSubmitted") {
+        return e.data.taskIndex;
+      }
     }
     return -1;
   });
@@ -521,7 +527,7 @@ function PreviewContent(props: {
     return idx;
   });
 
-  let wordsScrollEl: HTMLDivElement | undefined;
+  let promptsScrollEl: HTMLDivElement | undefined;
   let eventsScrollEl: HTMLDivElement | undefined;
 
   const scrollRowIntoView = (
@@ -544,7 +550,7 @@ function PreviewContent(props: {
   };
 
   createEffect(() => {
-    scrollRowIntoView(wordsScrollEl, currentWordIndex());
+    scrollRowIntoView(promptsScrollEl, currentTaskIndex());
   });
 
   createEffect(() => {
@@ -835,6 +841,15 @@ function PreviewContent(props: {
           icon={{ icon: "ph:arrow-left-bold" }}
           text="Back"
         />
+        {/* The replay coordinates: seed + settings regenerate the exact
+            sequence this log was recorded against (ME-171, ME-174). */}
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-sub">
+          <span>
+            {props.ctx.context.mode} {props.ctx.context.mode2}
+          </span>
+          <span>seed {props.ctx.context.mathSeed}</span>
+          <span class="break-all">settings {props.ctx.context.settingsId}</span>
+        </div>
         <Show when={isSynced()}>
           <div class="flex items-center gap-2 rounded bg-main px-3 py-1 text-xs font-bold tracking-wider text-bg uppercase">
             <span>● Synced</span>
@@ -1030,33 +1045,41 @@ function PreviewContent(props: {
         <div class="bg-bg-secondary flex min-h-0 w-0 flex-1 flex-col gap-2 rounded-lg p-3">
           <div class="text-xs tracking-wider text-sub uppercase">Prompts</div>
           <div
-            ref={(el) => (wordsScrollEl = el)}
+            ref={(el) => (promptsScrollEl = el)}
             class="min-h-0 flex-1 overflow-auto rounded bg-bg"
           >
             <table class="w-full text-xs">
               <thead class="sticky top-0 bg-bg">
                 <tr class="text-sub">
                   <th class="w-10 p-2 text-right">#</th>
-                  <th class="p-2 text-left">target</th>
-                  <th class="p-2 text-left">input</th>
+                  <th class="p-2 text-left">prompt</th>
+                  <th class="p-2 text-left">answer</th>
                 </tr>
               </thead>
               <tbody>
-                <For each={props.ctx.context.targetWords}>
+                <For each={props.ctx.context.targetPrompts}>
                   {(prompt, i) => (
                     <tr
                       data-row={i()}
                       class={cn(
                         "border-t border-bg",
-                        i() === currentWordIndex() && "bg-main/20",
+                        i() === currentTaskIndex() && "bg-main/20",
                       )}
                     >
                       <td class="p-2 text-right font-mono text-sub">{i()}</td>
                       <td class="p-2 font-mono">
                         {visualizeWhitespace(prompt)}
                       </td>
-                      <td class="p-2 font-mono">
-                        {visualizeWhitespace(finalInputs[i()] ?? "")}
+                      <td
+                        class={cn(
+                          "p-2 font-mono",
+                          finalAnswers[i()]?.data.correct === false &&
+                            "text-error",
+                        )}
+                      >
+                        {visualizeWhitespace(
+                          finalAnswers[i()]?.data.given ?? "",
+                        )}
                       </td>
                     </tr>
                   )}
@@ -1194,10 +1217,10 @@ function PreviewContent(props: {
         </div>
       </div>
 
-      {/* INSPECTOR: simulated input */}
+      {/* INSPECTOR: replayed answers */}
       <div class="bg-bg-secondary flex shrink-0 flex-col gap-2 rounded-lg p-3">
         <div class="text-xs tracking-wider text-sub uppercase">
-          Simulated input
+          Answers submitted
         </div>
         <div class="max-h-24 min-h-10 overflow-auto rounded bg-bg p-2 font-mono text-sm break-all whitespace-pre-wrap">
           {simulatedInput()}

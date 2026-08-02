@@ -1,22 +1,16 @@
 import { Config } from "./config/store";
 import * as Caret from "./test/caret";
-import * as CustomText from "./test/custom-text";
 import { configEvent } from "./events/config";
 import { debounce, throttle } from "throttle-debounce";
 import * as TestUI from "./test/test-ui";
-import {
-  getActivePage,
-  getCustomTextIndicator,
-  getGlobalOffsetTop,
-} from "./states/core";
+import { getActivePage, getGlobalOffsetTop } from "./states/core";
 import { isDevEnvironment } from "./utils/env";
 import { canQuickRestart } from "./utils/quick-restart";
-import { FontName } from "@croco-calc/schemas/fonts";
+import { FontName } from "@croco-calc/schemas/configs";
 import { qs, qsr } from "./utils/dom";
 import { createEffect } from "solid-js";
 import fileStorage from "./utils/file-storage";
 import { convertRemToPixels } from "./utils/numbers";
-import { getLanguage } from "./utils/json-data";
 import { replaceUnderscoresWithSpaces } from "./utils/strings";
 import { getResultVisible, isTestActive } from "./states/test";
 
@@ -26,7 +20,9 @@ export function previewFontFamily(font: FontName): void {
     "--font",
     `"${font.replaceAll(/_/g, " ")}", "Roboto Mono", "Vazirharf", "monospace"`,
   );
-  void TestUI.updateHintsPositionDebounced();
+  // A different family means different glyph widths, so the task stream has to
+  // re-measure before the preview is judged.
+  TestUI.applyStreamStyles();
   isPreviewingFont = true;
 }
 
@@ -41,7 +37,7 @@ export async function applyFontFamily(): Promise<void> {
     font = "LOCALCUSTOM";
 
     qs(".customFont")?.setHtml(`
-      @font-face{ 
+      @font-face{
         font-family: LOCALCUSTOM;
         src: url(${localFont});
         font-weight: 400;
@@ -50,17 +46,11 @@ export async function applyFontFamily(): Promise<void> {
       }`);
   }
 
-  const preferredFont = (await getLanguage(Config.language))?.preferredFont;
-
-  const fonts = [
-    `"${font}"`,
-    preferredFont !== undefined
-      ? `"${replaceUnderscoresWithSpaces(preferredFont)}"`
-      : undefined,
-    '"Roboto Mono"',
-    '"Vazirharf"',
-    "monospace",
-  ].filter((it) => it !== undefined);
+  // Upstream inserted a per-language preferred font here. CP-066 removes the
+  // language machinery outright — croco calc renders digits and five operator
+  // glyphs, which every font in the picker already covers — so the stack is
+  // just the chosen family and the fallbacks.
+  const fonts = [`"${font}"`, '"Roboto Mono"', '"Vazirharf"', "monospace"];
 
   document.documentElement.style.setProperty("--font", fonts.join(","));
 }
@@ -94,15 +84,7 @@ if (isDevEnvironment()) {
 
 window.addEventListener("beforeunload", (event) => {
   // Cancel the event as stated by the standard.
-  if (
-    canQuickRestart(
-      Config.mode,
-      Config.words,
-      Config.time,
-      CustomText.getData(),
-      getCustomTextIndicator()?.isLong ?? false,
-    )
-  ) {
+  if (canQuickRestart()) {
     //ignore
   } else {
     if (isTestActive()) {
@@ -114,17 +96,15 @@ window.addEventListener("beforeunload", (event) => {
   }
 });
 
+// `test-ui.ts` re-measures the task stream on resize; what is left here is the
+// shell's half of the job — park the caret while the window is in motion, then
+// put the keyboard and the caret back once it settles. The tape-mode, line
+// centring and hint-position branches went with the features they served
+// (CP-060 … CP-066).
 const debouncedEvent = debounce(250, () => {
   if (getActivePage() === "test" && !getResultVisible()) {
-    if (Config.tapeMode !== "off") {
-      void TestUI.scrollTape();
-    } else {
-      void TestUI.centerActiveLine();
-      void TestUI.updateHintsPositionDebounced();
-    }
     setTimeout(() => {
-      TestUI.updateWordsInputPosition();
-      TestUI.focusWords();
+      TestUI.focusTasks();
       Caret.show();
     }, 250);
   }
@@ -146,7 +126,7 @@ createEffect(() => {
 });
 
 configEvent.subscribe(async ({ key }) => {
-  if (key === "fontFamily" || key === "language") {
+  if (key === "fontFamily") {
     await applyFontFamily();
   }
 });

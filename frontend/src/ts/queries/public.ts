@@ -66,8 +66,9 @@ export const getVersionHistoryQueryOptions = () =>
 
 /**
  * CP-137 — the distribution of personal-best scores of `time 8` leaderboard
- * results, bucketed in steps of ten score points. `language` is gone from the
- * query because the brief removes language from the leaderboard entirely.
+ * results, bucketed in steps of ten score points. The query is the duration
+ * alone: `mode` is always `time` and `language` is gone from the leaderboard
+ * entirely, so there is nothing else left to key on.
  */
 async function fetchScoreHistogram(): Promise<
   | {
@@ -78,8 +79,7 @@ async function fetchScoreHistogram(): Promise<
 > {
   const response = await Ape.public.getScoreHistogram({
     query: {
-      mode: "time",
-      mode2: "8",
+      time: 8,
     },
   });
 
@@ -134,14 +134,14 @@ async function fetchTrainingStats(): Promise<{
   testsStarted: GroupDisplay;
   testsCompleted: GroupDisplay;
 }> {
-  const response = await Ape.public.getSiteStats();
+  const response = await Ape.public.getTrainingStats();
 
   if (response.status !== 200) {
     throw new Error(response.body.message);
   }
   const data = response.body.data;
 
-  const trainingSecondsRounded = Math.round(data.timeSpent);
+  const trainingSecondsRounded = Math.round(data.timeTraining);
   const trainingDuration = intervalToDuration({
     start: 0,
     end: trainingSecondsRounded * 1000,

@@ -30,6 +30,16 @@ export class Formatting {
   /**
    * CP-142 — `score`: correct tasks minus wrong tasks. Can be negative, and is
    * always a whole number, so it ignores `alwaysShowDecimalPlaces`.
+   *
+   * ME-161 / C33 — a negative score displays with U+2212 MINUS SIGN, not the
+   * U+002D hyphen `Number.prototype.toString` produces. The substitution lives
+   * here rather than in {@link number} because `number` also feeds `acc`,
+   * `tpm`, `consistency` and `percentage`: none of those is ever displayed
+   * negative, and a U+2212 leaking into one of them could reach something that
+   * later parses the string. `score` is the only signed display value.
+   *
+   * Callers that need the machine-readable form (a `data-` attribute, a CSV
+   * cell, a sort key) must use the raw number, not this string.
    */
   score(
     score: number | null | undefined,
@@ -38,7 +48,13 @@ export class Formatting {
     const options = { ...FORMAT_DEFAULT_OPTIONS, ...formatOptions };
     if (score === undefined || score === null) return options.fallback ?? "";
 
-    return this.number(score, { ...options, showDecimalPlaces: false });
+    const formatted = this.number(score, {
+      ...options,
+      showDecimalPlaces: false,
+    });
+    // `number` always emits the sign first, so only a leading hyphen is the
+    // minus sign — a hyphen anywhere else belongs to a caller-supplied suffix.
+    return formatted.startsWith("-") ? `−${formatted.slice(1)}` : formatted;
   }
 
   /**

@@ -13,8 +13,19 @@
 /** Tooltip shown on every control whose target is still `null`. */
 export const COMING_SOON_TOOLTIP = "coming soon";
 
+/**
+ * CP-129 — the bare hostname, and the single build-time constant every other
+ * name here is built from, so none of them can drift apart.
+ *
+ * The screenshot watermark reads this. `src/html/head.html` carries the same
+ * host in its `og:url`, `preconnect` and social-image tags; TypeScript cannot
+ * read HTML, so that file is the one place the literal is written twice and
+ * DoD's `head.html` assertion is what keeps the two in step.
+ */
+export const SITE_DOMAIN = "crococalc.com";
+
 /** CP-156 — the address the contact modal and the about page write to. */
-export const CONTACT_EMAIL = "contact@crococalc.com";
+export const CONTACT_EMAIL = `contact@${SITE_DOMAIN}`;
 
 /**
  * The second address decision D2 provisions. Deliberately **not** used by the
@@ -23,7 +34,7 @@ export const CONTACT_EMAIL = "contact@crococalc.com";
  * alias or a filter on the `[Bug] ` / `[Account] ` subject prefixes) rather
  * than in the markup.
  */
-export const SUPPORT_EMAIL = "support@crococalc.com";
+export const SUPPORT_EMAIL = `support@${SITE_DOMAIN}`;
 
 /** The public repository, linked from the footer, the about page and credits. */
 export const GITHUB_REPO_URL = "https://github.com/lxorb/croco-calc";

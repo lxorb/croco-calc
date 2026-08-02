@@ -63,6 +63,56 @@ describe("format.ts", () => {
     });
   });
 
+  /**
+   * ME-161 / master C33 — `score` is the one displayed value that can go
+   * negative, and a negative one renders with U+2212 MINUS SIGN rather than the
+   * U+002D HYPHEN-MINUS `Number.prototype.toString` produces.
+   */
+  describe("score", () => {
+    it("should render a negative score with U+2212, not U+002D", () => {
+      const format = getInstance();
+
+      expect(format.score(-1)).toEqual("−1");
+      expect(format.score(-42)).toEqual("−42");
+
+      expect(format.score(-42)).not.toContain("-");
+      expect(format.score(-42).codePointAt(0)).toEqual(0x2212);
+    });
+
+    it("should leave a non-negative score untouched", () => {
+      const format = getInstance();
+
+      expect(format.score(0)).toEqual("0");
+      expect(format.score(42)).toEqual("42");
+      expect(format.score(42)).not.toContain("−");
+    });
+
+    it("should ignore alwaysShowDecimalPlaces — the score is a whole number", () => {
+      const withDecimals = getInstance({ alwaysShowDecimalPlaces: true });
+
+      expect(withDecimals.score(42)).toEqual("42");
+      expect(withDecimals.score(-42)).toEqual("−42");
+    });
+
+    it("should keep the fallback dash ASCII — it is not a minus sign", () => {
+      const format = getInstance();
+
+      expect(format.score(null)).toEqual("-");
+      expect(format.score(undefined)).toEqual("-");
+      expect(format.score(null, { fallback: "none" })).toEqual("none");
+      expect(format.score(undefined, { fallback: "" })).toEqual("");
+    });
+
+    it("should only convert the sign, never a hyphen inside a suffix", () => {
+      const format = getInstance();
+
+      expect(format.score(-5, { suffix: " pts-total" })).toEqual(
+        "−5 pts-total",
+      );
+      expect(format.score(5, { suffix: " pts-total" })).toEqual("5 pts-total");
+    });
+  });
+
   describe("percentage", () => {
     it("should format with decimalPlaces from configuration", () => {
       //no decimals

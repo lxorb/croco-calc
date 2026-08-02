@@ -7,7 +7,6 @@ import Ape from "../../ape";
 import { signIn } from "../../auth";
 import { refetchInboxCollection } from "../../collections/inbox";
 import { addXp } from "../../db";
-import { toggleCaretDebug } from "../../elements/caret";
 import { getInputElement } from "../../input/input-element";
 import { hideLoaderBar, showLoaderBar } from "../../states/loader-bar";
 import { hideModal, showModal } from "../../states/modals";
@@ -18,7 +17,7 @@ import {
 } from "../../states/notifications";
 import { showSimpleModal } from "../../states/simple-modal";
 import { toggleUserFakeChartData } from "../../test/result";
-import { disableSlowTimerFail } from "../../test/test-timer";
+import { enableTimerDebug, getTimerStats } from "../../test/test-timer";
 import { setMediaQueryDebugLevel } from "../../ui";
 import { remoteValidation } from "../../utils/remote-validation";
 import { AnimatedModal } from "../common/AnimatedModal";
@@ -153,15 +152,20 @@ export function DevOptionsModal(): JSXElement {
       label: () => "Toggle Fake Chart Data",
       onClick: toggleUserFakeChartData,
     },
-    {
-      icon: "ph:cursor-text-bold",
-      label: () => "Toggle Caret Debug",
-      onClick: toggleCaretDebug,
-    },
+    // Upstream's "Disable Slow Timer Fail" is gone with the behaviour it
+    // disabled: the countdown schedules every tick against the absolute start
+    // time (CP-073), so it cannot accumulate lateness and never fails a test.
+    // What replaces it is the drift diagnostic that timer keeps instead.
     {
       icon: "ph:clock-bold",
-      label: () => "Disable Slow Timer Fail",
-      onClick: disableSlowTimerFail,
+      label: () => "Toggle Timer Debug",
+      onClick: () => {
+        enableTimerDebug();
+        const { ticks, worstDriftMs } = getTimerStats();
+        showNoticeNotification(
+          `Timer debug toggled. ${ticks} ticks, worst drift ${worstDriftMs.toFixed(2)} ms.`,
+        );
+      },
     },
     {
       icon: "ph:test-tube-bold",
