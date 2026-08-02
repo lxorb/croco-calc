@@ -430,8 +430,8 @@ export const CONFIGURATION_FORM_SCHEMA: ObjectSchema<Configuration> = {
       fields: {
         minTimeSpent: {
           type: "number",
-          label: "Minimum typing time the user needs to get on a leaderboard",
-          hint: "Typing time in seconds. Change is only applied after restarting the server.",
+          label: "Minimum time spent the user needs to get on a leaderboard",
+          hint: "Time spent in seconds. Change is only applied after restarting the server.",
           min: 0,
         },
         weeklyXp: {

@@ -118,9 +118,6 @@ function handleErrorResponse(
     res.statusMessage = message;
   }
 
-  //@ts-expect-error ignored so that we can see message in swagger stats
-  res.monkeyMessage = message;
-
   res.json({ message, data: data ?? null });
 }
 

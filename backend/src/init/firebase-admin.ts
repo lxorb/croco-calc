@@ -32,7 +32,9 @@ function readServiceAccount(): admin.ServiceAccount | undefined {
     }
   }
 
-  if (existsSync(SERVICE_ACCOUNT_PATH)) {
+  // INF-098: the on-disk key is a local-development fallback only. It is never
+  // consulted outside dev, so a stray key baked into an image cannot be used.
+  if (isDevEnvironment() && existsSync(SERVICE_ACCOUNT_PATH)) {
     return JSON.parse(
       readFileSync(SERVICE_ACCOUNT_PATH, "utf-8"),
     ) as admin.ServiceAccount;
