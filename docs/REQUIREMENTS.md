@@ -365,6 +365,29 @@ INF-053 removes the email client entirely — Firebase Auth sends verification a
 (the in-app **inbox** message builder, not SMTP) is **KEPT** and renamed `croco-mail.ts` (INV-139).
 **Reason.** The only user-facing mail is verification and password reset, both of which Firebase Auth sends.
 
+**DISCHARGED 2026-08-02 — audited, and the mail architecture is now fixed by user decision.**
+The deletion this ruling ordered is **already complete**; re-verified at audit time (INF-053a):
+`backend/src/init/email-client.ts` does not exist, `nodemailer` has zero references in `backend/src` and is
+absent from `backend/package.json`, and `backend/email-templates/`, `backend/src/queues/` and
+`backend/src/workers/` are all gone. `backend/src/utils/croco-mail.ts` survives correctly as the in-app
+inbox builder — it sends nothing and imports no transport. **No backend-sent email survives in croco calc,
+and nothing remains for WP-11 to delete.**
+
+The complete mail architecture, both directions:
+
+| Direction | Owner | Cost | DNS on `crococalc.com` |
+|---|---|---|---|
+| **Sending** (verification, password reset) | **Firebase Auth**, from its own Firebase domain | $0 | none required |
+| **Receiving** (`contact@`, `support@` → `me@emilvinu.de`) | **Cloudflare Email Routing** | $0 | MX + SPF, created by Cloudflare when the user enables routing |
+
+Moving either half to Azure Communication Services was evaluated on 2026-08-02 and **rejected**. For
+receiving the rejection is on capability rather than price: **ACS Email has no inbound feature at all** — its
+Event Grid integration carries only delivery/engagement reports for outbound mail, so there is no inbound
+event to route and no mailbox a human can read. The Azure-family answer would be an Exchange Online mailbox
+at ~$4/user/month, which buys nothing over Cloudflare's $0 forward. Cloudflare Email Routing is therefore
+retained deliberately. Enabling it is a **user action** (the API token lacks Email Routing scope, and
+Cloudflare requires a human to click the destination-verification link) — tracked as BL-7 in doc 06.
+
 ### C25 — Prometheus and the stats dashboard
 
 **Conflict.** INV-144 deletes `prom-client`, `swagger-stats` and `backend/src/utils/prometheus.ts`. INF-147 says
@@ -674,6 +697,22 @@ rule that cannot be satisfied is not a rule; a grep that does not implement the 
 | WP-03 / WP-08 / WP-11 exit criteria | scoped | review gap 15 → repo-wide greps demoted to DoD-07/08/-49 |
 | §6 file ownership (4 collisions) | corrected | review gap 10 → carve-outs in WP-04/08/09/12 |
 | §6 coverage (unowned paths and IDs) | completed | review gaps 11 + 12 → new §6.2 and §6.3 |
+| **Rows below added in revision 3 — user decisions of 2026-08-02** | | |
+| INF-056 (DB option table) | **re-evaluated with citations** | user decision → Azure DocumentDB (Cosmos MongoDB **vCore**) chosen; Cosmos **RU** rejected on evidence (no `$setWindowFields`, no `$bucket`, no `$lookup` sub-pipeline); self-hosted Mongo rejected on Azure Files/WiredTiger grounds |
+| INF-057 (Atlas M0) | **superseded** | user decision → `azurerm_mongo_cluster`, tier M10, `westeurope` |
+| INF-058 / INF-058a (M0-vs-Flex probe fork) | **superseded** | user decision → probe now *verifies* the live cluster; four required clauses; no pre-approved fallback tier |
+| INF-062 (Flex upgrade path) | **replaced** | user decision → cost lever is `mongodb_tier` + `mongodb_location`; free tier is $0 but `northeurope`-only, no backups, no HA |
+| INF-062a | **new** | vCore needs `retrywrites=false` in the URI; the Atlas-era `retryWrites=true` would fail on first write |
+| INF-059 / INF-060 / INF-061 | amended | firewall rule replaces the Atlas IP access list; admin user replaces the Atlas DB user; `mongodump` becomes defence in depth on M10 |
+| INF-005 (single region) | amended | one documented exception: the free-tier lever moves the DB to `northeurope` |
+| INF-074 / INF-086 (providers, secrets) | amended | `mongodbatlas` provider and `MONGODB_ATLAS_*` secrets struck |
+| INF-037 (cost table) | **VERIFIED** | every row now cited from the Azure Retail Prices API for `westeurope`, 2026-08-02; total ≈ $39.42/mo |
+| INF-038 (60 % headroom) | **breached, deliberately** | ≈ $39.42 leaves ~21 % headroom; under the hard $50 ceiling and user-accepted; recoverable to ≈ $16.86 via INF-062's free-tier lever |
+| INF-156 (cost-table gate) | **cleared** | no row carries the italic marker; `infra.yml`'s grep made precise so INF-156's own prose cannot trip it |
+| **BL-4** (Atlas org + API keys) | **RETIRED** | user decision → no Atlas account needed at all |
+| **B6** (ACA rates from memory) | **RESOLVED** | rates now cited; residual risk is the idle-vs-active assumption, policed by INF-144 |
+| C24 (transactional email) | **discharged + fixed** | audit found the deletion already complete; receiving = Cloudflare Email Routing, sending = Firebase only; ACS rejected (no inbound capability) |
+| **BL-7** | **new** | Cloudflare Email Routing not yet enabled — user is doing it themselves in the dashboard |
 
 Everything not in this table is binding as written.
 
@@ -780,15 +819,15 @@ written; "superseded" means §2 replaced it.
 | # | Assumption | Status |
 |---|---|---|
 | A1 | `master` → `main` | Upheld |
-| A2 | Compute on Azure; DB is Atlas M0, still Terraform-managed | Upheld (INF-057), deliberate deviation from "all on Azure" |
+| A2 | Compute on Azure; DB is Atlas M0, still Terraform-managed | **OVERTAKEN 2026-08-02 by user decision.** DB is now **Azure DocumentDB (Cosmos DB for MongoDB vCore)**, `azurerm_mongo_cluster`, tier M10 in `westeurope`. Everything is on Azure; the deviation A2 existed to flag is gone (INF-057 amended) |
 | A3 | Redis removed entirely | Upheld, and now the ruling (C23) |
 | A4 | workers.dev subdomain resolved once at first deploy, then propagated to five places | Upheld (INF-024), open item OQ-1 |
 | A5 | Region `westeurope` | Upheld (INF-005) |
 | A6 | Default `*.azurecontainerapps.io` API FQDN; no custom domain | Upheld (INF-047) |
-| A7 | No SMTP; Firebase Auth sends all user-facing mail | Upheld, and now the ruling (C24) |
+| A7 | No SMTP; Firebase Auth sends all user-facing mail | Upheld, and now the ruling (C24). **Verified by audit 2026-08-02** (INF-053a): no mail code remains. Receiving is Cloudflare Email Routing, not SMTP |
 | A8 | reCAPTCHA kept (the production build hard-fails without a site key) | Upheld (INF-105) |
 | A9 | User's 5-word lowercase commit convention overrides commitlint | Upheld (INF-134 … INF-136) |
-| A10 | Atlas IP access list `0.0.0.0/0` + SCRAM/TLS (a NAT gateway would cost ~$32/mo) | Upheld (INF-059) |
+| A10 | Database firewall open to all IPs + SCRAM-SHA-256/TLS (a NAT gateway would cost ~$32/mo) | Upheld (INF-059 amended); mechanism is now `azurerm_mongo_cluster_firewall_rule` |
 
 ---
 
@@ -801,7 +840,7 @@ written; "superseded" means §2 replaced it.
 | **BL-1** | **No Firebase credentials exist.** `C:\Users\me\agent-secrets\` contains only `cloudflare.txt` and `openai.txt`. INF-091 … INF-096 and INF-102 (create the Firebase project, register a Web App, enable Email/Password + Google + GitHub providers, add authorised domains, generate a service-account key, set the email action URL) are all **HUMAN ACTIONS** that cannot be automated. | The production frontend build cannot produce a working auth config; the backend cannot verify ID tokens; none of the three sign-in providers can be tested end-to-end. Auth work is **code-complete but unverified** until this clears (INF-103). CI uses the stub config (INF-101). | Human |
 | **BL-2** | **GitHub OAuth App cannot be created programmatically** (INF-094). The GitHub REST API has no endpoint for OAuth Apps, and the local `gh` token's scopes (`repo`, `workflow`, `delete_repo`, `read:org`, `gist`) do not cover developer settings. | GitHub sign-in. | Human |
 | **BL-3** | **reCAPTCHA v2 keys do not exist** (INF-106). `frontend/vite.config.ts` hard-fails a production build without `RECAPTCHA_SITE_KEY`. | Every production frontend build. | Human |
-| **BL-4** | **MongoDB Atlas org + programmatic API key pair do not exist** (INF-086). Terraform cannot create the cluster. | `terraform apply`, therefore the whole backend deployment. | Human |
+| ~~**BL-4**~~ | ~~**MongoDB Atlas org + programmatic API key pair do not exist** (INF-086).~~ **RETIRED 2026-08-02 by user decision** ("just host mongodb via azure"). The database is now **Azure DocumentDB (Cosmos DB for MongoDB vCore)**, created by `azurerm_mongo_cluster` with the same Azure credentials as every other resource. No Atlas organisation, no API key pair, no `MONGODB_ATLAS_*` secrets. | ~~`terraform apply`~~ — **nothing**. This blocker is gone. | ~~Human~~ — no action required |
 | **BL-5** | **Backend rejects `acc < 75`** (`backend/src/api/controllers/result.ts:215-217`) and `packages/schemas/src/results.ts:74` floors `acc` at 50. A math trainer legitimately produces 40–70 % accuracy. | Result saving would silently drop a large share of genuine runs; AC-029's `clamp((acc-50)/50, 0, 1)` would never see values below 50. **Both constraints MUST be removed or lowered to 0.** | WP-10 |
 
 ### 4.2 Open questions needing a decision (defaults chosen so work is not blocked)
@@ -873,7 +912,7 @@ elsewhere MUST treat this document as authoritative (INF-150).
 | Sentry error reporting | INF-146, INV-118d |
 | Prometheus + swagger-stats dashboard | C25 |
 | Branch protection rules | INF-122 |
-| VNet + NAT gateway for a stable Atlas egress IP (~$32/mo) | INF-059 |
+| VNet + NAT gateway for a stable database egress IP (~$32/mo) | INF-059 |
 | Bespoke croco calc default theme (v1 ships `serika_dark`) | OQ-16 / INV-082 |
 | A "bailed out early" test-ending concept | C38 — deliberately not built, see AC-187 |
 | Blind mode | C41 — struck, no defined behaviour survives CP-036 |
@@ -1217,7 +1256,8 @@ WP-11 owns `backend/src/app.ts` and `backend/src/init/**`); `INF-030` and `INF-1
 `frontend/static/robots.txt`, `sitemap.xml`, `version.json`, `contributors.json`, `supporters.json`;
 `docs/RUNBOOK.md` (new); `frontend/firebase.json` (delete).
 
-**Depends on:** WP-01. **Blocked on:** BL-1 … BL-4 for anything that touches a live cloud resource; the
+**Depends on:** WP-01. **Blocked on:** BL-1 … BL-3 for anything that touches a live cloud resource (BL-4 was
+retired on 2026-08-02 when the database moved to Azure); the
 Terraform code, workflows, `wrangler.jsonc`, `_headers` and icon pipeline can all be written and dry-run first.
 
 **Exit criteria:** INF-148's ten-point end-to-end acceptance list, minus item 6 while BL-1 is open;
@@ -1226,8 +1266,9 @@ if `BACKEND_URL` is unset or contains `monkeytype.com` (INF-013); no `BYPASS_*` 
 (INF-042); **no row of the INF-037 cost table still reads `UNVERIFIED` (INF-156) — this gates
 `terraform apply`, not the PR**; **`vars.BACKEND_URL` is written back by `infra.yml` from the Terraform
 output (INF-086a) and the backup workflow's Mongo credential source is chosen and documented in
-`docs/RUNBOOK.md`**; **the INF-058 probe has been run and its outcome recorded — M0 on pass, Atlas Flex on
-fail (INF-058a), with the cost table updated either way**.
+`docs/RUNBOOK.md`**; **the INF-058 probe has been run against the provisioned Azure DocumentDB cluster and
+all four required clauses ($setWindowFields, $out, $lookup-with-sub-pipeline, $bucket) passed — a required
+clause failing is a hard stop, not a tier flip (INF-058a amended)**.
 
 ---
 
@@ -1488,9 +1529,9 @@ A validation stage MUST be able to verify every line below mechanically or by di
 - [ ] **DoD-44** `gh api repos/lxorb/croco-calc --jq '.fork,.private,.default_branch'` → `false,false,main`;
       `git branch -r` shows exactly one remote branch.
 - [ ] **DoD-45** Actual spend checked seven days after go-live and recorded next to the INF-037 estimate.
-- [ ] **DoD-45a** No row of INF-037 reads `UNVERIFIED` at the moment `terraform apply` is first run
-      (INF-156), and the INF-058 probe's outcome is recorded with the resulting tier — M0 on pass, Atlas Flex
-      on fail (INF-058a).
+- [ ] **DoD-45a** No row of INF-037 carries the italic `UNVERIFIED` cell marker at the moment
+      `terraform apply` is first run (INF-156 — satisfied 2026-08-02), and the INF-058 probe has been run
+      against the deployed Azure DocumentDB cluster with all four required clauses passing (INF-058a).
 - [ ] **DoD-45b** `vars.BACKEND_URL` exists on the repo, equals the Terraform `api_base_url` output, and is
       the value the deployed bundle was built with; the backup workflow's Mongo credential mechanism is the
       one written down in `docs/RUNBOOK.md` (INF-086a).
