@@ -4,8 +4,8 @@
 # frontend image here (INF-032, INV-021) — build `frontend/dist` and serve it
 # from any static host, or run `pnpm dev-fe`.
 #
-# Redis is gone (INF-063 … INF-069): the daily and weekly leaderboards run on
-# MongoDB and the queues moved into the cron job runner.
+# The cache and queue layer is gone (INF-063 … INF-069): the daily and weekly
+# leaderboards run on MongoDB and the queues moved into the cron job runner.
 
 services:
   croco-calc-backend:

@@ -24,8 +24,8 @@ FROM node:24.11.0-alpine3.22
 ARG server_version=UNKNOWN
 
 # COPY to target.
-# INF-041: backend/redis-scripts went with Redis (INF-065) and the email
-# templates went with the SMTP client (INF-053).
+# INF-041: the Lua script directory went with the cache removal (INF-065) and
+# the email templates went with the SMTP client (INF-053).
 COPY --from=builder /prod/backend/node_modules /app/backend/node_modules
 COPY --from=builder /prod/backend/dist /app/backend/dist
 COPY --from=builder /prod/backend/private /app/backend/private
