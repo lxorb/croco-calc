@@ -1,0 +1,21 @@
+{
+  "ignorePatterns": ["node_modules", "dist", ".turbo"],
+  "extends": [
+    "../oxlint-config/index.jsonc"
+    // "@croco-calc/oxlint-config"
+  ],
+  "rules": {
+    // ME-166: `Math.random` MUST NOT appear anywhere in packages/math-engine.
+    // All randomness comes from the seeded mulberry32 PRNG (ME-002, ME-167).
+    // Belt and braces: __tests__/purity.spec.ts asserts the same thing over the
+    // source tree, so the guarantee survives a linter swap.
+    "no-restricted-properties": [
+      "error",
+      {
+        "object": "Math",
+        "property": "random",
+        "message": "ME-166: use the seeded mulberry32 PRNG (src/prng.ts), never Math.random."
+      }
+    ]
+  }
+}
