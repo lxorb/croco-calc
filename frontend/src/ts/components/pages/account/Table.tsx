@@ -29,9 +29,9 @@ type Sorting = {
 /**
  * AC-101 — the results table has exactly eight columns:
  * `isPb`, `score`, `tpm`, `acc`, `tasks`, `mode2`, `info`, `timestamp`.
- * monkeytype's `rawWpm`, `consistency`, `charStats`, `mode` and `tags` columns
- * are gone (AC-007, AC-016, master C5, C15) and `wpm` becomes `score`
- * (master C40).
+ * The upstream raw-speed, consistency, keystroke-stat, mode and tag columns are
+ * gone (AC-007, AC-016, master C5, C15) and the headline speed metric becomes
+ * `score` (master C40).
  */
 export function Table<M extends Mode>(props: {
   data: SnapshotResult<M>[];
@@ -110,10 +110,15 @@ function getColumns<M extends Mode>({
         },
       },
     }),
-    /** AC-101 row 2 — the headline metric, a signed integer (master C40). */
+    /**
+     * AC-101 row 2 — the headline metric, a signed integer (master C40).
+     * `format.score` rather than `format.decimals` because a whole number must
+     * stay whole even when `alwaysShowDecimalPlaces` is on, and because the
+     * same value has to read identically here and on the leaderboard.
+     */
     defineColumn("score", {
       header: "score",
-      cell: (info) => format.decimals(info.getValue()),
+      cell: (info) => format.score(info.getValue()),
     }),
     defineColumn("tpm", {
       header: "tpm",
@@ -131,7 +136,7 @@ function getColumns<M extends Mode>({
         breakpoint: "xs",
       },
     }),
-    /** AC-101 row 5 — `{correct}/{wrong}`, replacing monkeytype's `charStats`. */
+    /** AC-101 row 5 — `{correct}/{wrong}`, replacing the keystroke-stat cell. */
     defineColumn("tasks", {
       header: "correct/wrong",
       enableSorting: false,
@@ -142,7 +147,7 @@ function getColumns<M extends Mode>({
     }),
     /**
      * AC-101 row 6 — croco calc has exactly one mode, so the column prints the
-     * test length instead of monkeytype's `{mode} {mode2}` pair (AC-008).
+     * test length instead of the upstream `{mode} {mode2}` pair (AC-008).
      */
     defineColumn("mode2", {
       header: "time",
@@ -152,7 +157,9 @@ function getColumns<M extends Mode>({
         breakpoint: "md",
       },
     }),
+    /** AC-101 row 7 — the column id is `info`; `_id` is only the accessor. */
     defineColumn("_id", {
+      id: "info",
       header: "info",
       enableSorting: false,
       cell: (info) => {

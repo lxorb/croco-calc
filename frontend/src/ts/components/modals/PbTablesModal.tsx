@@ -23,7 +23,7 @@ type PBRow = PBWithMode2 & {
 /**
  * AC-063 — every stored personal best, keyed by `(mode2, settingsId)`
  * (master C4, C31). Rows are grouped by duration and ordered by `score` inside
- * each group; monkeytype's `raw` / `consistency` / `difficulty` / `language` /
+ * each group; the upstream `raw` / `consistency` / `difficulty` / `language` /
  * `punctuation` / `numbers` / `lazyMode` columns are gone with the fields
  * (AC-007, AC-064) and are replaced by `tpm` and the settings column, which is
  * the axis the two PB cards split on.
@@ -97,7 +97,9 @@ function getColumns(options: {
       ),
       cell: (info) => (
         <>
-          {f.decimals(info.getValue())}
+          {/* AC-063 — `score` stays a whole number regardless of
+              `alwaysShowDecimalPlaces`. */}
+          {f.score(info.getValue())}
           <br />
           <span class="text-sub">{f.accuracy(info.row.original.acc)}</span>
         </>

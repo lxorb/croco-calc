@@ -97,8 +97,8 @@ export function UserProfile(props: {
 
 /**
  * AC-055 … AC-058 — the all-time ranks strip. The language axis is gone
- * (AC-113), so the caption drops the language word and the two cells are the
- * `time 4` and `time 8` boards rather than monkeytype's 15 / 60 seconds.
+ * (AC-113), so the caption drops that segment and the two cells are the
+ * `time 4` and `time 8` boards rather than the upstream 15 / 60 seconds.
  */
 function LeaderboardPosition(props: {
   top4?: RankAndCount;
@@ -142,7 +142,7 @@ function LeaderboardPosition(props: {
  *
  * croco calc has a single mode axis, so the second card is split by settings
  * signature rather than by mode (AC-060). Both cards therefore share the same
- * unit word and the caption is what makes each cell identifiable.
+ * unit label and the caption is what makes each cell identifiable.
  */
 function PbCard(props: {
   caption: string;
@@ -190,9 +190,9 @@ function PbCard(props: {
                   <div class="text-xs text-sub">
                     {durationLabel(item.mode2)}
                   </div>
-                  <div class="text-4xl">
-                    {format().decimals(item.pb?.score)}
-                  </div>
+                  {/* AC-061 — `score` is a whole number, so it is rendered
+                      through `format.score` and never gains decimal places. */}
+                  <div class="text-4xl">{format().score(item.pb?.score)}</div>
                   <div class="text-xl opacity-75">
                     {format().accuracy(item.pb?.acc, {
                       showDecimalPlaces: false,
@@ -203,7 +203,7 @@ function PbCard(props: {
                 <Show when={item.pb !== undefined}>
                   <div class="col-start-1 row-start-1 grid bg-sub-alt text-center text-xs opacity-0 transition-opacity group-hover:opacity-100">
                     <div class="text-sub">{durationLabel(item.mode2)}</div>
-                    <div>{format().decimals(item.pb?.score)} score</div>
+                    <div>{format().score(item.pb?.score)} score</div>
                     <div>
                       {format().decimals(item.pb?.tpm, {
                         showDecimalPlaces: true,

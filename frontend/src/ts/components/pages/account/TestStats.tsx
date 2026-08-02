@@ -13,17 +13,18 @@ import { Icon } from "../../common/Icon";
 /**
  * AC-092 … AC-097 — the totals block.
  *
- * The headline reads `tasks answered` over the exact task count (monkeytype's
- * `estimated words typed` was a wpm-derived estimate) and the grid is the
- * fifteen cells of AC-093: the score / tpm / acc triples replace monkeytype's
- * wpm / raw / consistency ones, and a `total correct` / `total wrong` /
- * `total tasks` row is added.
+ * The headline reads `tasks answered` over the exact task count — upstream this
+ * headline was a speed-derived estimate — and the grid is the fifteen cells of
+ * AC-093: the score / tpm / acc triples replace the upstream speed / raw /
+ * consistency ones, and a `total correct` / `total wrong` / `total tasks` row
+ * is added.
  */
 export function TestStats(props: {
   queryState: Accessor<ResultsQueryState | undefined>;
 }): JSXElement {
   const format = getFormatting;
-  const formatScore = (val: number): string => format().decimals(val);
+  /** AC-093 — `score` is a whole number, so it never grows decimal places. */
+  const formatScore = (val: number): string => format().score(val);
   const formatTpm = (val: number): string =>
     format().decimals(val, { showDecimalPlaces: true });
   const formatPercentage = (val: number): string => format().percentage(val);
