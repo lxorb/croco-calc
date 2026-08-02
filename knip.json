@@ -1,16 +1,65 @@
 {
   "workspaces": {
+    ".": {
+      "entry": ["scripts/generate-icon.ts", "infra/scripts/db-probe.ts"],
+      "project": ["scripts/**/*.ts", "infra/scripts/**/*.ts"],
+      "ignoreDependencies": [
+        "caniuse-lite",
+        "prettier",
+        "stylelint-config-standard-scss"
+      ]
+    },
     "backend": {
-      "entry": "src/server.ts",
-      "project": "src/**/*.ts"
+      "entry": ["src/server.ts", "__tests__/**/*.spec.ts"],
+      "project": ["src/**/*.ts", "__tests__/**/*.ts"],
+      "ignoreDependencies": ["@croco-calc/oxlint-config"],
+      "ignoreBinaries": ["docker"]
     },
     "frontend": {
-      "entry": "src/ts/index.ts",
-      "project": "src/ts/**/*.ts"
+      "entry": [
+        "src/ts/index.ts",
+        "src/ts/email-handler.ts",
+        "vite.config.ts",
+        "vitest.config.ts",
+        "vite-plugins/*.ts",
+        "__tests__/**/*.spec.{ts,tsx}",
+        "__tests__/**/*.jsdom-spec.ts"
+      ],
+      "project": ["src/ts/**/*.{ts,tsx}", "vite-plugins/**/*.ts"],
+      "ignore": [
+        "src/ts/constants/firebase-config-example.ts",
+        "src/ts/types/*.d.ts"
+      ],
+      "ignoreDependencies": [
+        "@croco-calc/oxlint-config",
+        "@iconify-json/ph",
+        "@iconify-json/tabler",
+        "@tanstack/eslint-plugin-query",
+        "balloon-css",
+        "caniuse-lite",
+        "eslint-plugin-compat",
+        "eslint-plugin-solid",
+        "normalize.css",
+        "tailwindcss"
+      ],
+      "ignoreBinaries": ["docker"]
     },
     "packages/*": {
-      "entry": "src/index.ts",
-      "project": "src/**/*.ts"
+      "entry": ["src/index.ts", "__tests__/**/*.spec.ts"],
+      "project": ["src/**/*.ts", "__tests__/**/*.ts"],
+      "ignoreDependencies": [
+        "@croco-calc/oxlint-config",
+        "@croco-calc/tsup-config"
+      ]
+    },
+    "packages/oxlint-config": {
+      "entry": ["index.js", "plugins/*.js"],
+      "project": ["**/*.js"]
+    },
+    "packages/tsup-config": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreBinaries": ["tsup-node"]
     }
   }
 }

@@ -253,13 +253,15 @@ export type UserProfile = z.infer<typeof UserProfileSchema>;
 export const RewardTypeSchema = z.enum(["xp"]);
 export type RewardType = z.infer<typeof RewardTypeSchema>;
 
-export const XpRewardSchema = z.object({
+/**
+ * Upstream's `z.union([XpRewardSchema, BadgeRewardSchema])`. Badges are cut
+ * (C16), so the union collapses to its single remaining member; the plural name
+ * is kept because that is what the inbox and `CrocoMail.rewards` speak of.
+ */
+export const AllRewardsSchema = z.object({
   type: z.literal(RewardTypeSchema.enum.xp),
   item: z.number().int(),
 });
-export type XpReward = z.infer<typeof XpRewardSchema>;
-
-export const AllRewardsSchema = XpRewardSchema;
 export type AllRewards = z.infer<typeof AllRewardsSchema>;
 
 /** The in-app inbox message. monkeytype's `MonkeyMail`, renamed with INV-139. */
