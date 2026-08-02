@@ -1,51 +1,23 @@
-<div id="videoAdPopupWrapper" class="popupWrapper hidden">
-  <div id="videoAdPopup">
-    <div class="preloader">
-      <i class="fas fa-fw fa-spin fa-circle-notch"></i>
-    </div>
-    <div id="eg-video-player" class="video"></div>
-  </div>
-</div>
+<!--
+  The one static dialog left in the shell.
 
-<dialog id="practiseWordsModal" class="modalWrapper hidden">
-  <div class="modal" actions="">
-    <div class="title">Practice words</div>
-    <!-- <div class="inputs"> -->
-    <div class="group" data-id="missed">
-      <div class="title">
-        <i class="fas fa-times"></i>
-        missed
-      </div>
-      <div class="sub">
-        Include missed words or biwords (which include the previous word).
-      </div>
-      <div class="groupInputs">
-        <div class="buttonGroup">
-          <button class="missedOff" value="off">off</button>
-          <button class="missedWords" value="words">words</button>
-          <button class="missedBiwords" value="biwords">biwords</button>
-        </div>
-      </div>
-    </div>
-    <div class="group" data-id="slow">
-      <div class="title">
-        <i class="fas fa-tachometer-alt"></i>
-        slow
-      </div>
-      <div class="sub">Include words which you typed slower than others.</div>
-      <div class="groupInputs">
-        <div class="buttonGroup">
-          <button class="slowOff" value="false">off</button>
-          <button class="slowOn" value="true">on</button>
-        </div>
-      </div>
-    </div>
-    <div></div>
-    <!-- </div> -->
-    <button class="start">start</button>
-  </div>
-</dialog>
+  Deleted from here: `#videoAdPopupWrapper` (CP-006 / INV-189 — ads are not
+  built in this stage and `popups/video-ad-popup.ts` is gone) and
+  `#practiseWordsModal` (C19 cuts the practise-mistakes button from v1, and
+  ME-124 forbids practise-your-weak-spots behaviour outright).
 
+  `#commandLine` stays exactly as it was (CP-167): a search icon, a checking
+  spinner, a `Type to search` input, a warning row and a `.suggestions` list.
+  `commandline.ts` selects `.searchicon`, `input` and `.suggestions` out of this
+  markup and `styles/commandline.scss` styles it, so the structure and the class
+  names are load-bearing and must not drift.
+
+  The font awesome `<i>` elements were replaced with the inline phosphor SVGs
+  the rest of the app uses (C10). Bodies are copied from the generated bundle in
+  `components/common/Icon.tsx`; they inherit `currentColor` from the same
+  `.searchicon` / `.checkingicon` / `.icon` rules that coloured the old glyphs,
+  so no CSS changed.
+-->
 <dialog id="commandLine" class="modalWrapper hidden">
   <div class="modal">
     <div
@@ -56,16 +28,46 @@
       "
     >
       <div class="searchicon">
-        <i class="fas fa-fw fa-search"></i>
+        <svg
+          class="icon icon-fw"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 256 256"
+          aria-hidden="true"
+        >
+          <path
+            fill="currentColor"
+            d="M232.49 215.51L185 168a92.12 92.12 0 1 0-17 17l47.53 47.54a12 12 0 0 0 17-17ZM44 112a68 68 0 1 1 68 68a68.07 68.07 0 0 1-68-68"
+          />
+        </svg>
       </div>
       <div class="checkingicon hidden">
-        <i class="fas fa-fw fa-circle-notch fa-spin"></i>
+        <svg
+          class="icon icon-fw icon-spin"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 256 256"
+          aria-hidden="true"
+        >
+          <path
+            fill="currentColor"
+            d="M236 128a108 108 0 0 1-216 0c0-42.52 24.73-81.34 63-98.9a12 12 0 1 1 10 21.81C63.24 64.57 44 94.83 44 128a84 84 0 0 0 168 0c0-33.17-19.24-63.43-49-77.09a12 12 0 1 1 10-21.81c38.27 17.56 63 56.38 63 98.9"
+          />
+        </svg>
       </div>
       <input type="text" class="input" placeholder="Type to search" />
     </div>
     <div class="warning hidden">
       <div class="icon">
-        <i class="fas fa-fw fa-exclamation-triangle"></i>
+        <svg
+          class="icon icon-fw"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 256 256"
+          aria-hidden="true"
+        >
+          <path
+            fill="currentColor"
+            d="M240.26 186.1L152.81 34.23a28.74 28.74 0 0 0-49.62 0L15.74 186.1a27.45 27.45 0 0 0 0 27.71A28.31 28.31 0 0 0 40.55 228h174.9a28.31 28.31 0 0 0 24.79-14.19a27.45 27.45 0 0 0 .02-27.71m-20.8 15.7a4.46 4.46 0 0 1-4 2.2H40.55a4.46 4.46 0 0 1-4-2.2a3.56 3.56 0 0 1 0-3.73L124 46.2a4.77 4.77 0 0 1 8 0l87.44 151.87a3.56 3.56 0 0 1 .02 3.73M116 136v-32a12 12 0 0 1 24 0v32a12 12 0 0 1-24 0m28 40a16 16 0 1 1-16-16a16 16 0 0 1 16 16"
+          />
+        </svg>
       </div>
       <div class="text">This is some warning text.</div>
     </div>
