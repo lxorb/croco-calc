@@ -1,0 +1,126 @@
+{
+  "$comment": [
+    "SB-214 / DoD-19 baseline for the settings bar.",
+    "",
+    "Captured from the pristine monkeytype reference checkout, from",
+    "frontend/src/ts/components/pages/test/TestConfig.tsx (the `variables`,",
+    "`buttonClass` and `cardClass` declarations and the three pill wrappers) and",
+    "frontend/src/styles/tailwind.css (the --breakpoint-* scale). Default theme",
+    "serika_dark; the theme contributes only --roundness, which both trees read",
+    "through the same `rounded-(--roundness)` utility.",
+    "",
+    "DoD-19 says the SB-214 diff measures GEOMETRY, not content: card radii,",
+    "gaps, paddings and font sizes (SB-081-083), with label text and icons masked",
+    "out of the comparison region. In this tree those four quantities are fully",
+    "determined by the declarations recorded below, so the comparison is done",
+    "against them rather than against a PNG. That makes the check deterministic,",
+    "browser-free and CI-runnable, and it fails on exactly the changes a pixel",
+    "diff would catch. What it does NOT cover is a rendered-pixel regression that",
+    "leaves every declaration intact (a global reset change, a font-metric",
+    "change). See __screenshots__/README.md.",
+    "",
+    "REGENERATE ONLY BY AN EXPLICIT, REVIEWED COMMIT (DoD-19)."
+  ],
+
+  "source": {
+    "repo": "monkeytype",
+    "files": [
+      "frontend/src/ts/components/pages/test/TestConfig.tsx",
+      "frontend/src/styles/tailwind.css"
+    ],
+    "theme": "serika_dark"
+  },
+
+  "breakpoints": {
+    "md": 849,
+    "lg": 1105,
+    "xl": 1361,
+    "2xl": 1617
+  },
+
+  "//": "The SB-214 widths are exactly monkeytype's md/lg/xl/2xl thresholds, so these four samples cover every responsive branch the bar has.",
+  "sampleWidths": [849, 1105, 1361, 1617],
+
+  "declaredVariables": {
+    "base": {
+      "--card-gap": "0.25em",
+      "--font-size": "0.5em",
+      "--horizontal-padding": "0.4em",
+      "--vertical-padding": "0.5rem"
+    },
+    "md": {
+      "--card-gap": "1em",
+      "--font-size": "0.6em",
+      "--horizontal-padding": "0.45em",
+      "--vertical-padding": "0.75rem"
+    },
+    "lg": {
+      "--card-gap": "1em",
+      "--font-size": "0.75em",
+      "--horizontal-padding": "0.5em",
+      "--vertical-padding": "0.75rem"
+    },
+    "xl": {
+      "--card-gap": "2em",
+      "--font-size": "0.75em",
+      "--horizontal-padding": "1em",
+      "--vertical-padding": "0.75rem"
+    }
+  },
+
+  "resolved": {
+    "849": {
+      "--card-gap": "1em",
+      "--font-size": "0.6em",
+      "--horizontal-padding": "0.45em",
+      "--vertical-padding": "0.75rem"
+    },
+    "1105": {
+      "--card-gap": "1em",
+      "--font-size": "0.75em",
+      "--horizontal-padding": "0.5em",
+      "--vertical-padding": "0.75rem"
+    },
+    "1361": {
+      "--card-gap": "2em",
+      "--font-size": "0.75em",
+      "--horizontal-padding": "1em",
+      "--vertical-padding": "0.75rem"
+    },
+    "1617": {
+      "--card-gap": "2em",
+      "--font-size": "0.75em",
+      "--horizontal-padding": "1em",
+      "--vertical-padding": "0.75rem"
+    }
+  },
+
+  "cardClasses": [
+    "card",
+    "rounded-(--roundness)",
+    "bg-sub-alt",
+    "px-(--horizontal-padding)"
+  ],
+
+  "controlPaddingClasses": [
+    "px-(--horizontal-padding)",
+    "py-(--vertical-padding)"
+  ],
+
+  "containerClasses": [
+    "grid-cols-[1fr_auto_1fr]",
+    "[font-size:var(--font-size)]",
+    "mb-8",
+    "w-max",
+    "place-self-center",
+    "justify-center",
+    "mx-auto",
+    "md:grid",
+    "hidden"
+  ],
+
+  "cardGapClasses": {
+    "left": "mr-(--card-gap)",
+    "right": "ml-(--card-gap)"
+  }
+}
