@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ScoreSchema, TasksPerMinuteSchema } from "./util";
 
 const FriendsRankSchema = z
   .number()
@@ -7,58 +8,51 @@ const FriendsRankSchema = z
   .optional()
   .describe("only available on friendsOnly leaderboard");
 
+/**
+ * AC-131 / INV-036: score, accuracy, tpm and correct/wrong are the leaderboard
+ * columns. The boards are split by `mode2` alone (SB-176); master C5 keeps
+ * consistency off this surface and master C16 keeps user flags but cuts badges.
+ */
 export const LeaderboardEntrySchema = z.object({
-  wpm: z.number().nonnegative(),
+  score: ScoreSchema,
+  correct: z.number().int().nonnegative(),
+  wrong: z.number().int().nonnegative(),
   acc: z.number().nonnegative().min(0).max(100),
+  tpm: TasksPerMinuteSchema,
   timestamp: z.number().int().nonnegative(),
-  raw: z.number().nonnegative(),
-  consistency: z.number().nonnegative().optional(),
   uid: z.string(),
   name: z.string(),
-  discordId: z.string().optional(),
-  discordAvatar: z.string().optional(),
   rank: z.number().nonnegative().int(),
   friendsRank: FriendsRankSchema,
-  badgeId: z.number().int().optional(),
-  isPremium: z.boolean().optional(),
 });
 export type LeaderboardEntry = z.infer<typeof LeaderboardEntrySchema>;
 
-export const RedisDailyLeaderboardEntrySchema = LeaderboardEntrySchema.omit({
+/** The stored shape of a daily-leaderboard row; rank is assigned at read time. */
+export const DailyLeaderboardEntrySchema = LeaderboardEntrySchema.omit({
   rank: true,
   friendsRank: true,
 });
-export type RedisDailyLeaderboardEntry = z.infer<
-  typeof RedisDailyLeaderboardEntrySchema
->;
+export type DailyLeaderboardEntry = z.infer<typeof DailyLeaderboardEntrySchema>;
 
-export const RedisXpLeaderboardEntrySchema = z.object({
+/**
+ * The stored shape of a weekly-XP row. `timeTypedSeconds` is renamed
+ * `timeSpentSeconds` (AC-014).
+ */
+export const XpLeaderboardEntryBaseSchema = z.object({
   uid: z.string(),
   name: z.string(),
   lastActivityTimestamp: z.number().int().nonnegative(),
-  timeTypedSeconds: z.number().nonnegative(),
-  // optionals
-  // discordId: z.string().optional(),
-  discordId: z //todo remove once weekly leaderboards reset twice and remove null values
-    .string()
-    .optional()
-    .or(z.null().transform((_val) => undefined)),
-  discordAvatar: z.string().optional(),
-  badgeId: z.number().int().optional(),
-  isPremium: z.boolean().optional(),
+  timeSpentSeconds: z.number().nonnegative(),
 });
-export type RedisXpLeaderboardEntry = z.infer<
-  typeof RedisXpLeaderboardEntrySchema
+export type XpLeaderboardEntryBase = z.infer<
+  typeof XpLeaderboardEntryBaseSchema
 >;
 
-export const RedisXpLeaderboardScoreSchema = z.number().int().nonnegative();
-export type RedisXpLeaderboardScore = z.infer<
-  typeof RedisXpLeaderboardScoreSchema
->;
+export const XpLeaderboardScoreSchema = z.number().int().nonnegative();
+export type XpLeaderboardScore = z.infer<typeof XpLeaderboardScoreSchema>;
 
-export const XpLeaderboardEntrySchema = RedisXpLeaderboardEntrySchema.extend({
-  //based on another redis collection
-  totalXp: RedisXpLeaderboardScoreSchema,
+export const XpLeaderboardEntrySchema = XpLeaderboardEntryBaseSchema.extend({
+  totalXp: XpLeaderboardScoreSchema,
   // dynamically added when generating response on the backend
   rank: z.number().nonnegative().int(),
   friendsRank: FriendsRankSchema,

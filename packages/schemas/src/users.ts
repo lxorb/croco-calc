@@ -1,23 +1,36 @@
 import { z, ZodEffects, ZodOptional, ZodString } from "zod";
 import { IdSchema, nameWithSeparators, slug, StringNumberSchema } from "./util";
-import { LanguageSchema } from "./languages";
 import {
-  ModeSchema,
   Mode2Schema,
+  ModeSchema,
   PersonalBestsSchema,
-  DefaultWordsModeSchema,
-  DefaultTimeModeSchema,
-  QuoteLengthSchema,
-  DifficultySchema,
   PersonalBestSchema,
 } from "./shared";
-import { CustomThemeColorsSchema, FunboxNameSchema } from "./configs";
+import { CustomThemeColorsSchema } from "./configs";
+import {
+  AdditionSchema,
+  DivisionSchema,
+  FractionAdditionSchema,
+  MultiplicationSchema,
+} from "./math";
 import { doesNotContainDisallowedWords } from "./validation/validation";
 import { ConnectionSchema } from "./connections";
 
 export const ResultFilterPresetNameSchema = slug().max(16);
 
-const NoneFilterSchema = z.literal("none");
+const OnOffFilterSchema = z
+  .object({
+    on: z.boolean(),
+    off: z.boolean(),
+  })
+  .strict();
+
+/**
+ * AC-078 / AC-081: the filter dimensions are the croco calc settings plus `time`,
+ * `pb` and `date`, and nothing else (AC-079). Keys are the C2 canonical **stored**
+ * literals, never the display labels — persisting labels would make every stored
+ * filter fail to match every stored result.
+ */
 export const ResultFiltersSchema = z.object({
   _id: IdSchema,
   name: ResultFilterPresetNameSchema,
@@ -27,23 +40,14 @@ export const ResultFiltersSchema = z.object({
       yes: z.boolean(),
     })
     .strict(),
-  difficulty: z.record(DifficultySchema, z.boolean()),
-  mode: z.record(ModeSchema, z.boolean()),
-  words: z.record(DefaultWordsModeSchema.or(z.literal("custom")), z.boolean()),
-  time: z.record(DefaultTimeModeSchema.or(z.literal("custom")), z.boolean()),
-  quoteLength: z.record(QuoteLengthSchema, z.boolean()),
-  punctuation: z
-    .object({
-      on: z.boolean(),
-      off: z.boolean(),
-    })
-    .strict(),
-  numbers: z
-    .object({
-      on: z.boolean(),
-      off: z.boolean(),
-    })
-    .strict(),
+  time: z.record(Mode2Schema, z.boolean()),
+  addition: z.record(AdditionSchema, z.boolean()),
+  multiplication: z.record(MultiplicationSchema, z.boolean()),
+  division: z.record(DivisionSchema, z.boolean()),
+  fractionAddition: z.record(FractionAdditionSchema, z.boolean()),
+  fractionMultiplication: OnOffFilterSchema,
+  decimals: OnOffFilterSchema,
+  negatives: OnOffFilterSchema,
   date: z
     .object({
       last_day: z.boolean(),
@@ -53,36 +57,9 @@ export const ResultFiltersSchema = z.object({
       all: z.boolean(),
     })
     .strict(),
-  tags: z.record(IdSchema.or(NoneFilterSchema), z.boolean()),
-  language: z.record(LanguageSchema, z.boolean()),
-  funbox: z.record(FunboxNameSchema.or(NoneFilterSchema), z.boolean()),
 });
 export type ResultFilters = z.infer<typeof ResultFiltersSchema>;
 export type ResultFiltersKeys = keyof Omit<ResultFilters, "_id" | "name">;
-
-export const StreakHourOffsetSchema = z.number().min(-11).max(12).step(0.5);
-export type StreakHourOffset = z.infer<typeof StreakHourOffsetSchema>;
-
-export const UserStreakSchema = z
-  .object({
-    lastResultTimestamp: z.number().int().nonnegative(),
-    length: z.number().int().nonnegative(),
-    maxLength: z.number().int().nonnegative(),
-    hourOffset: StreakHourOffsetSchema.optional(),
-  })
-  .strict();
-export type UserStreak = z.infer<typeof UserStreakSchema>;
-export const TagNameSchema = nameWithSeparators().max(16);
-export type TagName = z.infer<typeof TagNameSchema>;
-
-export const UserTagSchema = z
-  .object({
-    _id: IdSchema,
-    name: TagNameSchema,
-    personalBests: PersonalBestsSchema,
-  })
-  .strict();
-export type UserTag = z.infer<typeof UserTagSchema>;
 
 function profileDetailsBase(
   schema: ZodString,
@@ -104,10 +81,10 @@ export const WebsiteSchema = profileDetailsBase(
   z.string().url().max(200).startsWith("https://"),
 ).or(z.literal(""));
 
+/** AC-052: `bio` plus socials. monkeytype's `keyboard` field is dropped. */
 export const UserProfileDetailsSchema = z
   .object({
     bio: profileDetailsBase(z.string().max(250)).or(z.literal("")),
-    keyboard: profileDetailsBase(z.string().max(75)).or(z.literal("")),
     socialProfiles: z
       .object({
         twitter: TwitterProfileSchema,
@@ -133,31 +110,10 @@ export const CustomThemeSchema = z
   .strict();
 export type CustomTheme = z.infer<typeof CustomThemeSchema>;
 
-export const PremiumInfoSchema = z.object({
-  startTimestamp: z.number().int().nonnegative(),
-  expirationTimestamp: z
-    .number()
-    .int()
-    .nonnegative()
-    .or(z.literal(-1).describe("lifetime premium")),
-});
-export type PremiumInfo = z.infer<typeof PremiumInfoSchema>;
-
-export const UserQuoteRatingsSchema = z.record(
-  LanguageSchema,
-  z.record(
-    StringNumberSchema.describe("quoteId as string"),
-    z.number().nonnegative(),
-  ),
-);
-export type UserQuoteRatings = z.infer<typeof UserQuoteRatingsSchema>;
-
+/** AC-113: leaderboard ids are keyed by mode and mode2 alone. */
 export const UserLbMemorySchema = z.record(
   ModeSchema,
-  z.record(
-    Mode2Schema,
-    z.record(LanguageSchema, z.number().int().nonnegative()),
-  ),
+  z.record(Mode2Schema, z.number().int().nonnegative()),
 );
 export type UserLbMemory = z.infer<typeof UserLbMemorySchema>;
 
@@ -168,33 +124,9 @@ export const RankAndCountSchema = z.object({
 export type RankAndCount = z.infer<typeof RankAndCountSchema>;
 
 export const AllTimeLbsSchema = z.object({
-  time: z.record(
-    Mode2Schema,
-    z.record(LanguageSchema, RankAndCountSchema.optional()),
-  ),
+  time: z.record(Mode2Schema, RankAndCountSchema.optional()),
 });
 export type AllTimeLbs = z.infer<typeof AllTimeLbsSchema>;
-
-export const BadgeSchema = z
-  .object({
-    id: z.number().int().nonnegative(),
-    selected: z.boolean().optional(),
-  })
-  .strict();
-export type Badge = z.infer<typeof BadgeSchema>;
-
-export const UserInventorySchema = z
-  .object({
-    badges: z.array(BadgeSchema),
-  })
-  .strict();
-export type UserInventory = z.infer<typeof UserInventorySchema>;
-
-export const QuoteModSchema = z
-  .boolean()
-  .describe("Admin for all languages if true")
-  .or(LanguageSchema.describe("Admin for the given language"));
-export type QuoteMod = z.infer<typeof QuoteModSchema>;
 
 export const TestActivitySchema = z
   .object({
@@ -227,13 +159,6 @@ export const CountByYearAndDaySchema = z.record(
 );
 export type CountByYearAndDay = z.infer<typeof CountByYearAndDaySchema>;
 
-//Record<language, array with quoteIds as string
-export const FavoriteQuotesSchema = z.record(
-  LanguageSchema,
-  z.array(StringNumberSchema),
-);
-export type FavoriteQuotes = z.infer<typeof FavoriteQuotesSchema>;
-
 export const UserEmailSchema = z.string().email();
 
 /**
@@ -258,30 +183,21 @@ export const UserSchema = z.object({
   lastReultHashes: z.array(z.string()).optional(), //TODO: fix typo (it's in the db too)
   completedTests: z.number().int().nonnegative().optional(),
   startedTests: z.number().int().nonnegative().optional(),
-  timeTyping: z
+  /** AC-013: monkeytype's `timeTyping`, renamed (AC-014). */
+  timeSpent: z
     .number()
     .nonnegative()
     .optional()
-    .describe("time typing in seconds"),
-  streak: UserStreakSchema.optional(),
+    .describe("time spent solving, in seconds"),
   xp: z.number().int().nonnegative().optional(),
-  discordId: z.string().optional(),
-  discordAvatar: z.string().optional(),
-  tags: z.array(UserTagSchema).optional(),
   profileDetails: UserProfileDetailsSchema.optional(),
   customThemes: z.array(CustomThemeSchema).optional(),
-  premium: PremiumInfoSchema.optional(),
-  isPremium: z.boolean().optional(),
-  quoteRatings: UserQuoteRatingsSchema.optional(),
-  favoriteQuotes: FavoriteQuotesSchema.optional(),
   lbMemory: UserLbMemorySchema.optional(),
   allTimeLbs: AllTimeLbsSchema,
-  inventory: UserInventorySchema.optional(),
   banned: z.boolean().optional(),
   lbOptOut: z.boolean().optional(),
   verified: z.boolean().optional(),
   needsToChangeName: z.boolean().optional(),
-  quoteMod: QuoteModSchema.optional(),
   resultFilterPresets: z.array(ResultFiltersSchema).optional(),
   testActivity: TestActivitySchema.optional(),
 });
@@ -292,44 +208,39 @@ export type ResultFiltersGroup = keyof ResultFilters;
 export type ResultFiltersGroupItem<T extends ResultFiltersGroup> =
   keyof ResultFilters[T];
 
-export const TypingStatsSchema = z.object({
+/** monkeytype's `TypingStatsSchema`, renamed with the AC-014 vocabulary. */
+export const TestStatsSchema = z.object({
   completedTests: z.number().int().nonnegative().optional(),
   startedTests: z.number().int().nonnegative().optional(),
-  timeTyping: z.number().int().nonnegative().optional(),
+  timeSpent: z.number().int().nonnegative().optional(),
 });
-export type TypingStats = z.infer<typeof TypingStatsSchema>;
+export type TestStats = z.infer<typeof TestStatsSchema>;
 
 export const UserProfileSchema = UserSchema.pick({
   uid: true,
   name: true,
   banned: true,
   addedAt: true,
-  discordId: true,
-  discordAvatar: true,
   xp: true,
   lbOptOut: true,
-  isPremium: true,
-  inventory: true,
   allTimeLbs: true,
   testActivity: true,
 })
   .extend({
-    typingStats: TypingStatsSchema,
-    personalBests: PersonalBestsSchema.pick({ time: true, words: true }),
-    streak: z.number().int().nonnegative(),
-    maxStreak: z.number().int().nonnegative(),
+    testStats: TestStatsSchema,
+    personalBests: PersonalBestsSchema.pick({ time: true }),
     details: UserProfileDetailsSchema,
   })
   .partial({
     //omitted for banned users
-    inventory: true,
     details: true,
     allTimeLbs: true,
     uid: true,
   });
 export type UserProfile = z.infer<typeof UserProfileSchema>;
 
-export const RewardTypeSchema = z.enum(["xp", "badge"]);
+/** Badges are cut (master C16), so XP is the only reward kind. */
+export const RewardTypeSchema = z.enum(["xp"]);
 export type RewardType = z.infer<typeof RewardTypeSchema>;
 
 export const XpRewardSchema = z.object({
@@ -338,16 +249,11 @@ export const XpRewardSchema = z.object({
 });
 export type XpReward = z.infer<typeof XpRewardSchema>;
 
-export const BadgeRewardSchema = z.object({
-  type: z.literal(RewardTypeSchema.enum.badge),
-  item: BadgeSchema,
-});
-export type BadgeReward = z.infer<typeof BadgeRewardSchema>;
-
-export const AllRewardsSchema = XpRewardSchema.or(BadgeRewardSchema);
+export const AllRewardsSchema = XpRewardSchema;
 export type AllRewards = z.infer<typeof AllRewardsSchema>;
 
-export const MonkeyMailSchema = z.object({
+/** The in-app inbox message. monkeytype's `MonkeyMail`, renamed with INV-139. */
+export const CrocoMailSchema = z.object({
   id: IdSchema,
   subject: z.string(),
   body: z.string(),
@@ -355,7 +261,7 @@ export const MonkeyMailSchema = z.object({
   read: z.boolean(),
   rewards: z.array(AllRewardsSchema),
 });
-export type MonkeyMail = z.infer<typeof MonkeyMailSchema>;
+export type CrocoMail = z.infer<typeof CrocoMailSchema>;
 
 export const ReportUserReasonSchema = z.enum([
   "Inappropriate name",
@@ -381,25 +287,21 @@ export type NewPassword = z.infer<typeof NewPasswordSchema>;
 export const PasswordSchema = z.string().min(1, "Required");
 export type Password = z.infer<typeof PasswordSchema>;
 
+/** AC-148: the friends table shows the time-4 and time-8 personal bests. */
 export const FriendSchema = UserSchema.pick({
   uid: true,
   name: true,
-  discordId: true,
-  discordAvatar: true,
   startedTests: true,
   completedTests: true,
-  timeTyping: true,
+  timeSpent: true,
   xp: true,
   banned: true,
   lbOptOut: true,
 })
   .extend({
     connectionId: IdSchema.optional(),
-    top15: PersonalBestSchema.optional(),
-    top60: PersonalBestSchema.optional(),
-    badgeId: z.number().int().optional(),
-    isPremium: z.boolean().optional(),
-    streak: UserStreakSchema.pick({ length: true, maxLength: true }).optional(),
+    top4: PersonalBestSchema.optional(),
+    top8: PersonalBestSchema.optional(),
   })
   .merge(ConnectionSchema.pick({ lastModified: true }).partial());
 

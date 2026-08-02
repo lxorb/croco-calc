@@ -1,9 +1,11 @@
 import { z } from "zod";
 
-/* ValidModeRuleSchema allows complex rules like `"mode2": "(15|60)"`. We don't want a strict validation here. */
+/**
+ * AC-114: the leaderboard axes are `mode` and `mode2` only (SB-176). Complex rules
+ * like `"mode2": "(4|8)"` stay allowed, so no strict validation here.
+ */
 export const ValidModeRuleSchema = z
   .object({
-    language: z.string(),
     mode: z.string(),
     mode2: z.string(),
   })
@@ -25,15 +27,6 @@ export const ConfigurationSchema = z.object({
   dev: z.object({
     responseSlowdownMs: z.number().int().nonnegative(),
   }),
-  quotes: z.object({
-    reporting: z.object({
-      enabled: z.boolean(),
-      maxReports: z.number().int().nonnegative(),
-      contentReportLimit: z.number().int().nonnegative(),
-    }),
-    submissionsEnabled: z.boolean(),
-    maxFavorites: z.number().int().nonnegative(),
-  }),
   results: z.object({
     savingEnabled: z.boolean(),
     objectHashCheckEnabled: z.boolean(),
@@ -43,7 +36,6 @@ export const ConfigurationSchema = z.object({
     }),
     limits: z.object({
       regularUser: z.number().int().nonnegative(),
-      premiumUser: z.number().int().nonnegative(),
     }),
     maxBatchSize: z.number().int().nonnegative(),
   }),
@@ -61,38 +53,24 @@ export const ConfigurationSchema = z.object({
     profiles: z.object({
       enabled: z.boolean(),
     }),
-    discordIntegration: z.object({
-      enabled: z.boolean(),
-    }),
     xp: z.object({
       enabled: z.boolean(),
-      funboxBonus: z.number(),
       gainMultiplier: z.number(),
       maxDailyBonus: z.number(),
       minDailyBonus: z.number(),
-      streak: z.object({
-        enabled: z.boolean(),
-        maxStreakDays: z.number().nonnegative(),
-        maxStreakMultiplier: z.number(),
-      }),
     }),
     inbox: z.object({
       enabled: z.boolean(),
       maxMail: z.number().int().nonnegative(),
     }),
-    premium: z.object({
+    reporting: z.object({
       enabled: z.boolean(),
+      maxReports: z.number().int().nonnegative(),
+      contentReportLimit: z.number().int().nonnegative(),
     }),
   }),
   admin: z.object({
     endpointsEnabled: z.boolean(),
-  }),
-  apeKeys: z.object({
-    endpointsEnabled: z.boolean(),
-    acceptKeys: z.boolean(),
-    maxKeysPerUser: z.number().int().nonnegative(),
-    apeKeyBytes: z.number().int().nonnegative(),
-    apeKeySaltRounds: z.number().int().nonnegative(),
   }),
   rateLimiting: z.object({
     badAuthentication: z.object({
@@ -111,11 +89,12 @@ export const ConfigurationSchema = z.object({
     xpRewardBrackets: z.array(RewardBracketSchema),
   }),
   leaderboards: z.object({
-    minTimeTyping: z
+    /** AC-120.3 as renamed by master C35. Default 7200 seconds. */
+    minTimeSpent: z
       .number()
       .min(0)
       .describe(
-        "Minimum typing time (in seconds) the user needs to get on a leaderboard",
+        "Minimum time (in seconds) the user needs to have spent solving to get on a leaderboard",
       ),
     weeklyXp: z.object({
       enabled: z.boolean(),
