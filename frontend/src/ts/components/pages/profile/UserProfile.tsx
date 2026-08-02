@@ -76,12 +76,21 @@ export function UserProfile(props: {
         </span>
       </Show>
 
-      <ActivityCalendar
-        testActivity={
-          props.isAccountPage ? undefined : props.profile.testActivity
+      {/* AC-158: on a public profile the heatmap only renders when that user
+      has enabled `showActivityOnPublicProfile` in the edit-profile modal. */}
+      <Show
+        when={
+          props.isAccountPage === true ||
+          props.profile.details?.showActivityOnPublicProfile === true
         }
-        isAccountPage={props.isAccountPage}
-      />
+      >
+        <ActivityCalendar
+          testActivity={
+            props.isAccountPage ? undefined : props.profile.testActivity
+          }
+          isAccountPage={props.isAccountPage}
+        />
+      </Show>
     </div>
   );
 }
