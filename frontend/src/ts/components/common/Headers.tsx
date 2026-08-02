@@ -1,13 +1,13 @@
 import { JSXElement, Show } from "solid-js";
 
 import { cn } from "../../utils/cn";
-import { Fa, FaProps } from "./Fa";
+import { Icon, IconProps } from "./Icon";
 
 export function H2(props: {
   id?: string;
   class?: string;
   text: string;
-  fa?: FaProps;
+  icon?: IconProps;
 }): JSXElement {
   return (
     <h2
@@ -17,8 +17,8 @@ export function H2(props: {
         props.class,
       )}
     >
-      <Show when={props.fa}>
-        <Fa {...(props.fa as FaProps)} />
+      <Show when={props.icon}>
+        <Icon {...(props.icon as IconProps)} />
       </Show>
       {props.text}
     </h2>
@@ -30,7 +30,7 @@ export function H3(props: {
   id?: string;
   class?: string;
   text: string;
-  fa: FaProps;
+  icon: IconProps;
 }): JSXElement {
   return (
     <h3
@@ -40,7 +40,7 @@ export function H3(props: {
         props.class,
       )}
     >
-      <Fa {...props.fa} />
+      <Icon {...props.icon} />
       {props.text}
     </h3>
   );

@@ -15,6 +15,7 @@ import { configEvent } from "../events/config";
 import { migrateConfig } from "./utils";
 import { promiseWithResolvers } from "../utils/misc";
 import { setConfig } from "./setters";
+import { repairAllOff } from "./coupling";
 import { deleteConfig } from "../ape/config";
 import { typedKeys } from "@croco-calc/util/objects";
 
@@ -53,19 +54,14 @@ export async function loadFromLocalStorage(): Promise<void> {
   loadDone();
 }
 
+/**
+ * Applied last, after every other key is in place, because they are the two
+ * halves of the SB-090/SB-091 coupling: applying them against a half-built
+ * config would let the cascade fire on a state the user never stored.
+ */
 const lastConfigsToApply: Set<keyof ConfigSchemas.Config> = new Set([
-  "keymapMode",
-  "minWpm",
-  "minAcc",
-  "minBurst",
-  "paceCaret",
-  "quoteLength", //quote length sets mode,
-  "words",
-  "time",
-  "mode", // mode sets punctuation and numbers
-  "numbers",
-  "punctuation",
-  "funbox",
+  "multiplication",
+  "fractionMultiplication",
 ]);
 
 export async function applyConfig(
@@ -74,7 +70,14 @@ export async function applyConfig(
   if (partialConfig === undefined || partialConfig === null) return;
 
   //migrate old values if needed, remove additional keys and merge with default config
-  const fullConfig: ConfigSchemas.Config = migrateConfig(partialConfig);
+  const migrated: ConfigSchemas.Config = migrateConfig(partialConfig);
+
+  // SB-104: a stored or remote config with every generator control off (a
+  // hand-edited account config) is repaired rather than rejected — the default
+  // `addition` value comes back and the correction is persisted below, the way
+  // monkeytype re-saves keys that failed to apply.
+  const fullConfig = repairAllOff(migrated);
+  const wasRepaired = JSON.stringify(migrated) !== JSON.stringify(fullConfig);
 
   configEvent.dispatch({ key: "fullConfigChange" });
 
@@ -107,6 +110,12 @@ export async function applyConfig(
     saveToLocalStorage(key);
   }
 
+  if (wasRepaired) {
+    saveToLocalStorage("addition");
+    saveToLocalStorage("multiplication");
+    saveToLocalStorage("fractionMultiplication");
+  }
+
   configEvent.dispatch({ key: "fullConfigChangeFinished" });
   setFullConfigStore(fullConfig);
 }
@@ -115,6 +124,28 @@ export async function resetConfig(): Promise<void> {
   await applyConfig(getDefaultConfig());
   await deleteConfig();
   saveFullConfigToLocalStorage(true);
+}
+
+/**
+ * SB-157 — set all eight settings-bar keys back to the SB-110 defaults in one
+ * `applyConfig` call, leaving every appearance/behaviour key untouched. Backs
+ * the `restoreDefaultTestSettings` palette command and the clickable
+ * "not eligible for leaderboards" notice (SB-181).
+ */
+export async function restoreDefaultTestSettings(): Promise<void> {
+  const defaults = getDefaultConfig();
+  await applyConfig({
+    ...Config,
+    addition: defaults.addition,
+    multiplication: defaults.multiplication,
+    division: defaults.division,
+    fractionAddition: defaults.fractionAddition,
+    fractionMultiplication: defaults.fractionMultiplication,
+    decimals: defaults.decimals,
+    negatives: defaults.negatives,
+    time: defaults.time,
+  });
+  saveFullConfigToLocalStorage();
 }
 
 const { promise: configLoadPromise, resolve: loadDone } =

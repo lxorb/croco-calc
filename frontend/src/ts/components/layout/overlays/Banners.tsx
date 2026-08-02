@@ -13,7 +13,7 @@ import { setGlobalOffsetTop } from "../../../states/core";
 import { getSnapshot } from "../../../states/snapshot";
 import { cn } from "../../../utils/cn";
 import { isProfilerMode } from "../../../utils/profiler-mode";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 import { showUpdateNameModal } from "../../modals/account-settings/UpdateNameModal";
 
 function Banner(props: BannerType): JSXElement {
@@ -22,9 +22,11 @@ function Banner(props: BannerType): JSXElement {
     removeBanner(props.id);
     // });
   };
+  // `Banner.icon` is an iconify id (CP-002); monkeytype passed font awesome
+  // class strings straight into a bare `<i>`.
   const icon = (): string =>
     props.icon === undefined || props.icon === ""
-      ? "fa fa-fw fa-bullhorn"
+      ? "ph:megaphone-bold"
       : props.icon;
 
   return (
@@ -41,14 +43,14 @@ function Banner(props: BannerType): JSXElement {
       <div class="flex w-full justify-between gap-2">
         <Show
           when={props.imagePath !== undefined}
-          fallback={<i class={`self-center ${icon()}`}></i>}
+          fallback={<Icon icon={icon()} fixedWidth class="self-center" />}
         >
           <img
             src={props.imagePath}
             alt="Banner Image"
             class="hidden aspect-6/1 h-full max-h-9 self-center xl:block"
           />
-          <i class={`self-center ${icon()} xl:hidden`}></i>
+          <Icon icon={icon()} fixedWidth class="self-center xl:hidden" />
         </Show>
         <div class="self-center p-2">{props.customContent ?? props.text}</div>
         <Show
@@ -61,11 +63,11 @@ function Banner(props: BannerType): JSXElement {
                 remove();
               }}
             >
-              <Fa icon="fa-times" fixedWidth />
+              <Icon icon="ph:x-bold" fixedWidth />
             </button>
           }
         >
-          <i class={`self-center ${icon()}`}></i>
+          <Icon icon={icon()} fixedWidth class="self-center" />
         </Show>
       </div>
     </div>
@@ -83,7 +85,7 @@ export function Banners(): JSXElement {
         nameChangeAdded = true;
         addBanner({
           level: "error",
-          icon: "fas fa-exclamation-triangle",
+          icon: "ph:warning-bold",
           customContent: (
             <>
               You need to update your account name.{" "}
@@ -115,7 +117,7 @@ export function Banners(): JSXElement {
     if (isProfilerMode()) {
       addBanner({
         level: "error",
-        icon: "fas fa-stopwatch",
+        icon: "ph:timer-bold",
         text: "Profiler mode enabled",
         important: true,
       });

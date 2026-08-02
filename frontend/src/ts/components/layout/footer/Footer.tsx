@@ -1,15 +1,27 @@
-import { JSXElement } from "solid-js";
+import { JSXElement, Show } from "solid-js";
 
+import {
+  COMING_SOON_TOOLTIP,
+  GITHUB_REPO_URL,
+  SOCIAL_LINKS,
+} from "../../../constants/links";
 import { getIsScreenshotting } from "../../../states/core";
 import { showModal } from "../../../states/modals";
 import { getFocus } from "../../../states/test";
 import { cn } from "../../../utils/cn";
+import { Balloon } from "../../common/Balloon";
 import { Button } from "../../common/Button";
 import { Keytips } from "./Keytips";
 import { ThemeIndicator } from "./ThemeIndicator";
 import { VersionButton } from "./VersionButton";
 
+/**
+ * CP-012 — exactly seven buttons, in this order, each with a fixed-width
+ * leading icon. monkeytype's `twitter` button is gone (CP-013).
+ */
 export function Footer(): JSXElement {
+  const discordUrl = (): string | null => SOCIAL_LINKS.discord;
+
   return (
     <footer
       class={cn("relative text-xs text-sub", {
@@ -28,8 +40,8 @@ export function Footer(): JSXElement {
           <Button
             variant="text"
             text="contact"
-            fa={{
-              icon: "fa-envelope",
+            icon={{
+              icon: "ph:envelope-simple-bold",
               fixedWidth: true,
             }}
             onClick={() => showModal("Contact")}
@@ -37,8 +49,8 @@ export function Footer(): JSXElement {
           <Button
             variant="text"
             text="support"
-            fa={{
-              icon: "fa-donate",
+            icon={{
+              icon: "ph:hand-heart-bold",
               fixedWidth: true,
             }}
             onClick={() => showModal("Support")}
@@ -46,37 +58,51 @@ export function Footer(): JSXElement {
           <Button
             variant="text"
             text="github"
-            fa={{
-              icon: "fa-code",
+            icon={{
+              icon: "ph:code-bold",
               fixedWidth: true,
             }}
-            href="https://github.com/monkeytypegame/monkeytype"
+            href={GITHUB_REPO_URL}
           />
-          <Button
-            variant="text"
-            text="discord"
-            fa={{
-              icon: "fa-discord",
-              variant: "brand",
-              fixedWidth: true,
-            }}
-            href="https://www.discord.gg/monkeytype"
-          />
-          <Button
-            variant="text"
-            text="twitter"
-            fa={{
-              icon: "fa-twitter",
-              variant: "brand",
-              fixedWidth: true,
-            }}
-            href="https://x.com/monkeytype"
-          />
+          {/*
+            CP-017: the discord invite does not exist yet, so the button renders
+            disabled with a `coming soon` tooltip rather than linking nowhere.
+            The tooltip lives on a wrapper because a disabled button sets
+            `pointer-events: none` and would never see the hover itself.
+          */}
+          <Show
+            when={discordUrl()}
+            fallback={
+              <Balloon text={COMING_SOON_TOOLTIP} position="up" inline>
+                <Button
+                  variant="text"
+                  text="discord"
+                  icon={{
+                    icon: "ph:discord-logo-bold",
+                    fixedWidth: true,
+                  }}
+                  disabled
+                />
+              </Balloon>
+            }
+          >
+            {(url) => (
+              <Button
+                variant="text"
+                text="discord"
+                icon={{
+                  icon: "ph:discord-logo-bold",
+                  fixedWidth: true,
+                }}
+                href={url()}
+              />
+            )}
+          </Show>
           <Button
             variant="text"
             text="terms"
-            fa={{
-              icon: "fa-file-contract",
+            icon={{
+              icon: "ph:file-text-bold",
               fixedWidth: true,
             }}
             href="/terms-of-service.html"
@@ -85,8 +111,8 @@ export function Footer(): JSXElement {
             href="/security-policy.html"
             variant="text"
             text="security"
-            fa={{
-              icon: "fa-shield-alt",
+            icon={{
+              icon: "ph:shield-bold",
               fixedWidth: true,
             }}
           />
@@ -94,8 +120,8 @@ export function Footer(): JSXElement {
             href="/privacy-policy.html"
             variant="text"
             text="privacy"
-            fa={{
-              icon: "fa-lock",
+            icon={{
+              icon: "ph:lock-bold",
               fixedWidth: true,
             }}
           />

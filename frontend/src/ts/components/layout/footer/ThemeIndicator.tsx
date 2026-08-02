@@ -3,14 +3,10 @@ import { JSXElement, Show } from "solid-js";
 import { useCustomThemesLiveQuery } from "../../../collections/custom-themes";
 import { setConfig } from "../../../config/setters";
 import { Config } from "../../../config/store";
-import {
-  getThemeIndicator,
-  isAuthenticated,
-  setCommandlineSubgroup,
-} from "../../../states/core";
+import { getThemeIndicator, isAuthenticated } from "../../../states/core";
 import { showModal } from "../../../states/modals";
 import { showNoticeNotification } from "../../../states/notifications";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 
 export function ThemeIndicator(): JSXElement {
   const themes = useCustomThemesLiveQuery();
@@ -28,9 +24,9 @@ export function ThemeIndicator(): JSXElement {
       }
       setConfig("customTheme", true);
     } else {
-      const subgroup = Config.customTheme ? "customTheme" : "themes";
-      setCommandlineSubgroup(subgroup);
-      showModal("Commandline");
+      // CP-014 — the indicator opens the theme modal, which hosts both the
+      // preset picker and the custom-theme editor (C9).
+      showModal("Theme");
     }
   };
 
@@ -45,10 +41,10 @@ export function ThemeIndicator(): JSXElement {
       <div class="relative">
         <Show when={getThemeIndicator().isFavorite}>
           <div class="absolute top-[-0.5em] right-[-0.5em] flex rounded-full bg-bg p-[0.25em]">
-            <Fa icon="fa-star" size={0.5} />
+            <Icon icon="ph:star-bold" size={0.5} />
           </div>
         </Show>
-        <Fa icon="fa-palette" fixedWidth />
+        <Icon icon="ph:palette-bold" fixedWidth />
       </div>
       <div class="text">{getThemeIndicator().text}</div>
     </button>

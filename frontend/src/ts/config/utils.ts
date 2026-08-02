@@ -1,13 +1,14 @@
 import type {
   Config as ConfigSchema,
-  FunboxName,
   PartialConfig,
 } from "@croco-calc/schemas/configs";
 import * as ConfigSchemas from "@croco-calc/schemas/configs";
 import { typedKeys } from "@croco-calc/util/objects";
+
 import { getDefaultConfig } from "../constants/default-config";
 import { sanitize } from "../utils/sanitize";
 import { Config } from "./store";
+
 /**
  * migrates possible outdated config and merges with the default config values
  * @param config partial or possible outdated config
@@ -38,6 +39,16 @@ function sanitizeConfig(
   return sanitize(ConfigSchemas.PartialConfigSchema.strip(), config);
 }
 
+/**
+ * SB-122 — a stored config that fails validation is *repaired*, never
+ * discarded. Two families of repair live here:
+ *
+ * 1. monkeytype's own legacy shapes for the keys croco calc kept
+ *    (`quickTab`, `swapEscAndTab`, boolean `smoothCaret`, string `fontSize`, …).
+ * 2. croco calc's own migration: a four-element `accountChart` is padded with a
+ *    fifth `"on"` (§6.1 arity note, AC-085), and monkeytype's second-based
+ *    `time` is translated into croco calc's minutes (SB-012).
+ */
 function replaceLegacyValues(
   configObj: ConfigSchemas.PartialConfig,
 ): ConfigSchemas.PartialConfig {
@@ -58,21 +69,9 @@ function replaceLegacyValues(
     configObj.quickRestart = "esc";
   }
 
-  if (
-    //@ts-expect-error legacy configs
-    configObj.alwaysShowCPM === true &&
-    configObj.typingSpeedUnit === undefined
-  ) {
-    configObj.typingSpeedUnit = "cpm";
-  }
-
   //@ts-expect-error legacy configs
   if (configObj.showAverage === "wpm") {
     configObj.showAverage = "speed";
-  }
-
-  if (typeof configObj.playSoundOnError === "boolean") {
-    configObj.playSoundOnError = configObj.playSoundOnError ? "1" : "off";
   }
 
   if (
@@ -83,70 +82,9 @@ function replaceLegacyValues(
     configObj.timerStyle = "off";
   }
 
-  if (
-    //@ts-expect-error legacy configs
-    configObj.showLiveWpm === true &&
-    configObj.liveSpeedStyle === undefined
-  ) {
-    let val: ConfigSchemas.LiveSpeedAccBurstStyle = "mini";
-    if (configObj.timerStyle !== "bar" && configObj.timerStyle !== "off") {
-      val = configObj.timerStyle as ConfigSchemas.LiveSpeedAccBurstStyle;
-    }
-    configObj.liveSpeedStyle = val;
-  }
-
-  if (
-    //@ts-expect-error legacy configs
-    configObj.showLiveBurst === true &&
-    configObj.liveBurstStyle === undefined
-  ) {
-    let val: ConfigSchemas.LiveSpeedAccBurstStyle = "mini";
-    if (configObj.timerStyle !== "bar" && configObj.timerStyle !== "off") {
-      val = configObj.timerStyle as ConfigSchemas.LiveSpeedAccBurstStyle;
-    }
-    configObj.liveBurstStyle = val;
-  }
-
-  if (
-    //@ts-expect-error legacy configs
-    configObj.showLiveAcc === true &&
-    configObj.liveAccStyle === undefined
-  ) {
-    let val: ConfigSchemas.LiveSpeedAccBurstStyle = "mini";
-    if (configObj.timerStyle !== "bar" && configObj.timerStyle !== "off") {
-      val = configObj.timerStyle as ConfigSchemas.LiveSpeedAccBurstStyle;
-    }
-    configObj.liveAccStyle = val;
-  }
-
-  if (typeof configObj.soundVolume === "string") {
-    configObj.soundVolume = parseFloat(configObj.soundVolume);
-  }
-
-  if (typeof configObj.funbox === "string") {
-    if (configObj.funbox === "none") {
-      configObj.funbox = [];
-    } else {
-      configObj.funbox = (configObj.funbox as string).split(
-        "#",
-      ) as FunboxName[];
-    }
-  }
-
-  if (typeof configObj.customLayoutfluid === "string") {
-    configObj.customLayoutfluid = (configObj.customLayoutfluid as string).split(
-      "#",
-    ) as ConfigSchemas.CustomLayoutFluid;
-  }
-
-  if (typeof configObj.indicateTypos === "boolean") {
-    configObj.indicateTypos =
-      configObj.indicateTypos === false ? "off" : "replace";
-  }
-
   if (typeof configObj.fontSize === "string") {
     //legacy values use strings
-    const oldValue = configObj.fontSize;
+    const oldValue: string = configObj.fontSize;
     let newValue = parseInt(oldValue);
 
     if (oldValue === "125") {
@@ -160,18 +98,34 @@ function replaceLegacyValues(
     configObj.fontSize = 1;
   }
 
-  if (
-    Array.isArray(configObj.accountChart) &&
-    configObj.accountChart.length !== 4
-  ) {
-    configObj.accountChart = ["on", "on", "on", "on"];
+  // §6.1 arity note: pad monkeytype's four-element chart toggle array with the
+  // fifth `Per minute` entry (AC-085). Anything else is reset.
+  if (Array.isArray(configObj.accountChart)) {
+    const stored = configObj.accountChart as ("on" | "off")[];
+    if (stored.length === 4) {
+      configObj.accountChart = [
+        ...stored,
+        "on",
+      ] as ConfigSchemas.AccountChart;
+    } else if (stored.length !== 5) {
+      configObj.accountChart = ["on", "on", "on", "on", "on"];
+    }
   }
 
+  // SB-012: monkeytype stored `time` in seconds (15/30/60/120 plus custom
+  // values). croco calc stores minutes, so anything outside 1|2|4|8 is mapped
+  // onto the nearest legal length rather than thrown away.
   if (
-    typeof configObj.minAccCustom === "number" &&
-    configObj.minAccCustom > 100
+    typeof configObj.time === "number" &&
+    ![1, 2, 4, 8].includes(configObj.time)
   ) {
-    configObj.minAccCustom = 100;
+    const minutes = configObj.time / 60;
+    const legal = [1, 2, 4, 8] as const;
+    configObj.time = legal.reduce((best, candidate) =>
+      Math.abs(candidate - minutes) < Math.abs(best - minutes)
+        ? candidate
+        : best,
+    );
   }
 
   if (
@@ -194,43 +148,12 @@ function replaceLegacyValues(
     configObj.customBackgroundFilter = [arr[0], arr[1], arr[2], arr[3]];
   }
 
-  if (typeof configObj.quoteLength === "number") {
-    if (configObj.quoteLength === -1) {
-      configObj.quoteLength = [0, 1, 2, 3];
-    } else {
-      configObj.quoteLength = [configObj.quoteLength];
-    }
-  }
-
-  if (configObj.tapeMargin !== undefined) {
-    if (configObj.tapeMargin < 10) {
-      configObj.tapeMargin = 10;
-    } else if (configObj.tapeMargin > 90) {
-      configObj.tapeMargin = 90;
-    }
-  }
-
   if (configObj.maxLineWidth !== undefined) {
     if (configObj.maxLineWidth < 20 && configObj.maxLineWidth !== 0) {
       configObj.maxLineWidth = 20;
     } else if (configObj.maxLineWidth > 1000) {
       configObj.maxLineWidth = 1000;
     }
-  }
-
-  if ("keymapShowTopRow" in configObj && configObj.keymapKeys === undefined) {
-    switch (configObj.keymapShowTopRow) {
-      case "never":
-        configObj.keymapKeys = "minimal";
-        break;
-      case "always":
-        configObj.keymapKeys = "minimal_numrow";
-        break;
-      case "layout":
-        configObj.keymapKeys = "minimal";
-        break;
-    }
-    delete configObj.keymapShowTopRow;
   }
 
   return configObj;

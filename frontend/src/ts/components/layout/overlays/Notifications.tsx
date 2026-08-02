@@ -13,25 +13,25 @@ import { cn } from "../../../utils/cn";
 import { Anime } from "../../common/anime/Anime";
 import { AnimePresence } from "../../common/anime/AnimePresence";
 import { AnimeShow } from "../../common/anime/AnimeShow";
-import { Fa, FaProps } from "../../common/Fa";
+import { Icon, IconProps } from "../../common/Icon";
 
 const levelConfig = {
   notice: {
-    icon: "fa-info-circle",
+    icon: "ph:info-bold",
     title: "Notice",
     border: "var(--notif-notice-border, rgba(0,130,251,0.985))",
     bg: "var(--notif-notice-bg, rgba(0,77,148,0.9))",
     bgHover: "var(--notif-notice-bg-hover, rgba(0,77,148,0.5))",
   },
   success: {
-    icon: "fa-check-circle",
+    icon: "ph:check-circle-bold",
     title: "Success",
     border: "var(--notif-success-border, rgba(100,206,100,0.71))",
     bg: "var(--notif-success-bg, rgba(0,148,0,0.9))",
     bgHover: "var(--notif-success-bg-hover, rgba(0,148,0,0.5))",
   },
   error: {
-    icon: "fa-times-circle",
+    icon: "ph:x-circle-bold",
     title: "Error",
     border: "var(--notif-error-border, rgba(241,51,34,0.71))",
     bg: "var(--notif-error-bg, rgba(138,18,12,0.9))",
@@ -52,12 +52,15 @@ function NotificationItem(props: { notification: Notification }): JSXElement {
   const config = (): (typeof levelConfig)[keyof typeof levelConfig] =>
     levelConfig[props.notification.level] ?? levelConfig.notice;
 
-  const iconProps = (): FaProps =>
+  // `customIcon` carries a full iconify id (`ph:gift-bold`), not a bare name —
+  // CP-002 requires the literal `set:name` strings to be auditable at the call
+  // site rather than assembled here.
+  const iconProps = (): IconProps =>
     props.notification.customIcon !== undefined
-      ? ({
-          icon: `fa-${props.notification.customIcon}`,
+      ? {
+          icon: props.notification.customIcon,
           fixedWidth: true,
-        } as FaProps)
+        }
       : { icon: config().icon };
 
   const title = (): string => props.notification.customTitle ?? config().title;
@@ -93,7 +96,7 @@ function NotificationItem(props: { notification: Notification }): JSXElement {
           onClick={() => removeNotification(props.notification.id)}
         >
           <div class="pb-2 opacity-50">
-            <Fa {...iconProps()} class="mr-2 inline" />
+            <Icon {...iconProps()} class="mr-2 inline" />
             {title()}
           </div>
           <Show
@@ -132,7 +135,7 @@ export function Notifications(): JSXElement {
           class="text-white mb-4 w-full overflow-hidden text-xs"
           onClick={() => clearAllNotifications()}
         >
-          <Fa icon="fa-times" class="mr-1" />
+          <Icon icon="ph:x-bold" class="mr-1" />
           Clear all
         </button>
       </AnimeShow>

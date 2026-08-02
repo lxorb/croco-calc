@@ -1,20 +1,14 @@
 import * as ConfigSchemas from "@croco-calc/schemas/configs";
+import { typedKeys } from "@croco-calc/util/objects";
 import { ZodType as ZodSchema } from "zod";
+
 import { saveToLocalStorage } from "../config/persistence";
 import { configEvent } from "../events/config";
-import { showNoticeNotification } from "../states/notifications";
-import {
-  canSetConfigWithCurrentFunboxes,
-  canSetFunboxWithConfig,
-} from "./funbox-validation";
-import { triggerResize, escapeHTML } from "../utils/misc";
-import { camelCaseToWords, capitalizeFirstLetter } from "../utils/strings";
+import { triggerResize } from "../utils/misc";
+import { CycleDirection, nextCycleValue, BarKey } from "./coupling";
 import { configMetadata } from "./metadata";
 import { Config, setConfigStore } from "./store";
 import { isConfigValueValid } from "./validation";
-import { FunboxName } from "@croco-calc/schemas/configs";
-import { typedKeys } from "@croco-calc/util/objects";
-import { isTestActive } from "../states/test";
 
 export function setConfig<T extends keyof ConfigSchemas.Config>(
   key: T,
@@ -39,25 +33,8 @@ export function setConfig<T extends keyof ConfigSchemas.Config>(
 
   const previousValue = Config[key];
 
-  if (
-    metadata.changeRequiresRestart &&
-    isTestActive() &&
-    Config.funbox.includes("no_quit")
-  ) {
-    showNoticeNotification(
-      "No quit funbox is active. Please finish the test.",
-      {
-        important: true,
-      },
-    );
-    console.warn(
-      `Could not set config key "${key}" with value "${JSON.stringify(
-        value,
-      )}" - no quit funbox active.`,
-    );
-    return false;
-  }
-
+  // SB-101/SB-103/SB-215: the all-off guard lives here, evaluated on the
+  // post-cascade configuration, so every entry point shares one predicate.
   if (metadata.isBlocked?.({ value, currentConfig: Config })) {
     console.warn(
       `Could not set config key "${key}" with value "${JSON.stringify(
@@ -78,25 +55,8 @@ export function setConfig<T extends keyof ConfigSchemas.Config>(
     return false;
   }
 
-  if (!canSetConfigWithCurrentFunboxes(key, value, Config.funbox)) {
-    if (key === "words" || key === "time") {
-      showNoticeNotification("Active funboxes do not support infinite tests");
-    } else {
-      showNoticeNotification(
-        `You can't set ${camelCaseToWords(
-          key,
-        )} to ${String(value)} with currently active funboxes.`,
-        { durationMs: 5000 },
-      );
-    }
-    console.warn(
-      `Could not set config key "${key}" with value "${JSON.stringify(
-        value,
-      )}" - funbox conflict.`,
-    );
-    return false;
-  }
-
+  // SB-090/SB-091: the coupling cascade, run through monkeytype's own
+  // `overrideConfig` mechanism so it fires from every entry point (SB-095).
   if (metadata.overrideConfig) {
     const targetConfig = metadata.overrideConfig({
       value,
@@ -115,7 +75,9 @@ export function setConfig<T extends keyof ConfigSchemas.Config>(
       const set = setConfig(targetKey, targetValue, options);
       if (!set) {
         throw new Error(
-          `Failed to set config key "${targetKey}" with value "${targetValue}" for ${metadata.displayString} config override.`,
+          `Failed to set config key "${targetKey}" with value "${String(
+            targetValue,
+          )}" for ${metadata.displayString ?? key} config override.`,
         );
       }
     }
@@ -147,62 +109,22 @@ export function setConfig<T extends keyof ConfigSchemas.Config>(
   return true;
 }
 
-export function setQuoteLengthAll(nosave?: boolean): boolean {
-  return setConfig("quoteLength", [0, 1, 2, 3], {
-    nosave,
-  });
-}
-
-export function toggleFunbox(funbox: FunboxName, nosave?: boolean): boolean {
-  if (isTestActive() && Config.funbox.includes("no_quit")) {
-    showNoticeNotification(
-      "No quit funbox is active. Please finish the test.",
-      {
-        important: true,
-      },
-    );
-    return false;
-  }
-
-  const funboxCheck = canSetFunboxWithConfig(funbox, Config);
-  if (!funboxCheck.ok) {
-    const errorStrings = funboxCheck.errors.map(
-      (e) =>
-        `${capitalizeFirstLetter(
-          camelCaseToWords(e.key),
-        )} cannot be set to ${String(e.value)}.`,
-    );
-    showNoticeNotification(
-      `You can't enable ${escapeHTML(funbox.replace(/_/g, " "))}:<br />${errorStrings.map((s) => escapeHTML(s)).join("<br />")}`,
-      { durationMs: 5000, useInnerHtml: true },
-    );
-    return false;
-  }
-
-  const previousValue = Config.funbox;
-
-  let newConfig: FunboxName[] = Config.funbox;
-
-  if (newConfig.includes(funbox)) {
-    newConfig = newConfig.filter((it) => it !== funbox);
-  } else {
-    newConfig = [...newConfig, funbox].sort();
-  }
-
-  if (!isConfigValueValid("funbox", newConfig, ConfigSchemas.FunboxSchema)) {
-    return false;
-  }
-
-  Config.funbox = newConfig;
-  saveToLocalStorage("funbox", nosave);
-  configEvent.dispatch({
-    key: "funbox",
-    newValue: Config.funbox,
-    nosave,
-    previousValue,
-  });
-
-  setConfigStore("funbox", newConfig);
-
-  return true;
+/**
+ * SB-050/SB-051/SB-052 — advance a settings-bar control one step.
+ *
+ * `direction` is `1` for a primary click / `Enter` / `Space` and `-1` for
+ * `Shift`+click, `Shift`+`Enter`, `Shift`+`Space` and the context-menu event.
+ * States disallowed by the SB-215 guard are skipped silently; when every other
+ * state is disallowed the call is a no-op and returns `false` (SB-052).
+ *
+ * The eight controls share this one helper, so the bar, the mobile modal and
+ * the keyboard path can never drift apart.
+ */
+export function cycleSetting(
+  key: BarKey,
+  direction: CycleDirection = 1,
+): boolean {
+  const next = nextCycleValue(key, direction, Config);
+  if (next === undefined) return false;
+  return setConfig(key, next);
 }

@@ -6,7 +6,7 @@ import { showModal } from "../../../states/modals";
 import { cn } from "../../../utils/cn";
 import { isDevEnvironment } from "../../../utils/env";
 import { Button } from "../../common/Button";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 import { ScrollToTop } from "../footer/ScrollToTop";
 import { Banners } from "./Banners";
 import { FpsCounter } from "./FpsCounter";
@@ -32,7 +32,7 @@ export function Overlays(): JSXElement {
         }}
         tabIndex="-1"
       >
-        <Fa icon="fa-terminal" />
+        <Icon icon="ph:terminal-window-bold" />
       </button>
       <Banners />
       <Notifications />
@@ -55,8 +55,8 @@ function DevButtons(): JSXElement {
           text: "Configure server",
           position: "right",
         }}
-        fa={{
-          icon: "fa-server",
+        icon={{
+          icon: "ph:hard-drives-bold",
         }}
         class="rounded-tl-none rounded-bl-none p-2"
       />
@@ -66,8 +66,8 @@ function DevButtons(): JSXElement {
           position: "right",
         }}
         onClick={() => showModal("DevOptions")}
-        fa={{
-          icon: "fa-flask",
+        icon={{
+          icon: "ph:flask-bold",
         }}
         class="rounded-tl-none rounded-bl-none p-2"
       />

@@ -83,8 +83,8 @@ export function Nav(): JSXElement {
     <nav class={cn("z-5 flex w-full items-center gap-1 md:gap-2")}>
       <Button
         variant="text"
-        fa={{
-          icon: "fa-keyboard",
+        icon={{
+          icon: "ph:calculator-bold",
           fixedWidth: true,
         }}
         router-link
@@ -99,8 +99,8 @@ export function Nav(): JSXElement {
       />
       <Button
         variant="text"
-        fa={{
-          icon: "fa-crown",
+        icon={{
+          icon: "ph:crown-bold",
           fixedWidth: true,
         }}
         router-link
@@ -115,8 +115,8 @@ export function Nav(): JSXElement {
       />
       <Button
         variant="text"
-        fa={{
-          icon: "fa-info",
+        icon={{
+          icon: "ph:info-bold",
           fixedWidth: true,
         }}
         class={buttonClass()}
@@ -129,24 +129,31 @@ export function Nav(): JSXElement {
           prefetchAboutPage();
         }}
       />
+      {/*
+        C9: the monkeytype settings page is deleted, but the nav item stays and
+        opens the theme modal. `data-nav-item="settings"` is preserved verbatim
+        because all 52 theme CSS files colour the nav through it (CP-005,
+        CP-164, CP-166).
+      */}
       <Button
         variant="text"
-        fa={{
-          icon: "fa-cog",
+        icon={{
+          icon: "ph:gear-bold",
           fixedWidth: true,
         }}
         class={buttonClass()}
-        href="/settings"
         dataset={{
           "data-nav-item": "settings",
         }}
-        router-link
+        onClick={() => {
+          showModal("Theme");
+        }}
       />
       <div class="grow"></div>
       <Button
         variant="text"
-        fa={{
-          icon: "fa-bell",
+        icon={{
+          icon: "ph:bell-bold",
           fixedWidth: true,
         }}
         dataset={{
@@ -178,9 +185,8 @@ export function Nav(): JSXElement {
                   dataset={{
                     "data-nav-item": "login",
                   }}
-                  fa={{
-                    icon: "fa-user",
-                    variant: "regular",
+                  icon={{
+                    icon: "ph:user-bold",
                     fixedWidth: true,
                   }}
                   router-link

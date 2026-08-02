@@ -2,11 +2,17 @@ import { JSXElement, Show } from "solid-js";
 
 import { cn } from "../../utils/cn";
 import { BalloonProps, buildBalloonHtmlProperties } from "./Balloon";
-import { Fa, FaProps } from "./Fa";
+import { Icon, IconProps } from "./Icon";
 
 type BaseProps = {
   text?: string;
-  fa?: FaProps;
+  /**
+   * Leading icon, as an iconify `set:name` id (CP-001, CP-002, C10). This
+   * replaces monkeytype's `fa` prop one-for-one — the `Fa` renderer was swapped
+   * for `Icon`, the call sites keep their shape and only the icon string
+   * changes.
+   */
+  icon?: IconProps;
   class?: string;
   variant?: "text" | "button";
   children?: JSXElement;
@@ -45,8 +51,8 @@ export function Button(props: ButtonProps | AnchorProps): JSXElement {
 
   const content = (
     <>
-      <Show when={props.fa !== undefined}>
-        <Fa {...(props.fa as FaProps)} />
+      <Show when={props.icon !== undefined}>
+        <Icon {...(props.icon as IconProps)} />
       </Show>
       <Show when={props.text !== undefined}>{props.text}</Show>
       {props.children}

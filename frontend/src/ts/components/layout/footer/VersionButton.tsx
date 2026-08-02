@@ -6,7 +6,7 @@ import { lastSeenServerCompatibility } from "../../../ape/adapters/ts-rest-adapt
 import { getVersion } from "../../../states/core";
 import { showModal } from "../../../states/modals";
 import { isDevEnvironment } from "../../../utils/env";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 
 export function VersionButton(): JSXElement {
   const [indicatorVisible, setIndicatorVisible] = createSignal(true);
@@ -46,7 +46,7 @@ export function VersionButton(): JSXElement {
 
   return (
     <button type="button" class="textButton flex" onClick={handleClick}>
-      <Fa icon="fa-code-branch" fixedWidth />
+      <Icon icon="ph:git-branch-bold" fixedWidth />
       <div class="text">{getVersionText()}</div>
       <Show when={showNewIndicator()}>
         <div

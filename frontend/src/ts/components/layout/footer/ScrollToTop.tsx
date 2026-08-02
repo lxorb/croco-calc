@@ -2,7 +2,7 @@ import { JSXElement, createSignal, onMount, onCleanup } from "solid-js";
 
 import { getActivePage } from "../../../states/core";
 import { scrollToTop } from "../../../utils/misc";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 
 export function ScrollToTop(): JSXElement {
   const [visible, setVisible] = createSignal(false);
@@ -41,7 +41,7 @@ export function ScrollToTop(): JSXElement {
           scrollToTop();
         }}
       >
-        <Fa icon="fa-angle-double-up" />
+        <Icon icon="ph:caret-double-up-bold" />
       </button>
     </div>
   );

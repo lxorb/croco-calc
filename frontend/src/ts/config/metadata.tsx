@@ -1,29 +1,20 @@
 import * as ConfigSchemas from "@croco-calc/schemas/configs";
 import { roundTo1 } from "@croco-calc/util/numbers";
-import { checkCompatibility } from "@monkeytype/funbox";
 import { JSXElement } from "solid-js";
 
-import * as CustomThemes from "../collections/custom-themes";
-import { getDefaultConfig } from "../constants/default-config";
+import { __nonReactive as CustomThemes } from "../collections/custom-themes";
 import { isAuthenticated } from "../states/core";
 import { showNoticeNotification } from "../states/notifications";
-import { FaObject } from "../types/font-awesome";
-import { isDevEnvironment } from "../utils/env";
-import { reloadAfter } from "../utils/misc";
-import { capitalizeFirstLetter } from "../utils/strings";
-import { getOptions } from "../utils/zod";
-import { canSetFunboxWithConfig } from "./funbox-validation";
-// type SetBlock = {
-//   [K in keyof ConfigSchemas.Config]?: ConfigSchemas.Config[K][];
-// };
-
-// type RequiredConfig = {
-//   [K in keyof ConfigSchemas.Config]?: ConfigSchemas.Config[K];
-// };
+import { applyCoupling, wouldBeAllOff } from "./coupling";
 
 export type OptionMetadata = {
+  /**
+   * The label rendered for this state — in the settings bar (SB-022) and in the
+   * command palette (SB-155). One mapping table, never two.
+   */
   displayString?: string;
-  fa?: FaObject;
+  /** An iconify id, overriding the config key's own icon for this state. */
+  icon?: string;
   visible?: boolean;
 };
 
@@ -45,9 +36,10 @@ export type ConfigMetadata<K extends keyof ConfigSchemas.Config> = {
   description?: string | JSXElement;
 
   /**
-   * Fa object (icon)
+   * An iconify id (INV-081). `tabler:*` for the eight settings-bar keys,
+   * `ph:*` everywhere else — master C10, SB-060/SB-061.
    */
-  fa: FaObject;
+  icon: string;
 
   optionsMetadata?: ConfigSchemas.Config[K] extends string | number | symbol
     ? Record<ConfigSchemas.Config[K], OptionMetadata>
@@ -57,12 +49,6 @@ export type ConfigMetadata<K extends keyof ConfigSchemas.Config> = {
           false: OptionMetadata;
         }>
       : never;
-
-  // commandline?: {
-  //   displayValues?: ConfigSchemas.Config[K] extends string | number | symbol
-  //     ? Partial<Record<ConfigSchemas.Config[K], string>>
-  //     : never;
-  // };
 
   /**
    * Group that this config belongs to. Used for partial presets
@@ -117,1232 +103,455 @@ export type ConfigMetadataObject = {
   [K in keyof ConfigSchemas.Config]: ConfigMetadata<K>;
 };
 
-//todo:
-// maybe have generic set somehow handle test restarting
+/**
+ * Shared by the five generator controls (SB-100). Selecting a value is blocked
+ * whenever the configuration it would commit — i.e. the one produced *after*
+ * the SB-090/SB-091 coupling cascade — has no enabled generator left
+ * (SB-101, SB-215, ME-089, master C36).
+ */
+function blockIfAllOff<K extends keyof ConfigSchemas.Config>(key: K) {
+  return ({
+    value,
+    currentConfig,
+  }: {
+    value: ConfigSchemas.Config[K];
+    currentConfig: Readonly<ConfigSchemas.Config>;
+  }): boolean => {
+    if (!wouldBeAllOff(key, value, currentConfig)) return false;
+    showNoticeNotification("at least one task type must be enabled");
+    return true;
+  };
+}
+
+/**
+ * SB-090 + SB-091, expressed through monkeytype's own `overrideConfig`
+ * mechanism so the cascade fires identically from every entry point (SB-095):
+ * a bar click, the mobile modal, the palette, an imported settings JSON, a
+ * shared-settings URL and the server config applied at login.
+ */
+function couplingOverride<K extends "multiplication" | "fractionMultiplication">(
+  key: K,
+) {
+  return ({
+    value,
+    currentConfig,
+  }: {
+    value: ConfigSchemas.Config[K];
+    currentConfig: Readonly<ConfigSchemas.Config>;
+  }): Partial<ConfigSchemas.Config> => {
+    const next = applyCoupling({ ...currentConfig, [key]: value }, key);
+    const changes: Partial<ConfigSchemas.Config> = {};
+    if (key !== "multiplication" && next.multiplication !== currentConfig.multiplication) {
+      changes.multiplication = next.multiplication;
+    }
+    if (
+      key !== "fractionMultiplication" &&
+      next.fractionMultiplication !== currentConfig.fractionMultiplication
+    ) {
+      changes.fractionMultiplication = next.fractionMultiplication;
+    }
+    return changes;
+  };
+}
 
 const caretOptionsMetadata = {
-  banana: {
-    visible: false,
-  },
-  carrot: {
-    visible: false,
-  },
-  monkey: {
-    visible: false,
-  },
   block: {},
   off: {},
   default: {},
   outline: {},
   underline: {},
 };
+
 export const configMetadata: ConfigMetadataObject = {
-  // test
-  punctuation: {
-    key: "punctuation",
-    fa: {
-      icon: "fa-at",
-    },
+  // ------------------------------------------------------------------
+  // test — the eight settings-bar controls.
+  // All eight: group "test" (SB-130), changeRequiresRestart (SB-055),
+  // a `tabler:*` icon (SB-060), and a label per state (SB-024 … SB-047).
+  // ------------------------------------------------------------------
+  addition: {
+    key: "addition",
+    displayString: "addition",
+    icon: "tabler:plus",
     changeRequiresRestart: true,
     group: "test",
-    overrideValue: ({ value, currentConfig }) => {
-      if (currentConfig.mode === "quote") {
-        return false;
-      }
-      return value;
+    isBlocked: blockIfAllOff("addition"),
+    optionsMetadata: {
+      off: { displayString: "+100" },
+      "100": { displayString: "+100" },
+      "1000": { displayString: "+1000" },
     },
   },
-  numbers: {
-    key: "numbers",
-    fa: {
-      icon: "fa-hashtag",
-    },
+  multiplication: {
+    key: "multiplication",
+    displayString: "multiplication",
+    icon: "tabler:x",
     changeRequiresRestart: true,
     group: "test",
-    overrideValue: ({ value, currentConfig }) => {
-      if (currentConfig.mode === "quote") {
-        return false;
-      }
-      return value;
+    isBlocked: blockIfAllOff("multiplication"),
+    // SB-091: switching multiplication off also clears fraction multiplication.
+    overrideConfig: couplingOverride("multiplication"),
+    optionsMetadata: {
+      off: { displayString: "12x12" },
+      "12": { displayString: "12x12" },
+      "20": { displayString: "20x20" },
+      "100": { displayString: "100x100" },
     },
   },
-  words: {
-    key: "words",
-    fa: { icon: "fa-font" },
-    displayString: "word count",
+  division: {
+    key: "division",
+    displayString: "division",
+    icon: "tabler:divide",
     changeRequiresRestart: true,
     group: "test",
-    overrideConfig: ({ currentConfig }) => {
-      if (currentConfig.mode !== "words") {
-        return {
-          mode: "words",
-        };
-      }
-      return {};
+    isBlocked: blockIfAllOff("division"),
+    optionsMetadata: {
+      // SB-031: the OFF label is the single character `/`, not `144/12`.
+      off: { displayString: "/" },
+      tables: { displayString: "144/12" },
+      threeByTwo: { displayString: "xxx/xx" },
+    },
+  },
+  fractionAddition: {
+    key: "fractionAddition",
+    displayString: "fraction addition",
+    icon: "tabler:math-1-divide-2",
+    changeRequiresRestart: true,
+    group: "test",
+    isBlocked: blockIfAllOff("fractionAddition"),
+    optionsMetadata: {
+      off: { displayString: "+1/12" },
+      "12": { displayString: "+1/12" },
+      "99": { displayString: "+1/xx" },
+    },
+  },
+  fractionMultiplication: {
+    key: "fractionMultiplication",
+    displayString: "fraction multiplication",
+    icon: "tabler:math-x-divide-y",
+    changeRequiresRestart: true,
+    group: "test",
+    isBlocked: blockIfAllOff("fractionMultiplication"),
+    // SB-090: turning it on while multiplication is off forces `"100"` (C21).
+    overrideConfig: couplingOverride("fractionMultiplication"),
+    optionsMetadata: {
+      false: { displayString: "*x/y" },
+      true: { displayString: "*x/y" },
+    },
+  },
+  decimals: {
+    key: "decimals",
+    displayString: "decimals",
+    icon: "tabler:decimal",
+    changeRequiresRestart: true,
+    group: "test",
+    optionsMetadata: {
+      false: { displayString: "4.2" },
+      true: { displayString: "4.2" },
+    },
+  },
+  negatives: {
+    key: "negatives",
+    displayString: "negative numbers",
+    icon: "tabler:minus",
+    changeRequiresRestart: true,
+    group: "test",
+    optionsMetadata: {
+      false: { displayString: "-" },
+      true: { displayString: "-" },
     },
   },
   time: {
     key: "time",
-    fa: { icon: "fa-clock" },
-    changeRequiresRestart: true,
     displayString: "time",
-    group: "test",
-    overrideConfig: ({ currentConfig }) => {
-      if (currentConfig.mode !== "time") {
-        return {
-          mode: "time",
-        };
-      }
-      return {};
-    },
-  },
-  mode: {
-    key: "mode",
-    fa: { icon: "fa-bars" },
+    icon: "tabler:clock",
     changeRequiresRestart: true,
+    group: "test",
     optionsMetadata: {
-      time: {
-        fa: { icon: "fa-clock" },
-      },
-      words: {
-        fa: { icon: "fa-font" },
-      },
-      quote: {
-        fa: { icon: "fa-quote-left" },
-      },
-      zen: {
-        fa: { icon: "fa-mountain" },
-      },
-      custom: {
-        fa: { icon: "fa-wrench" },
-      },
+      1: { displayString: "1" },
+      2: { displayString: "2" },
+      4: { displayString: "4" },
+      8: { displayString: "8" },
     },
-    group: "test",
-    overrideConfig: ({ value }) => {
-      if (value === "custom" || value === "quote" || value === "zen") {
-        return {
-          numbers: false,
-          punctuation: false,
-        };
-      }
-      return {};
-    },
-    afterSet: ({ currentConfig }) => {
-      if (currentConfig.mode === "zen" && currentConfig.paceCaret !== "off") {
-        showNoticeNotification(`Pace caret will not work with zen mode.`);
-      }
-    },
-  },
-  quoteLength: {
-    key: "quoteLength",
-    fa: { icon: "fa-quote-right" },
-    displayString: "quote length",
-    changeRequiresRestart: true,
-    group: "test",
-    overrideConfig: ({ currentConfig }) => {
-      if (currentConfig.mode !== "quote") {
-        return {
-          mode: "quote",
-        };
-      }
-      return {};
-    },
-  },
-  language: {
-    key: "language",
-    fa: { icon: "fa-language" },
-    displayString: "language",
-    changeRequiresRestart: true,
-    group: "test",
-    description: "Change in which language you want to type.",
-  },
-  burstHeatmap: {
-    key: "burstHeatmap",
-    fa: { icon: "fa-fire" },
-    displayString: "word burst heatmap",
-    changeRequiresRestart: false,
-    group: "test",
   },
 
+  // ------------------------------------------------------------------
   // behavior
-  difficulty: {
-    key: "difficulty",
-    fa: { icon: "fa-star" },
-    changeRequiresRestart: true,
-    group: "behavior",
-    description:
-      "Normal is the classic typing test experience. Expert fails the test if you submit (press space) an incorrect word. Master fails if you press a single incorrect key (meaning you have to achieve 100% accuracy).",
-  },
-  quickRestart: {
-    key: "quickRestart",
-    fa: { icon: "fa-redo-alt" },
-    displayString: "quick restart",
-    changeRequiresRestart: false,
-    group: "behavior",
-    description:
-      'Press tab, esc or enter to quickly restart the test, or to quickly jump to the test page. These options disable tab navigation on most parts of the website. Using the "esc" option will move opening the commandline to the tab key.',
-  },
-  repeatQuotes: {
-    key: "repeatQuotes",
-    fa: { icon: "fa-sync-alt" },
-    displayString: "repeat quotes",
-    changeRequiresRestart: false,
-    group: "behavior",
-    description:
-      "This setting changes the restarting behavior when typing in quote mode. Changing it to 'typing' will repeat the quote if you restart while typing.",
-  },
+  // ------------------------------------------------------------------
   resultSaving: {
     key: "resultSaving",
-    fa: { icon: "fa-save" },
+    icon: "ph:floppy-disk-bold",
     displayString: "result saving",
     changeRequiresRestart: false,
     group: "behavior",
-    description:
-      'Set this setting to "off" in case you want to practice without saving new results to your account and affecting your statistics.',
   },
-  blindMode: {
-    key: "blindMode",
-    fa: { icon: "fa-eye-slash" },
-    optionsMetadata: {
-      true: {
-        // Use an `&ensp;` here so that the `on` button for blind mode will
-        // have the same height on both Chromium and Firefox.
-        displayString: " ",
-      },
-    },
-    displayString: "blind mode",
+  quickRestart: {
+    key: "quickRestart",
+    icon: "ph:fast-forward-bold",
+    displayString: "quick restart",
     changeRequiresRestart: false,
     group: "behavior",
-    description:
-      "No errors or incorrect words are highlighted. Helps you to focus on raw speed. If enabled, quick end is recommended.",
-  },
-  alwaysShowWordsHistory: {
-    key: "alwaysShowWordsHistory",
-    fa: { icon: "fa-align-left" },
-    displayString: "always show words history",
-    changeRequiresRestart: false,
-    group: "behavior",
-    description:
-      "This option will automatically show the words history at the end of the test. Can cause slight lag with a lot of words.",
   },
   singleListCommandLine: {
     key: "singleListCommandLine",
-    fa: { icon: "fa-list" },
+    icon: "ph:list-bold",
     displayString: "single list command line",
     changeRequiresRestart: false,
     group: "behavior",
-    description:
-      "When enabled, it will show the command line with all commands in a single list instead of submenu arrangements. Selecting 'manual' will expose all commands only after typing >.",
-  },
-  minWpm: {
-    key: "minWpm",
-    fa: { icon: "fa-bomb" },
-    displayString: "min speed",
-    changeRequiresRestart: true,
-    group: "behavior",
-    description:
-      "Automatically fails a test if your speed falls below a threshold.",
-  },
-  minWpmCustomSpeed: {
-    key: "minWpmCustomSpeed",
-    fa: { icon: "fa-bomb" },
-    displayString: "min speed custom",
-    changeRequiresRestart: true,
-    group: "behavior",
-    overrideConfig: ({ currentConfig }) => {
-      if (currentConfig.minWpm !== "custom") {
-        return {
-          minWpm: "custom",
-        };
-      }
-      return {};
-    },
-  },
-  minAcc: {
-    key: "minAcc",
-    fa: { icon: "fa-bomb" },
-    displayString: "min accuracy",
-    changeRequiresRestart: true,
-    group: "behavior",
-    description:
-      "Automatically fails a test if your accuracy falls below a threshold.",
-  },
-  minAccCustom: {
-    key: "minAccCustom",
-    fa: { icon: "fa-bomb" },
-    displayString: "min accuracy custom",
-    changeRequiresRestart: true,
-    group: "behavior",
-    overrideConfig: ({ currentConfig }) => {
-      if (currentConfig.minAcc !== "custom") {
-        return {
-          minAcc: "custom",
-        };
-      }
-      return {};
-    },
-  },
-  minBurst: {
-    key: "minBurst",
-    fa: { icon: "fa-bomb" },
-    displayString: "min word burst",
-    changeRequiresRestart: true,
-    group: "behavior",
-    description:
-      "Automatically fails a test if your raw for a single word falls below this threshold. Selecting 'flex' allows for this threshold to automatically decrease for longer words.",
-  },
-  minBurstCustomSpeed: {
-    key: "minBurstCustomSpeed",
-    fa: { icon: "fa-bomb" },
-    displayString: "min word burst custom speed",
-    changeRequiresRestart: true,
-    group: "behavior",
-  },
-  britishEnglish: {
-    key: "britishEnglish",
-    fa: { icon: "fa-language" },
-    displayString: "british english",
-    changeRequiresRestart: true,
-    group: "behavior",
-    description:
-      "When enabled, the website will use the British spelling instead of American. Note that this might not replace all words correctly. If you find any issues, please let us know.",
-  },
-  funbox: {
-    key: "funbox",
-    fa: { icon: "fa-gamepad" },
-    changeRequiresRestart: true,
-    group: "behavior",
-    description:
-      "These are special modes that change the website in some special way (by altering the word generation, behavior of the website or the looks). Give each one of them a try!",
-    isBlocked: ({ value, currentConfig }) => {
-      if (!checkCompatibility(value)) {
-        showNoticeNotification(
-          `${capitalizeFirstLetter(
-            value.join(", "),
-          )} is an invalid combination of funboxes`,
-        );
-        return true;
-      }
-
-      for (const funbox of value) {
-        const check = canSetFunboxWithConfig(funbox, currentConfig);
-        if (!check.ok) {
-          showNoticeNotification(
-            `"${funbox}" cannot be enabled with the current config`,
-          );
-          return true;
-        }
-      }
-
-      return false;
-    },
-  },
-  customLayoutfluid: {
-    key: "customLayoutfluid",
-    fa: { icon: "fa-tint" },
-    displayString: "custom layoutfluid",
-    changeRequiresRestart: true,
-    group: "behavior",
-    description:
-      "Select which layouts you want the layoutfluid funbox to cycle through.",
-    overrideValue: ({ value }) => {
-      return Array.from(new Set(value));
-    },
-  },
-  customPolyglot: {
-    key: "customPolyglot",
-    fa: { icon: "fa-language" },
-    displayString: "polyglot languages",
-    changeRequiresRestart: false,
-    group: "behavior",
-    description: "Select which languages you want the polyglot funbox to use.",
-    overrideValue: ({ value }) => {
-      return Array.from(new Set(value));
-    },
   },
 
-  // input
-  freedomMode: {
-    key: "freedomMode",
-    fa: { icon: "fa-feather-alt" },
-    changeRequiresRestart: false,
-    displayString: "freedom mode",
-    group: "input",
-    description:
-      "Allows you to delete any word, even if it was typed correctly.",
-    overrideConfig: ({ value }) => {
-      if (value) {
-        return {
-          confidenceMode: "off",
-        };
-      }
-      return {};
-    },
-  },
-  strictSpace: {
-    key: "strictSpace",
-    fa: { icon: "fa-minus" },
-    displayString: "strict space",
-    changeRequiresRestart: true,
-    group: "input",
-    description:
-      "Pressing space at the beginning of a word will insert a space character when this mode is enabled.",
-  },
-  oppositeShiftMode: {
-    key: "oppositeShiftMode",
-    fa: { icon: "fa-exchange-alt" },
-    displayString: "opposite shift mode",
-    changeRequiresRestart: false,
-    group: "input",
-    description:
-      'This mode will force you to use opposite shift keys for shifting. Using an incorrect one will count as an error. This feature ignores keys in locations B, Y, and ^ because many people use the other hand for those keys. If you\'re using external software to emulate your layout (including QMK), you should use the "keymap" mode - the standard "on" will not work. This will enforce opposite shift based on the "keymap layout" setting.',
-  },
-  stopOnError: {
-    key: "stopOnError",
-    fa: { icon: "fa-hand-paper" },
-    displayString: "stop on error",
-    changeRequiresRestart: true,
-    group: "input",
-    description:
-      "Letter mode will stop input when pressing any incorrect letters. Word mode will not allow you to continue to the next word until you correct all mistakes.",
-    overrideConfig: ({ value }) => {
-      if (value !== "off") {
-        return {
-          confidenceMode: "off",
-        };
-      }
-      return {};
-    },
-  },
-  confidenceMode: {
-    key: "confidenceMode",
-    fa: { icon: "fa-backspace" },
-    displayString: "confidence mode",
-    changeRequiresRestart: false,
-    group: "input",
-    description:
-      "When enabled, you will not be able to go back to previous words to fix mistakes. When turned up to the max, you won't be able to backspace at all.",
-    overrideConfig: ({ value }) => {
-      if (value !== "off") {
-        return {
-          freedomMode: false,
-          stopOnError: "off",
-        };
-      }
-      return {};
-    },
-  },
-  quickEnd: {
-    key: "quickEnd",
-    fa: { icon: "fa-step-forward" },
-    displayString: "quick end",
-    changeRequiresRestart: false,
-    group: "input",
-    description:
-      "This only applies to the words mode - when enabled, the test will end as soon as the last word has been typed, even if it's incorrect. When disabled, you need to manually confirm the last incorrect entry with a space.",
-  },
-  indicateTypos: {
-    key: "indicateTypos",
-    fa: { icon: "fa-exclamation" },
-    displayString: "indicate typos",
-    changeRequiresRestart: false,
-    group: "input",
-    description:
-      'Shows typos that you\'ve made. "Below" shows what you typed below the letters, "replace" will replace the letters with the ones you typed and "both" will do the same as replace and below, but it will show the correct letters below your mistakes.',
-  },
-  compositionDisplay: {
-    key: "compositionDisplay",
-    fa: { icon: "fa-language" },
-    displayString: "composition display",
-    changeRequiresRestart: false,
-    group: "input",
-    description:
-      'Change how composition is displayed. "off" will just underline the letter if composition is active. "below" will show the composed character below the test. "replace" will replace the letter in the test with the composed character.',
-  },
-  hideExtraLetters: {
-    key: "hideExtraLetters",
-    fa: { icon: "fa-eye-slash" },
-    displayString: "hide extra letters",
-    changeRequiresRestart: false,
-    group: "input",
-    description:
-      "Hides extra letters. This will completely avoid words jumping lines (due to changing width), but might feel a bit confusing when you press a key and nothing happens.",
-  },
-  lazyMode: {
-    key: "lazyMode",
-    fa: { icon: "fa-couch" },
-    displayString: "lazy mode",
-    changeRequiresRestart: true,
-    group: "input",
-    description:
-      "Replaces accents / diacritics / special characters with their normal letter equivalents.",
-  },
-  layout: {
-    key: "layout",
-    fa: { icon: "fa-keyboard" },
-    displayString: "layout",
-    changeRequiresRestart: true,
-    group: "input",
-    description:
-      "With this setting you can emulate other layouts. This setting is best kept off, as it can break things like dead keys and alt layers.",
-  },
-  codeUnindentOnBackspace: {
-    key: "codeUnindentOnBackspace",
-    fa: { icon: "fa-code" },
-    displayString: "code unindent on backspace",
-    changeRequiresRestart: true,
-    group: "input",
-    description:
-      "Automatically go back to the previous line when deleting line leading tab characters. Only works in code languages.",
-  },
-
-  // sound
-  soundVolume: {
-    key: "soundVolume",
-    fa: { icon: "fa-volume-down" },
-    displayString: "sound volume",
-    changeRequiresRestart: false,
-    group: "sound",
-    description: "Change the volume of the sound effects.",
-  },
-  playSoundOnClick: {
-    key: "playSoundOnClick",
-    optionsMetadata: {
-      off: {},
-      "1": { displayString: "click" },
-      "2": { displayString: "beep" },
-      "3": { displayString: "pop" },
-      "4": { displayString: "nk creams" },
-      "5": { displayString: "typewriter" },
-      "6": { displayString: "osu" },
-      "7": { displayString: "hitmarker" },
-      "8": { displayString: "sine" },
-      "9": { displayString: "sawtooth" },
-      "10": { displayString: "square" },
-      "11": { displayString: "triangle" },
-      "12": { displayString: "pentatonic" },
-      "13": { displayString: "wholetone" },
-      "14": { displayString: "fist fight" },
-      "15": { displayString: "rubber keys" },
-      "16": { displayString: "fart" },
-      "17": { displayString: "akko lavenders" },
-      "18": { displayString: "cherrymx black abs" },
-      "19": { displayString: "cherrymx black pbt" },
-      "20": { displayString: "cherrymx blue abs" },
-      "21": { displayString: "cherrymx blue pbt" },
-      "22": { displayString: "cherrymx brown pbt" },
-      "23": { displayString: "kalih box white" },
-      "24": { displayString: "razer green" },
-      "25": { displayString: "tealios v2" },
-      "26": { displayString: "trust gxt" },
-    },
-    fa: { icon: "fa-volume-up" },
-    displayString: "play sound on click",
-    changeRequiresRestart: false,
-    group: "sound",
-    description: "Plays a short sound when you press a key.",
-  },
-  playSoundOnError: {
-    key: "playSoundOnError",
-    optionsMetadata: {
-      off: {},
-      "1": { displayString: "damage" },
-      "2": { displayString: "triangle" },
-      "3": { displayString: "square" },
-      "4": { displayString: "missed punch" },
-    },
-    fa: { icon: "fa-volume-mute" },
-    displayString: "play sound on error",
-    changeRequiresRestart: false,
-    group: "sound",
-    description:
-      "Plays a short sound if you press an incorrect key or press space too early.",
-  },
-  playTimeWarning: {
-    key: "playTimeWarning",
-    optionsMetadata: {
-      off: {},
-      "1": { displayString: "1 second" },
-      "3": { displayString: "3 seconds" },
-      "5": { displayString: "5 seconds" },
-      "10": { displayString: "10 seconds" },
-    },
-    fa: { icon: "fa-exclamation-triangle" },
-    displayString: "play time warning",
-    changeRequiresRestart: false,
-    group: "sound",
-    description:
-      "Play a short warning sound if you are close to the end of a timed test.",
-  },
-
-  // caret
+  // ------------------------------------------------------------------
+  // caret (restored by master C11)
+  // ------------------------------------------------------------------
   smoothCaret: {
     key: "smoothCaret",
-    fa: { icon: "fa-i-cursor" },
+    icon: "ph:cursor-text-bold",
     displayString: "smooth caret",
     changeRequiresRestart: false,
     group: "caret",
-    description: "The caret will move smoothly between letters and words.",
   },
   caretStyle: {
     key: "caretStyle",
-    fa: { icon: "fa-i-cursor" },
+    icon: "ph:cursor-bold",
     displayString: "caret style",
     changeRequiresRestart: false,
     group: "caret",
-    description: "Change the style of the caret during the test.",
     optionsMetadata: caretOptionsMetadata,
-  },
-  paceCaret: {
-    key: "paceCaret",
-    fa: { icon: "fa-i-cursor" },
-    displayString: "pace caret",
-    changeRequiresRestart: false,
-    group: "caret",
-    description:
-      "Displays a second caret that moves at constant speed. The 'average' option averages the speed of last 10 results. The 'tag pb' option takes the highest PB of any active tag. The 'daily' option takes the highest speed of the last 24 hours.",
-    optionsMetadata: {
-      tagPb: {
-        displayString: "tag pb",
-      },
-      average: {},
-      custom: {},
-      daily: {},
-      last: {},
-      off: {},
-      pb: {},
-    },
-    isBlocked: ({ value }) => {
-      if (document.readyState === "complete") {
-        if ((value === "pb" || value === "tagPb") && !isAuthenticated()) {
-          showNoticeNotification(
-            `Pace caret "pb" and "tag pb" are unavailable without an account`,
-          );
-          return true;
-        }
-      }
-      return false;
-    },
-  },
-  paceCaretCustomSpeed: {
-    key: "paceCaretCustomSpeed",
-    fa: { icon: "fa-i-cursor" },
-    displayString: "pace caret custom speed",
-    changeRequiresRestart: false,
-    group: "caret",
-    overrideConfig: ({ currentConfig }) => {
-      if (currentConfig.paceCaret !== "custom") {
-        return {
-          paceCaret: "custom",
-        };
-      }
-      return {};
-    },
-  },
-  paceCaretStyle: {
-    key: "paceCaretStyle",
-    fa: { icon: "fa-i-cursor" },
-    displayString: "pace caret style",
-    changeRequiresRestart: false,
-    group: "caret",
-    description: "Change the style of the pace caret during the test.",
-    optionsMetadata: caretOptionsMetadata,
-  },
-  repeatedPace: {
-    key: "repeatedPace",
-    fa: { icon: "fa-i-cursor" },
-    displayString: "repeated pace",
-    changeRequiresRestart: false,
-    group: "caret",
-    description:
-      "When repeating a test, a pace caret will automatically be enabled for one test with the speed of your previous test. It does not override the pace caret if it's already enabled.",
   },
 
+  // ------------------------------------------------------------------
   // appearance
+  // ------------------------------------------------------------------
   timerStyle: {
     key: "timerStyle",
-    fa: { icon: "fa-chart-pie" },
-    displayString: "live progress style",
+    icon: "ph:clock-bold",
+    displayString: "timer style",
     changeRequiresRestart: false,
     group: "appearance",
-    description:
-      'Change the style of the timer/word count during a test. "Flash" styles will briefly show the timer in timed modes every 15 seconds.',
   },
   liveSpeedStyle: {
     key: "liveSpeedStyle",
-    fa: { icon: "fa-tachometer-alt" },
-    displayString: "live speed style",
+    icon: "ph:gauge-bold",
+    displayString: "live tpm style",
     changeRequiresRestart: false,
     group: "appearance",
-    description:
-      "Change the style of the live speed displayed during the test.",
-    overrideConfig: ({ value }) => {
-      if (value === "text") {
-        return {
-          monkey: false,
-        };
-      }
-      return {};
-    },
   },
   liveAccStyle: {
     key: "liveAccStyle",
-    fa: { icon: "fa-tachometer-alt" },
-    displayString: "live accuracy style",
+    icon: "ph:target-bold",
+    displayString: "live acc style",
     changeRequiresRestart: false,
     group: "appearance",
-    description:
-      "Change the style of the live accuracy displayed during the test.",
-    overrideConfig: ({ value }) => {
-      if (value === "text") {
-        return {
-          monkey: false,
-        };
-      }
-      return {};
-    },
-  },
-  liveBurstStyle: {
-    key: "liveBurstStyle",
-    fa: { icon: "fa-tachometer-alt" },
-    displayString: "live word burst style",
-    changeRequiresRestart: false,
-    group: "appearance",
-    description:
-      "Change the style of the live burst speed displayed during the test.",
   },
   timerColor: {
     key: "timerColor",
-    fa: { icon: "fa-chart-pie" },
+    icon: "ph:palette-bold",
     displayString: "timer color",
     changeRequiresRestart: false,
     group: "appearance",
-    description:
-      "Change the color of the progress, live speed, accuracy and burst text.",
   },
   timerOpacity: {
     key: "timerOpacity",
-    fa: { icon: "fa-chart-pie" },
+    icon: "ph:drop-bold",
     displayString: "timer opacity",
     changeRequiresRestart: false,
     group: "appearance",
-    description:
-      "Change the opacity of the progress, live speed, burst and accuracy text.",
-  },
-  highlightMode: {
-    key: "highlightMode",
-    fa: { icon: "fa-highlighter" },
-    displayString: "highlight mode",
-    changeRequiresRestart: false,
-    group: "appearance",
-    description: "Change what is highlighted during the test.",
-  },
-  typedEffect: {
-    key: "typedEffect",
-    fa: { icon: "fa-eye" },
-    displayString: "typed effect",
-    changeRequiresRestart: false,
-    group: "appearance",
-    description: "Change how typed words are shown.",
-  },
-  tapeMode: {
-    key: "tapeMode",
-    fa: { icon: "fa-tape" },
-    triggerResize: true,
-    changeRequiresRestart: false,
-    displayString: "tape mode",
-    group: "appearance",
-    description:
-      "Only shows one line which scrolls horizontally. Setting this to 'word' will make it scroll after every word and 'letter' will scroll after every keypress. Works best with smooth line scroll enabled and a monospace font.",
-    overrideConfig: ({ value }) => {
-      if (value !== "off") {
-        return {
-          showAllLines: false,
-        };
-      }
-      return {};
-    },
-  },
-  tapeMargin: {
-    key: "tapeMargin",
-    fa: { icon: "fa-tape" },
-    displayString: "tape margin",
-    triggerResize: true,
-    changeRequiresRestart: false,
-    group: "appearance",
-    description:
-      "When in tape mode, set the carets position from the left edge of the typing test as a percentage (for example, 50% centers it).",
-  },
-  smoothLineScroll: {
-    key: "smoothLineScroll",
-    fa: { icon: "fa-align-left" },
-    displayString: "smooth line scroll",
-    changeRequiresRestart: false,
-    group: "appearance",
-    description: "When enabled, the line transition will be animated.",
-  },
-  showAllLines: {
-    key: "showAllLines",
-    fa: { icon: "fa-align-left" },
-    changeRequiresRestart: false,
-    displayString: "show all lines",
-    group: "appearance",
-    description:
-      "When enabled, the website will show all lines for word, custom and quote mode tests - otherwise the lines will be limited to 3, and will automatically scroll. Using this could cause the timer text and live speed to not be visible.",
-    isBlocked: ({ value, currentConfig }) => {
-      if (value && currentConfig.tapeMode !== "off") {
-        showNoticeNotification("Show all lines doesn't support tape mode.");
-        return true;
-      }
-      return false;
-    },
   },
   alwaysShowDecimalPlaces: {
     key: "alwaysShowDecimalPlaces",
-    fa: {
-      icon: "fa-ellipsis-h",
-    },
+    icon: "ph:list-numbers-bold",
     displayString: "always show decimal places",
     changeRequiresRestart: false,
     group: "appearance",
-    description:
-      "Always shows decimal places for values on the result page, without the need to hover over the stats.",
-  },
-  typingSpeedUnit: {
-    key: "typingSpeedUnit",
-    fa: { icon: "fa-tachometer-alt" },
-    displayString: "typing speed unit",
-    changeRequiresRestart: false,
-    group: "appearance",
-    description: "Display typing speed in the specified unit.",
   },
   startGraphsAtZero: {
     key: "startGraphsAtZero",
-    fa: { icon: "fa-chart-line" },
+    icon: "ph:chart-line-bold",
     displayString: "start graphs at zero",
     changeRequiresRestart: false,
     group: "appearance",
-    description:
-      "Force graph axis to always start at zero, no matter what the data is. Turning this off may exaggerate the value changes.",
   },
   maxLineWidth: {
     key: "maxLineWidth",
-    fa: { icon: "fa-text-width" },
-    changeRequiresRestart: false,
-    triggerResize: true,
+    icon: "ph:arrows-horizontal-bold",
     displayString: "max line width",
+    changeRequiresRestart: false,
     group: "appearance",
-    description:
-      "Change the maximum width of the typing test, measured in characters. Setting this to 0 will align the words to the edges of the content area.",
+    triggerResize: true,
+    overrideValue: ({ value }) => {
+      if (value < 20 && value !== 0) return 20;
+      if (value > 1000) return 1000;
+      return value;
+    },
   },
   fontSize: {
     key: "fontSize",
-    fa: { icon: "fa-font" },
-    changeRequiresRestart: false,
-    triggerResize: true,
+    icon: "ph:ruler-bold",
     displayString: "font size",
+    changeRequiresRestart: false,
     group: "appearance",
-    description: "Change the font size of the test words.",
+    triggerResize: true,
+    overrideValue: ({ value }) => (value < 0 ? 1 : roundTo1(value)),
   },
   fontFamily: {
     key: "fontFamily",
-    fa: { icon: "fa-font" },
+    icon: "ph:text-aa-bold",
     displayString: "font family",
     changeRequiresRestart: false,
     group: "appearance",
-    description:
-      "Change the font family used by the website. Using a local font will override your choice. ",
-    optionsMetadata: {
-      Comic_Sans_MS: {
-        displayString: "Helvetica",
-      },
-    },
-  },
-  keymapMode: {
-    key: "keymapMode",
-    fa: { icon: "fa-keyboard" },
-    displayString: "keymap mode",
-    changeRequiresRestart: false,
-    group: "appearance",
-    description:
-      "Displays your current layout while taking a test. React shows what you pressed and Next shows what you need to press next.",
-  },
-  keymapLayout: {
-    key: "keymapLayout",
-    fa: { icon: "fa-keyboard" },
-    displayString: "keymap layout",
-    changeRequiresRestart: false,
-    group: "appearance",
-    description: "Controls which layout is displayed on the keymap.",
-    overrideConfig: ({ currentConfig }) =>
-      currentConfig.keymapMode === "off" ? { keymapMode: "static" } : {},
-  },
-  keymapStyle: {
-    key: "keymapStyle",
-    fa: { icon: "fa-keyboard" },
-    displayString: "keymap style",
-    changeRequiresRestart: false,
-    group: "appearance",
-    overrideConfig: ({ currentConfig }) =>
-      currentConfig.keymapMode === "off" ? { keymapMode: "static" } : {},
-  },
-  keymapLegendStyle: {
-    key: "keymapLegendStyle",
-    fa: { icon: "fa-keyboard" },
-    displayString: "keymap legend style",
-    changeRequiresRestart: false,
-    group: "appearance",
-    overrideConfig: ({ currentConfig }) =>
-      currentConfig.keymapMode === "off" ? { keymapMode: "static" } : {},
-  },
-  keymapKeys: {
-    key: "keymapKeys",
-    fa: { icon: "fa-keyboard" },
-    displayString: "keymap keys",
-    changeRequiresRestart: false,
-    group: "appearance",
-    overrideConfig: ({ currentConfig }) =>
-      currentConfig.keymapMode === "off" ? { keymapMode: "static" } : {},
-  },
-  keymapSize: {
-    key: "keymapSize",
-    fa: { icon: "fa-keyboard" },
     triggerResize: true,
-    changeRequiresRestart: false,
-    displayString: "keymap size",
-    group: "appearance",
-    description: "Change the size of the keymap.",
-    overrideValue: ({ value }) => {
-      if (value < 0.5) value = 0.5;
-      if (value > 3.5) value = 3.5;
-      return roundTo1(value);
-    },
-    overrideConfig: ({ currentConfig }) =>
-      currentConfig.keymapMode === "off" ? { keymapMode: "static" } : {},
   },
 
+  // ------------------------------------------------------------------
   // theme
+  // ------------------------------------------------------------------
   flipTestColors: {
     key: "flipTestColors",
-    fa: { icon: "fa-adjust" },
+    icon: "ph:arrows-left-right-bold",
     displayString: "flip test colors",
     changeRequiresRestart: false,
     group: "theme",
-    description:
-      "By default, typed text is brighter than the future text. When enabled, the colors will be flipped and the future text will be brighter than the already typed text.",
   },
   colorfulMode: {
     key: "colorfulMode",
-    fa: { icon: "fa-fill-drip" },
+    icon: "ph:paint-brush-bold",
     displayString: "colorful mode",
     changeRequiresRestart: false,
     group: "theme",
-    description:
-      "When enabled, the test words will use the main color, instead of the text color, making the website more colorful.",
   },
   customBackground: {
     key: "customBackground",
-    fa: { icon: "fa-link" },
+    icon: "ph:image-bold",
     displayString: "custom background",
     changeRequiresRestart: false,
     group: "theme",
-    overrideValue: ({ value }) => {
-      return value.trim();
-    },
-    description:
-      "Set an image url or local image to be a custom background image. Local image always take priority over the image url. Cover fits the image to cover the screen. Contain fits the image to be fully visible. Max fits the image corner to corner.",
+    overrideValue: ({ value }) => value.trim(),
   },
   customBackgroundSize: {
     key: "customBackgroundSize",
-    fa: { icon: "fa-image" },
+    icon: "ph:arrows-out-bold",
     displayString: "custom background size",
     changeRequiresRestart: false,
     group: "theme",
-    description:
-      "Set an image url or local image to be a custom background image. Cover fits the image to cover the screen. Contain fits the image to be fully visible. Max fits the image corner to corner.",
   },
   customBackgroundFilter: {
     key: "customBackgroundFilter",
-    fa: { icon: "fa-image" },
+    icon: "ph:sliders-horizontal-bold",
     displayString: "custom background filter",
     changeRequiresRestart: false,
     group: "theme",
-    description: "Apply various effects to the custom background.",
   },
   autoSwitchTheme: {
     key: "autoSwitchTheme",
-    fa: { icon: "fa-palette" },
+    icon: "ph:circle-half-bold",
     displayString: "auto switch theme",
     changeRequiresRestart: false,
     group: "theme",
-    description:
-      "Enabling this will automatically switch the theme between light and dark depending on the system theme.",
   },
   themeLight: {
     key: "themeLight",
-    fa: { icon: "fa-palette" },
-    displayString: "theme light",
+    icon: "ph:sun-bold",
+    displayString: "light theme",
     changeRequiresRestart: false,
     group: "theme",
   },
   themeDark: {
     key: "themeDark",
-    fa: { icon: "fa-palette" },
-    displayString: "theme dark",
+    icon: "ph:circle-half-bold",
+    displayString: "dark theme",
     changeRequiresRestart: false,
     group: "theme",
   },
   randomTheme: {
     key: "randomTheme",
-    fa: { icon: "fa-palette" },
-    changeRequiresRestart: false,
+    icon: "ph:shuffle-bold",
     displayString: "random theme",
+    changeRequiresRestart: false,
     group: "theme",
-    description:
-      "After completing a test, the theme will be set to a random one. The random themes are not saved to your config. If set to 'favorite' only favorite themes will be randomized. If set to 'light' or 'dark', only presets with light or dark background colors will be randomized, respectively. If set to 'auto' dark or light themes are used, depending on your system theme. If set to 'custom', custom themes will be randomized.",
-    optionsMetadata: {
-      fav: {
-        displayString: "favorite",
-      },
-      auto: {},
-      custom: {},
-      dark: {},
-      light: {},
-      off: {},
-      on: {},
-    },
     isBlocked: ({ value }) => {
-      if (value === "custom") {
-        if (!isAuthenticated()) {
-          showNoticeNotification(
-            "Random theme 'custom' is unavailable without an account",
-          );
-          return true;
-        }
-        if (CustomThemes.__nonReactive.getCustomThemes().length === 0) {
-          showNoticeNotification(
-            "Random theme 'custom' requires at least one custom theme to be saved",
-          );
-          return true;
-        }
+      if (value === "custom" && !isAuthenticated()) {
+        showNoticeNotification(
+          "Random custom theme requires an account with custom themes",
+        );
+        return true;
+      }
+      if (value === "custom" && CustomThemes.getCustomThemes().length === 0) {
+        showNoticeNotification("You need to create a custom theme first");
+        return true;
       }
       return false;
     },
   },
   favThemes: {
     key: "favThemes",
-    fa: { icon: "fa-palette" },
+    icon: "ph:star-bold",
     displayString: "favorite themes",
     changeRequiresRestart: false,
     group: "theme",
   },
   theme: {
     key: "theme",
-    fa: { icon: "fa-palette" },
+    icon: "ph:palette-bold",
+    displayString: "theme",
     changeRequiresRestart: false,
     group: "theme",
-    description:
-      "Completely change the look and feel of the website by picking one of the presets, or by creating your own completely custom theme.",
-    overrideConfig: () => {
-      return {
-        customTheme: false,
-      };
-    },
+    overrideConfig: ({ currentConfig }) =>
+      currentConfig.customTheme ? { customTheme: false } : {},
   },
   customTheme: {
     key: "customTheme",
-    fa: { icon: "fa-palette" },
+    icon: "ph:pen-nib-bold",
     displayString: "custom theme",
     changeRequiresRestart: false,
     group: "theme",
   },
   customThemeColors: {
     key: "customThemeColors",
-    fa: { icon: "fa-palette" },
+    icon: "ph:paint-bucket-bold",
     displayString: "custom theme colors",
     changeRequiresRestart: false,
     group: "theme",
-    overrideValue: ({ value }) => {
-      const allColorsThesame = value.every((color) => color === value[0]);
-      if (allColorsThesame) {
-        return getDefaultConfig().customThemeColors;
-      } else {
-        return value;
-      }
-    },
   },
 
+  // ------------------------------------------------------------------
   // hide elements
+  // ------------------------------------------------------------------
   showKeyTips: {
     key: "showKeyTips",
-    fa: { icon: "fa-question" },
-    displayString: "show key tips",
+    icon: "ph:keyboard-bold",
+    displayString: "key tips",
     changeRequiresRestart: false,
     group: "hideElements",
-    description: "Shows the keybind tips at the bottom of the page.",
-    optionsMetadata: {
-      true: { displayString: "show" },
-      false: { displayString: "hide" },
-    },
   },
   showOutOfFocusWarning: {
     key: "showOutOfFocusWarning",
-    fa: { icon: "fa-exclamation" },
-    displayString: "show out of focus warning",
+    icon: "ph:eye-bold",
+    displayString: "out of focus warning",
     changeRequiresRestart: false,
     group: "hideElements",
-    description:
-      "Shows an out of focus reminder after 1 second of being 'out of focus' (not being able to type).",
-    optionsMetadata: {
-      true: { displayString: "show" },
-      false: { displayString: "hide" },
-    },
-  },
-  capsLockWarning: {
-    key: "capsLockWarning",
-    fa: { icon: "fa-exclamation-triangle" },
-    displayString: "caps lock warning",
-    changeRequiresRestart: false,
-    group: "hideElements",
-    description: "Displays a warning when caps lock is on.",
-    optionsMetadata: {
-      true: { displayString: "show" },
-      false: { displayString: "hide" },
-    },
   },
   showAverage: {
     key: "showAverage",
-    fa: { icon: "fa-chart-bar" },
-    displayString: "show average",
+    icon: "ph:chart-bar-bold",
+    displayString: "average",
     changeRequiresRestart: false,
     group: "hideElements",
-    description:
-      "Displays your average speed and/or accuracy over the last 10 tests.",
   },
   showPb: {
     key: "showPb",
-    fa: { icon: "fa-crown" },
-    displayString: "show personal best",
+    icon: "ph:crown-bold",
+    displayString: "personal best",
     changeRequiresRestart: false,
     group: "hideElements",
   },
 
+  // ------------------------------------------------------------------
   // other (hidden)
+  // ------------------------------------------------------------------
   accountChart: {
     key: "accountChart",
-    fa: { icon: "fa-chart-line" },
+    icon: "ph:chart-line-bold",
     displayString: "account chart",
     changeRequiresRestart: false,
     group: "hidden",
-    overrideValue: ({ value, currentValue }) => {
-      // if both speed and accuracy are off, set opposite to on
-      // i dedicate this fix to AshesOfAFallen and our 2 collective brain cells
-      if (value[0] === "off" && value[1] === "off") {
-        const changedIndex = value[0] === currentValue[0] ? 0 : 1;
-        value[changedIndex] = "on";
-      }
-      return value;
-    },
-  },
-  monkey: {
-    key: "monkey",
-    fa: { icon: "fa-egg" },
-    displayString: "monkey",
-    changeRequiresRestart: false,
-    group: "hidden",
-    overrideConfig: ({ value, currentConfig }) => {
-      if (value) {
-        return {
-          liveSpeedStyle:
-            currentConfig.liveSpeedStyle === "text"
-              ? "mini"
-              : currentConfig.liveSpeedStyle,
-          liveAccStyle:
-            currentConfig.liveAccStyle === "text"
-              ? "mini"
-              : currentConfig.liveAccStyle,
-        };
-      }
-      return {};
-    },
-  },
-  monkeyPowerLevel: {
-    key: "monkeyPowerLevel",
-    fa: { icon: "fa-egg" },
-    displayString: "monkey power level",
-    changeRequiresRestart: false,
-    group: "hidden",
-  },
-
-  // ads
-  ads: {
-    key: "ads",
-    fa: { icon: "fa-ad" },
-    changeRequiresRestart: false,
-    description: `You can disable or enable ads at any time. "Result" will show one ad on the result page, "on" will add floating vertical banners, and "sellout" will add multiple ads on every page.`,
-    group: "ads",
-    overrideValue: ({ value }) => {
-      if (isDevEnvironment()) {
-        return "off";
-      }
-      return value;
-    },
-    isBlocked: ({ value }) => {
-      if (value !== "off" && isDevEnvironment()) {
-        showNoticeNotification("Ads are disabled in development mode.");
-        return true;
-      }
-      return false;
-    },
-    afterSet: ({ nosave }) => {
-      if (!nosave && !isDevEnvironment()) {
-        reloadAfter(3);
-        showNoticeNotification("Ad settings changed. Refreshing...");
-      }
-    },
   },
 };
-
-// typed accessor for a single option's metadata, avoiding per-callsite casts
-export function getOptionMetadata<K extends keyof ConfigSchemas.Config>(
-  key: K,
-  option: ConfigSchemas.Config[K],
-): OptionMetadata | undefined {
-  return (
-    configMetadata[key] as {
-      optionsMetadata?: Record<string, OptionMetadata> | undefined;
-    }
-  ).optionsMetadata?.[String(option)];
-}
-
-// the selectable options for a config key, excluding those marked visible:false
-export function getVisibleOptions<K extends keyof ConfigSchemas.Config>(
-  key: K,
-): ConfigSchemas.Config[K][] | undefined {
-  return getOptions(ConfigSchemas.ConfigSchema.shape[key])?.filter(
-    (option) =>
-      getOptionMetadata(key, option as ConfigSchemas.Config[K])?.visible !==
-      false,
-  ) as ConfigSchemas.Config[K][] | undefined;
-}
-
-// the label shown for a single option (and used to match it while searching)
-export function getOptionLabel<K extends keyof ConfigSchemas.Config>(
-  key: K,
-  option: ConfigSchemas.Config[K],
-): string {
-  const optionMeta = getOptionMetadata(key, option);
-  if (optionMeta?.displayString !== undefined) return optionMeta.displayString;
-  if (option === true) return "on";
-  if (option === false) return "off";
-  return String(option).replace(/_/g, " ");
-}
-
-// all of a setting's visible option labels joined, so search can match on them
-export function getOptionSearchKeywords<K extends keyof ConfigSchemas.Config>(
-  key: K,
-): string {
-  return (getVisibleOptions(key) ?? [])
-    .map((option) => getOptionLabel(key, option))
-    .join(" ");
-}
