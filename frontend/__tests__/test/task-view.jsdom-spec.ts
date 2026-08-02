@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -19,6 +22,21 @@ import type { TaskView } from "../../src/ts/test/test-engine";
  * 2. at any moment, `document.body.textContent` does not contain the answer of
  *    any task whose `data-result` is unset (C29's own testable statement).
  */
+
+/**
+ * Same fixed cold-graph cost as the other jsdom specs in this directory:
+ * `test-ui` pulls in the config store, the states, the collections and the
+ * generated icon bundle (measured at ~1.0 s cold, ~0 ms warm), and the
+ * `vi.resetModules()` below re-executes it for every test so the module-level
+ * stream offset and the `states/test` signals cannot leak between them. Under
+ * the full 54-file suite competing for the CPU that setup cost alone exceeds
+ * vitest's default 5 s per-test budget.
+ *
+ * Explicit budget here rather than a `testTimeout` in `vitest.config.ts`, which
+ * is WP-12's file — matching `result-screen.jsdom-spec.ts` and
+ * `task-stream-geometry.jsdom-spec.ts`.
+ */
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
 const SETTINGS: MathSettings = { ...DEFAULT_MATH_SETTINGS, time: 1 };
 
@@ -65,6 +83,64 @@ describe("task stream rendering", () => {
       const firstPrompt = engine.viewAt(0)?.prompt ?? "";
       expect(firstPrompt.length).toBeGreaterThan(0);
       expect(document.body.textContent).not.toContain(firstPrompt);
+    });
+
+    /**
+     * The stated threat model, directly: `test.scss` really does put
+     * `filter: blur(4px)` on `#tasks.preStart`, but that is decoration over an
+     * empty placeholder, not the hide itself. Deleting every stylesheet rule —
+     * what a devtools user does in two clicks, and what a screenshot of a
+     * mid-load page could catch — must reveal nothing, because there is
+     * nothing in the markup to reveal.
+     */
+    it("survives having every style stripped off (CP-046)", async () => {
+      const ui = await loadUi();
+      const engine = createTestEngine({ seed: 90210, settings: SETTINGS });
+      ui.applyPreStart();
+
+      // Simulate the devtools attack: drop the blur and the opacity entirely.
+      const tasks = document.querySelector("#tasks") as HTMLElement;
+      tasks.classList.remove("preStart", "blurred");
+      tasks.style.filter = "none";
+      tasks.style.opacity = "1";
+      for (const el of document.querySelectorAll<HTMLElement>("*")) {
+        el.style.removeProperty("filter");
+        el.style.removeProperty("opacity");
+      }
+
+      const batcher = createTaskBatcher(90210, SETTINGS);
+      const first = batcher.take();
+      const firstAnswer = renderAnswerDisplay(first.answer, first.kind);
+
+      // Nothing is *renderable*: no text node anywhere under #tasks, so there
+      // is nothing for a screenshot to catch however the CSS is mangled.
+      expect(tasks.textContent).toBe("");
+
+      // …and nothing is readable in the elements panel either: every attribute
+      // on every masked task is structural. A short answer like "4" is a
+      // substring of `data-taskindex="4"` by pure coincidence, so the check has
+      // to be per-attribute rather than over the serialised HTML — the same
+      // reason `STRUCTURAL_ATTRS` exists further down this file.
+      const allowed = new Set([
+        "class",
+        "style",
+        "data-taskindex",
+        "data-masked",
+      ]);
+      for (const el of tasks.querySelectorAll("*")) {
+        for (const attr of el.attributes) {
+          expect(allowed).toContain(attr.name);
+          if (attr.name === "data-taskindex") continue;
+          expect(attr.value).not.toContain(firstAnswer);
+          expect(attr.value).not.toContain(first.prompt);
+        }
+      }
+
+      // The prompt string itself is nowhere at all — it is long enough that a
+      // coincidental match is not a concern.
+      expect(document.body.innerHTML).not.toContain(first.prompt);
+      // And the engine has not handed the answer out either.
+      expect(engine.viewAt(0)?.expected).toBeUndefined();
     });
 
     it("carries the `preStart` class and `data-state` (CP-046, CP-186)", async () => {
@@ -270,6 +346,90 @@ describe("task stream rendering", () => {
       const html = document.querySelector("#tasks")?.innerHTML ?? "";
       // no digits at all can appear, since neither prompt nor answer is rendered
       expect(html).not.toMatch(/>[^<]*\d/);
+    });
+
+    /**
+     * C29's written acceptance test is about the DOM, but the requirement it
+     * serves is "the user cannot read the answer ahead of time", and `index.ts`
+     * hands a handful of objects to `window` for console debugging. Those are
+     * client state that is every bit as trivially readable as the DOM, and
+     * nothing else in the suite looks at them.
+     */
+    describe("nor the console surface", () => {
+      it("exposes no answer through `window.currentEventLog()`", async () => {
+        const { buildEventLog } = await import("../../src/ts/test/events/data");
+        const { logTestEvent, setEventLogContext } =
+          await import("../../src/ts/test/events/data");
+
+        const seed = 4242;
+        const batcher = createTaskBatcher(seed, SETTINGS);
+        const answers: string[] = [];
+        const prompts: string[] = [];
+        for (let i = 0; i < 12; i++) {
+          const task = batcher.take();
+          answers.push(renderAnswerDisplay(task.answer, task.kind));
+          prompts.push(task.prompt);
+        }
+
+        // Exactly what `test-logic.ts` records for a run in progress: the first
+        // task shown, one wrong answer committed, the clock ticking.
+        setEventLogContext({
+          targetPrompts: [],
+          mode: "time",
+          mode2: "1",
+          mathSeed: seed,
+          settingsId: "custom",
+        });
+        logTestEvent("timer", 0, { event: "start" });
+        logTestEvent("taskShown", 1, {
+          taskIndex: 0,
+          prompt: prompts[0] ?? "",
+        });
+        logTestEvent("answerSubmitted", 2, {
+          taskIndex: 0,
+          given: "999999",
+          correct: false,
+        });
+        logTestEvent("taskShown", 3, {
+          taskIndex: 1,
+          prompt: prompts[1] ?? "",
+        });
+
+        const dumped = JSON.stringify(buildEventLog());
+        // Not even the answer of the task the user just got *wrong* — the log
+        // records what was entered and whether it was right, never what was
+        // right (see the C29 note in `test/events/types.ts`).
+        for (const answer of answers) {
+          expect(dumped).not.toContain(`"${answer}"`);
+        }
+        expect(dumped).toContain(`"${prompts[0] ?? ""}"`);
+      });
+
+      it("hands no task data to `window` at boot", async () => {
+        const index = readFileSync(
+          resolve(process.cwd(), "src/ts/index.ts"),
+          "utf8",
+        );
+        const call = /addToGlobal\(\{([\s\S]*?)\}\);/.exec(index)?.[1] ?? "";
+        expect(call).not.toBe("");
+
+        const keys = [...call.matchAll(/^\s*(\w+)\s*:/gm)].map((m) => m[1]);
+        // The engine is module-private on purpose (see the `test-logic.ts`
+        // header). If a future change puts it, the task store or a view
+        // accessor on `window`, this list changes and this test fails.
+        expect(keys).toEqual([
+          "snapshot",
+          "config",
+          "glarsesMode",
+          "enableTimerDebug",
+          "getTimerStats",
+          "toggleDebugLogs",
+          "qs",
+          "qsa",
+          "qsr",
+          "currentEventLog",
+        ]);
+      });
     });
   });
 

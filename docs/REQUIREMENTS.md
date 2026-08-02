@@ -541,6 +541,24 @@ kept unchanged by INV-033 — renaming it would force a schema edit, a DoD-27 ed
 The *label* changes to `idle` because "afk" is gamer jargon that CP-178's tone rules argue against, and
 because doc 04's authors reached for "idle" independently. AC-039's worked example is unaffected (0 s idle).
 
+**Amendment (task #75, coordinator ruling R5 — `afkDetected` is a separate quantity from `afkDuration`).**
+The table above governs `afkDuration`: the **summed** count of whole seconds that carried no input, persisted,
+and the term in AC-026's XP formula. That is unchanged.
+
+`afkDetected` — the boolean behind the results screen's `idle detected` note (CP-096's `.group.info`) — was
+previously undefined. It is hereby defined as **"the run *ended* idle"**: true when the last
+**5** seconds of the run all carried no input. A run shorter than the window is judged on its whole length,
+and a run with zero elapsed seconds is never flagged. This is upstream's own rule under C19
+(`getKeypressesPerSecond(eventLog).slice(-5).every(kps => kps === 0)`), reproduced exactly.
+
+**It is explicitly NOT `afkDuration >= 60`.** In a typing test a second with no keystroke is anomalous; in a
+math trainer it is the *normal* state — a user computing `847 × 23` is silent for several seconds by design,
+and those seconds are counted in `afkDuration`. A summed threshold would therefore fire on a perfectly
+attentive eight-minute run made of sixty ordinary thinking pauses, which is precisely the population the note
+must not accuse of walking away. The trailing-window rule says only what the note claims: you stopped and did
+not come back. `afkDetected` is display-only — not persisted, not part of any metric, and with no effect on
+saving, PBs or leaderboards — so this definition is scoped to the notice and touches nothing in C37's table.
+
 ### C38 — `bailedOut` was load-bearing but never defined (review gap 6)
 
 **Conflict.** AC-121.4 made a result ineligible when `result.bailedOut === true`; INV-033 keeps the field;

@@ -13,6 +13,11 @@ import * as DB from "./db";
 import "./ui";
 import { Config } from "./config/store";
 import * as TestLogic from "./test/test-logic";
+// Side-effect import, load-bearing: `test/result.ts` registers itself as the
+// results presenter (`TestLogic.registerResultPresenter`) at module load, and
+// nothing else on the boot path pulls it in. Without this line a finished run
+// hands off to the no-op default and the results screen never renders (CP-090).
+import "./test/result";
 import * as TestTimer from "./test/test-timer";
 import { onAuthStateChanged } from "./auth";
 import { enable } from "./legacy-states/glarses-mode";

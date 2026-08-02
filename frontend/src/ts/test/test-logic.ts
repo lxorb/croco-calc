@@ -75,8 +75,17 @@ export type TestResultPayload = {
 
 type ResultPresenter = (payload: TestResultPayload) => void | Promise<void>;
 
+/**
+ * Replaced by WP-07's `test/result.ts` at module load. If it is ever still in
+ * place when a run finishes, the results screen was never imported by the boot
+ * path — fail loudly rather than swallowing the run in silence.
+ */
 let presentResult: ResultPresenter = () => {
-  /* replaced by WP-07's result.ts at module load */
+  console.error(
+    "No result presenter registered: `test/result.ts` was never imported, so " +
+      "the finished run cannot be displayed. `index.ts` must keep its " +
+      '`import "./test/result";` side-effect import.',
+  );
 };
 
 /**
@@ -339,8 +348,19 @@ function buildCompletedEvent(
 }
 
 /**
- * C19 / C37 — "you walked away", not "you were slow". A run shorter than the
- * window is judged on its whole length, which is upstream's `slice(-5)`.
+ * C19 / C37 (as amended for `afkDetected`) — "you walked away", not "you were
+ * slow". True when the last {@link AFK_TRAILING_SECONDS} seconds all carried no
+ * input; a run shorter than the window is judged on its whole length, which is
+ * upstream's `slice(-5)` exactly.
+ *
+ * Deliberately not `afkDuration >= 60`: `afkDuration` sums *every* silent
+ * second, and in a math trainer silence is thinking time, so a summed threshold
+ * accuses an attentive user of leaving. See the C37 amendment in
+ * `docs/REQUIREMENTS.md`.
+ *
+ * `elapsed === 0` returns false rather than upstream's vacuous `[].every()`
+ * true: a run in which no second has passed cannot meaningfully have been
+ * abandoned, and it is already flagged `too short` (CP-109).
  */
 function isAfkDetected(active: TestEngine): boolean {
   const elapsed = active.snapshot().elapsedSeconds;

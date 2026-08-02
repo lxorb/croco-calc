@@ -22,6 +22,22 @@ import type { TaskView } from "../../src/ts/test/test-engine";
  * - the caret is handed the *delta* of the jump, not the cumulative offset.
  */
 
+/**
+ * `test-ui` pulls in the config store, the states, the collections and the
+ * generated icon bundle; transforming and executing that graph cold costs ~1.0 s
+ * on an idle machine (measured: 1033 ms cold, 0 ms warm, against 97 ms for the
+ * `renderStream` call the first test actually asserts on). `vi.resetModules()`
+ * below deliberately re-executes it per test — the isolation is load-bearing,
+ * see the note there — and under the full 52-file suite competing for the CPU
+ * that fixed cost pushes the first test past vitest's default 5 s budget.
+ *
+ * So this is a setup cost, not a slow assertion. It gets an explicit, generous
+ * budget here rather than a `testTimeout` in `vitest.config.ts`, which is
+ * WP-12's file. Same treatment, and same reasoning, as
+ * `result-screen.jsdom-spec.ts`.
+ */
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
+
 const TASK_HEIGHT = 40;
 const TASK_MARGIN = 5;
 const LINE_HEIGHT = TASK_HEIGHT + TASK_MARGIN * 2;
@@ -135,6 +151,13 @@ function marginTop(): number {
 
 describe("the task stream window (CP-044)", () => {
   beforeEach(() => {
+    // Load-bearing, despite the ~1 s per-test cost it buys (see the budget note
+    // at the top of the file). `test-ui` keeps `lineHeight` and `streamOffset`
+    // in module scope and `states/test` holds Solid signals in module scope, so
+    // without a fresh registry the offset accumulated by one test leaks into
+    // the next — and "clamps the out-of-focus warning" asserts that
+    // `outOfFocusMaxHeight()` is still *unset* before the first render, which
+    // is only true of a module that has not rendered yet.
     vi.resetModules();
     setupDom();
     installFakeLayout();
