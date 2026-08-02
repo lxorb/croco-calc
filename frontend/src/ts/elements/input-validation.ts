@@ -146,19 +146,19 @@ export class ValidatedHtmlInputElement<
 
     this.indicator = new InputIndicator(this, {
       success: {
-        icon: "fa-check",
+        icon: "ph:check-bold",
         level: 1,
       },
       failed: {
-        icon: "fa-times",
+        icon: "ph:x-bold",
         level: -1,
       },
       warning: {
-        icon: "fa-exclamation-triangle",
+        icon: "ph:warning-bold",
         level: 1,
       },
       checking: {
-        icon: "fa-circle-notch",
+        icon: "ph:circle-notch-bold",
         spinIcon: true,
         level: 0,
       },

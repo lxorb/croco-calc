@@ -1140,7 +1140,7 @@ function checkUniqueSelector(
 
     addBanner({
       level: "error",
-      icon: "fas fa-exclamation-triangle",
+      icon: "ph:warning-bold",
       text: "Warning: qs/qsr detected selector(s) matching multiple elements, check console for details.",
     });
   }

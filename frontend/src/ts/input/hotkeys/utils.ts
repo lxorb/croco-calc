@@ -29,7 +29,7 @@ export function createHotkey(
       callback(e, context);
     },
     () => ({
-      ignoreInputs: false, //hotkeys are active on the words input, but not on other interactive elements
+      ignoreInputs: false, //hotkeys are active on the answer input (#tasksInput), but not on other interactive elements
       stopPropagation: false, //we set stopPropagation in the callback if the hotkey executes
       preventDefault: false, //we set preventDefault in the callback if the hotkey executes
       requireReset: true,

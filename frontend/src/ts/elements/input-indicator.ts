@@ -1,6 +1,8 @@
 import { ElementWithUtils } from "../utils/dom";
+import { renderIconHtml } from "../utils/icon-html";
 
 type InputIndicatorOption = {
+  /** An iconify id, e.g. `"ph:check-bold"` (C10, DoD-12). */
   icon: string;
   spinIcon?: true;
   message?: string;
@@ -48,9 +50,10 @@ export class InputIndicator {
         data-balloon-pos="left"
         ${(option.message ?? "") ? `aria-label="${option.message}"` : ""}
       >
-        <i class="fas fa-fw ${option.icon} ${
-          option.spinIcon ? "fa-spin" : ""
-        }"></i>
+        ${renderIconHtml(option.icon, {
+          fixedWidth: true,
+          spin: option.spinIcon,
+        })}
       </div>
       `;
     }

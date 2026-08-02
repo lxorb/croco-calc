@@ -43,7 +43,7 @@ async function getLatest(): Promise<PSA[] | null> {
       addBanner({
         level: "notice",
         text: "Dev Info: Backend server not running",
-        icon: "fas fa-exclamation-triangle",
+        icon: "ph:warning-bold",
       });
     } else {
       type InstatusSummary = {
@@ -216,7 +216,7 @@ export async function show(): Promise<void> {
     addBanner({
       level,
       text: psa.message,
-      icon: "fas fa-bullhorn",
+      icon: "ph:megaphone-bold",
       important: psa.sticky ?? false,
       onClose: () => {
         setMemory(psa._id);

@@ -40,9 +40,10 @@ COPY ["docker/backend/entry-point.sh", "./"]
 
 RUN echo "${server_version}" > /app/backend/dist/server.version
 
-# INF-042: MODE and nothing else. monkeytype's image hardcoded BYPASS_ANTICHEAT,
-# BYPASS_EMAILCLIENT and BYPASS_FIREBASE; BYPASS_FIREBASE=true disables
-# authentication outright, which must never ship. Verify with
+# INF-042: MODE and nothing else. monkeytype's image hardcoded three BYPASS_*
+# switches (anti-cheat, email client, firebase); the firebase one disables
+# authentication outright, which must never ship. None of them is set here, and
+# DoD-04a asserts exactly that. Verify with
 #   docker inspect --format '{{json .Config.Env}}' ghcr.io/lxorb/croco-calc-api:<sha>
 ENV MODE=prod
 

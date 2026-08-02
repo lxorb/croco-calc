@@ -1,6 +1,11 @@
 @import "balloon-css/balloon.min.css";
 @import "core.scss";
 
+// DoD-12 / INV-116 — the standalone pages used to pull font awesome off a CDN.
+// They now inline the same iconify bodies the app bundles, so they need the
+// `svg.icon` presentation rules too.
+@import "icons.scss";
+
 @font-face {
   font-family: "Roboto Mono";
   font-style: normal;

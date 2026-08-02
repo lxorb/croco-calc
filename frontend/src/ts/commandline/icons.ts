@@ -1,47 +1,24 @@
-import { createRoot } from "solid-js";
-
-import { Icon } from "../components/common/Icon";
+import {
+  __testing as iconHtmlTesting,
+  renderIconHtml,
+} from "../utils/icon-html";
 
 /**
  * Iconify markup for the command palette (master C30, WP-04 exit criterion:
  * zero font awesome class strings anywhere in `frontend/src`, per DoD-12).
  *
  * `commandline.ts` builds its suggestion list as one big HTML string, so it
- * cannot mount `<Icon />` as a component. Rather than duplicate the generated
- * icon bundle — which only `components/common/Icon.tsx` owns (WP-04) — this
- * renders that component once per id in a detached reactive root and caches the
- * resulting `outerHTML`.
- *
- * The read happens **after** `createRoot` returns: Solid flushes the effect
- * queue in `completeUpdates` before handing control back, and it is that effect
- * which writes the icon body into the `<svg>`. Reading inside the root callback
- * would therefore yield an empty element.
+ * cannot mount `<Icon />` as a component. The rendering and caching live in
+ * `utils/icon-html.ts`, which the input-field status indicator shares; this
+ * module only adds the palette's fallback-icon rule on top.
  */
-const cache = new Map<string, string>();
 
 /** The palette's fallback icon — the reference used a chevron glyph here. */
 export const DEFAULT_COMMAND_ICON = "ph:caret-right-bold";
 
 export function getIconHtml(icon?: string, extraClass?: string): string {
   const id = icon !== undefined && icon !== "" ? icon : DEFAULT_COMMAND_ICON;
-  const cacheKey = `${id}|${extraClass ?? ""}`;
-
-  const cached = cache.get(cacheKey);
-  if (cached !== undefined) return cached;
-
-  let svg: SVGSVGElement | undefined;
-  const dispose = createRoot((dispose) => {
-    svg = Icon({ icon: id, fixedWidth: true, class: extraClass }) as
-      | SVGSVGElement
-      | undefined;
-    return dispose;
-  });
-
-  const html = svg?.outerHTML ?? "";
-  dispose();
-
-  cache.set(cacheKey, html);
-  return html;
+  return renderIconHtml(id, { fixedWidth: true, class: extraClass });
 }
 
 /**
@@ -52,4 +29,4 @@ export function getIconHtml(icon?: string, extraClass?: string): string {
  */
 export const BLANK_ICON_HTML = `<span style="display:inline-block;width:1.25em"></span>`;
 
-export const __testing = { cache };
+export const __testing = iconHtmlTesting;
