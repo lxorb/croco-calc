@@ -2,6 +2,11 @@
 
 Status of the `crococalc.com` domain, Cloudflare zone, Firebase Auth hardening, and email.
 
+**Mail summary (decided 2026-08-02, user decision):** receiving = **Cloudflare Email Routing** (free,
+`contact@` and `support@` forward to `me@emilvinu.de`, enabled manually by the user); sending = **Firebase
+Auth only**, from its own domain. The backend sends no mail and no sending-related DNS record is needed.
+See §4.
+
 **This file contains no secrets.** API tokens, client secrets, refresh tokens and signer keys must never
 be added to it. The Cloudflare API token is read at call time from `C:\Users\me\agent-secrets\cloudflare.txt`
 (see INF-028); Firebase admin calls use an OAuth2 access token minted from the local `firebase-tools`
@@ -91,7 +96,39 @@ Confirmed by an independent `GET .../config`, which returned
 
 ---
 
-## 4. Email on `crococalc.com` — BLOCKED on token permissions
+## 4. Email on `crococalc.com` — architecture decided, enabling is a user action
+
+> ### Decided 2026-08-02 by user decision
+>
+> Moving email to Azure was considered and **cancelled**. The architecture is:
+>
+> | Direction | Owner | Cost | What it needs on this zone |
+> |---|---|---|---|
+> | **Sending** — account verification, password reset | **Firebase Auth**, from its own Firebase-hosted domain | $0 | **nothing** — no SPF, no DKIM, no DMARC, no sending domain |
+> | **Receiving** — `contact@crococalc.com`, `support@crococalc.com` → `me@emilvinu.de` | **Cloudflare Email Routing** | $0 | MX + SPF, which **Cloudflare creates itself** when routing is enabled |
+>
+> **The backend sends no email at all.** Audited 2026-08-02: `backend/src/init/email-client.ts` does not
+> exist, `nodemailer` has zero references in `backend/src` and is absent from `backend/package.json`, and
+> `backend/email-templates/`, `backend/src/queues/` and `backend/src/workers/` are all gone.
+> `backend/src/utils/croco-mail.ts` remains, but it only builds the **in-app inbox** message — it sends
+> nothing and imports no transport. So the old note at the end of this section about needing a transactional
+> SMTP provider for `noreply@crococalc.com` is **obsolete**: nothing sends as that address, and nothing needs
+> to.
+>
+> **Why not Azure Communication Services?** For sending it would be redundant — Firebase already does it,
+> free, with no DNS work. For receiving it is not merely redundant but **incapable**: ACS Email has no
+> inbound feature. Its Event Grid integration carries only delivery and engagement reports for *outbound*
+> mail, so there is no inbound event type to route and no mailbox a person can open. The Azure-family answer
+> to "a human must read `contact@`" is an Exchange Online mailbox at roughly $4/user/month — which buys
+> nothing over Cloudflare's $0 forward and would eat ~10 % of the remaining budget headroom. Cloudflare Email
+> Routing is therefore kept **deliberately**, not by inertia.
+>
+> **No mail-related DNS records have been created by tooling.** The zone was re-verified on 2026-08-02 and
+> holds **zero DNS records of any type — zero MX, zero TXT**. This matters: when the user enables Email
+> Routing, Cloudflare writes its own MX and SPF records into a completely clean zone, with nothing to
+> conflict against.
+
+### Original blocker record (still accurate on the token, retained for context)
 
 **Not configured. Nothing was created.** The Cloudflare API token currently in
 `agent-secrets\cloudflare.txt` is valid and active but is **not scoped for Email Routing**.
@@ -159,14 +196,21 @@ Re-read `GET /zones/{zone}/email/routing/dns` after enabling and replace this se
 Cloudflare does **not** create a DMARC record; consider adding `_dmarc` TXT `v=DMARC1; p=quarantine`
 (the pattern already used on `emilvinu.de`).
 
-### Email Routing cannot send mail
+### Email Routing cannot send mail — and nothing needs it to
 
-Cloudflare Email Routing is **inbound forwarding only**. The backend sends verification and
-password-reset mail through nodemailer SMTP (`backend/src/init/email-client.ts`, env vars `EMAIL_HOST`,
-`EMAIL_USER`, `EMAIL_PASS`, `EMAIL_PORT`, `EMAIL_FROM`; the hardcoded default is still
-`Monkeytype <noreply@monkeytype.com>`). Sending as `noreply@crococalc.com` needs a separate transactional
-SMTP provider plus its own SPF include and DKIM records on this zone. That is not covered by Email Routing
-and is not set up.
+Cloudflare Email Routing is **inbound forwarding only**. That is fine, because **nothing in croco calc sends
+mail from `crococalc.com`**:
+
+- Firebase Auth sends verification and password-reset mail itself, from its own Firebase domain. It needs no
+  records on this zone.
+- The backend's SMTP client is **gone** — see the audit in the decision box at the top of this section. The
+  paragraph that used to sit here described `backend/src/init/email-client.ts` and its
+  `EMAIL_HOST`/`EMAIL_USER`/`EMAIL_PASS`/`EMAIL_PORT`/`EMAIL_FROM` env vars, defaulting to
+  `Monkeytype <noreply@monkeytype.com>`. That file no longer exists and those variables have no consumer.
+
+Consequently **no SPF include, no DKIM selector and no DMARC record is required for sending**, and none
+should be added. If a future feature genuinely needs the app to send mail, that is a new decision requiring
+a sending domain and its own DNS records — do not assume the current setup supports it.
 
 ---
 
@@ -253,21 +297,31 @@ To undo: `DELETE /accounts/{account}/workers/domains/{domain_id}`.
 
 ### Done and verified
 
-- `crococalc.com` zone confirmed active, id `16b25af306fcd3f45a28b54f65602e9a`, zero DNS records.
+- `crococalc.com` zone confirmed active, id `16b25af306fcd3f45a28b54f65602e9a`, **zero DNS records** —
+  re-verified 2026-08-02 via `GET /zones/{zone}/dns_records?per_page=100`: `result` was an empty array,
+  **zero MX and zero TXT**. No mail-related record has been created by any tooling, so the zone is clean for
+  the user to enable Email Routing into.
+- Mail architecture decided (§4): receiving = Cloudflare Email Routing, sending = Firebase Auth only.
+  Azure Communication Services evaluated and rejected — it cannot receive mail into a human-readable mailbox.
+- Backend mail subsystem audited and confirmed **absent** (no `email-client.ts`, no `nodemailer`, no
+  templates, no queues/workers); `croco-mail.ts` correctly survives as the in-app inbox builder.
 - Firebase `authorizedDomains` extended to include `crococalc.com` and `www.crococalc.com`, re-read to confirm.
 - Firebase `signIn.email.passwordRequired` set to `true`, re-read to confirm; email-link sign-in disabled.
 
 ### Pending — human action required
 
-1. **Grant Email Routing permissions** to the Cloudflare API token (Account → Email Routing Addresses →
-   Edit; Zone → Email Routing Rules → Edit), or configure Email Routing in the dashboard. Nothing about
-   email works until this is done.
+1. **Enable Cloudflare Email Routing** on `crococalc.com` — **the user has taken this on** and will do it in
+   the dashboard (crococalc.com → Email → Email Routing). Either grant the API token the two missing
+   permission groups (Account → Email Routing Addresses → Edit; Zone → Email Routing Rules → Edit) or skip
+   the API entirely and use the dashboard. Add `contact@crococalc.com` and `support@crococalc.com` as
+   forwards to `me@emilvinu.de`. Let Cloudflare write the MX/SPF records itself.
 2. **Click the verification link** Cloudflare emails to `me@emilvinu.de` once it is added as a destination.
-   Routing rules deliver nothing before this.
+   Routing rules deliver nothing before this. Unavoidably human.
 3. **Decide the contact address.** `docs/requirements/03-pages-core.md` §10 blocker **B-1** still has
    `<CONTACT_EMAIL>` set to the placeholder `me@emilvinu.de`. With the domain live, `contact@crococalc.com`
    is the natural value — update the build-time constant (CP-156) once routing forwards it.
-4. **Choose an outbound SMTP provider** if the backend is to send as `noreply@crococalc.com`.
+4. ~~**Choose an outbound SMTP provider.**~~ **Struck 2026-08-02** — nothing sends from this domain. Firebase
+   Auth owns all user-facing mail and sends from its own domain.
 5. **Deploy the `croco-calc` Worker**, then apply §5 to bind apex and `www`.
 6. **Update INF-024 / INF-025** in `docs/requirements/06-infra-and-ops.md` to reflect that a custom domain
    now exists.
