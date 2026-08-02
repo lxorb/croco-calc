@@ -1,30 +1,29 @@
 import { JSXElement } from "solid-js";
 
-import { ViewApeKeyModal } from "./account-settings/ViewApeKeyModal";
 import { ContactModal } from "./ContactModal";
 import { CookiesModal } from "./CookiesModal";
-import { CustomTestDurationModal } from "./CustomTestDurationModal";
-import { CustomTextModal } from "./CustomTextModal";
-import { CustomWordAmountModal } from "./CustomWordAmountModal";
-import { EditResultTagsModal } from "./EditResultTagsModal";
 import { ForgotPasswordModal } from "./ForgotPasswordModal";
 import { GoogleSignupModal } from "./GoogleSignUpModal";
 import { LastSignedOutResultModal } from "./LastSignedOutResultModal";
 import { MobileTestConfigModal } from "./MobileTestConfigModal";
 import { PbTablesModal } from "./PbTablesModal";
-import { AddPresetModal } from "./preset/AddPresetModal";
-import { EditPresetModal } from "./preset/EditPresetModal";
-import { QuoteRateModal } from "./QuoteRateModal";
-import { QuoteReportModal } from "./QuoteReportModal";
-import { QuoteSearchModal } from "./QuoteSearchModal";
 import { RegisterCaptchaModal } from "./RegisterCaptchaModal";
 import { ShareTestSettings } from "./ShareTestSettings";
 import { SimpleModal } from "./SimpleModal";
 import { StreakHourOffsetModal } from "./StreakHourOffsetModal";
 import { SupportModal } from "./SupportModal";
+import { ThemeModal } from "./ThemeModal";
 import { UserReportModal } from "./UserReportModal";
 import { VersionHistoryModal } from "./VersionHistoryModal";
 
+/**
+ * The mounted modal set (INV-114 KEEP / INV-115 DELETE, CP-190).
+ *
+ * The quote system, custom text, word-count and duration pickers, the word
+ * filter, tags and config presets are all cut (INV-115), so nothing from those
+ * trees is mounted here any more. `ThemeModal` is new UI extracted from the
+ * deleted settings page (INV-116, C9).
+ */
 export function Modals(): JSXElement {
   return (
     <>
@@ -32,26 +31,17 @@ export function Modals(): JSXElement {
       <ContactModal />
       <RegisterCaptchaModal />
       <SupportModal />
+      <ThemeModal />
       <SimpleModal />
-      <CustomTextModal />
-      <QuoteRateModal />
-      <QuoteReportModal />
-      <QuoteSearchModal />
-      <CustomTestDurationModal />
-      <CustomWordAmountModal />
       <PbTablesModal />
       <ShareTestSettings />
       <MobileTestConfigModal />
       <CookiesModal />
-      <AddPresetModal />
-      <EditPresetModal />
-      <ViewApeKeyModal />
       <LastSignedOutResultModal />
       <StreakHourOffsetModal />
       <GoogleSignupModal />
       <ForgotPasswordModal />
       <UserReportModal />
-      <EditResultTagsModal />
     </>
   );
 }
