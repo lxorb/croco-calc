@@ -18,7 +18,7 @@ describe("ConfigController", () => {
       getConfigMock.mockResolvedValue({
         _id: new ObjectId(),
         uid: uid,
-        config: { language: "english" },
+        config: { addition: "1000" },
       });
 
       //WHEN
@@ -30,7 +30,7 @@ describe("ConfigController", () => {
       //THEN
       expect(body).toStrictEqual({
         message: "Configuration retrieved",
-        data: { language: "english" },
+        data: { addition: "1000" },
       });
 
       expect(getConfigMock).toHaveBeenCalledWith(uid);
@@ -52,7 +52,7 @@ describe("ConfigController", () => {
         .patch("/configs")
         .set("Authorization", `Bearer ${uid}`)
         .accept("application/json")
-        .send({ language: "english" })
+        .send({ addition: "1000" })
         .expect(200);
 
       //THEN
@@ -62,7 +62,7 @@ describe("ConfigController", () => {
       });
 
       expect(saveConfigMock).toHaveBeenCalledWith(uid, {
-        language: "english",
+        addition: "1000",
       });
     });
     it("should fail with unknown config", async () => {

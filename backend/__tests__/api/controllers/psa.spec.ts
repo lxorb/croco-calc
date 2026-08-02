@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { setup } from "../../__testData__/controller-test";
 import * as PsaDal from "../../../src/dal/psa";
-import * as Prometheus from "../../../src/utils/prometheus";
 import { ObjectId } from "mongodb";
 
 const { mockApp, uid } = setup();
@@ -9,11 +8,9 @@ const { mockApp, uid } = setup();
 describe("Psa Controller", () => {
   describe("get psa", () => {
     const getPsaMock = vi.spyOn(PsaDal, "get");
-    const recordClientVersionMock = vi.spyOn(Prometheus, "recordClientVersion");
 
     afterEach(() => {
       getPsaMock.mockClear();
-      recordClientVersionMock.mockClear();
     });
 
     it("get psas without authorization", async () => {
@@ -57,25 +54,12 @@ describe("Psa Controller", () => {
           },
         ],
       });
-
-      expect(recordClientVersionMock).toHaveBeenCalledWith("unknown");
     });
     it("get psas with authorization", async () => {
       await mockApp
         .get("/psas")
         .set("Authorization", `Bearer ${uid}`)
         .expect(200);
-    });
-
-    it("get psas records x-client-version", async () => {
-      await mockApp.get("/psas").set("x-client-version", "1.0").expect(200);
-
-      expect(recordClientVersionMock).toHaveBeenCalledWith("1.0");
-    });
-    it("get psas records client-version", async () => {
-      await mockApp.get("/psas").set("client-version", "2.0").expect(200);
-
-      expect(recordClientVersionMock).toHaveBeenCalledWith("2.0");
     });
   });
 });

@@ -5,82 +5,68 @@ import * as PublicDal from "../../../src/dal/public";
 const { mockApp } = setup();
 
 describe("PublicController", () => {
-  describe("get speed histogram", () => {
-    const getSpeedHistogramMock = vi.spyOn(PublicDal, "getSpeedHistogram");
+  describe("get score histogram", () => {
+    const getScoreHistogramMock = vi.spyOn(PublicDal, "getScoreHistogram");
 
     afterEach(() => {
-      getSpeedHistogramMock.mockClear();
+      getScoreHistogramMock.mockClear();
     });
 
-    it("gets for english time 60", async () => {
+    it("gets for time 4", async () => {
       //GIVEN
-      getSpeedHistogramMock.mockResolvedValue({ "0": 1, "10": 2 });
+      getScoreHistogramMock.mockResolvedValue({ "0": 1, "10": 2 });
 
       //WHEN
       const { body } = await mockApp
-        .get("/public/speedHistogram")
-        .query({ language: "english", mode: "time", mode2: "60" })
+        .get("/public/scoreHistogram")
+        .query({ mode: "time", mode2: "4" })
         .expect(200);
 
       //THEN
       expect(body).toEqual({
-        message: "Public speed histogram retrieved",
+        message: "Public score histogram retrieved",
         data: { "0": 1, "10": 2 },
       });
 
-      expect(getSpeedHistogramMock).toHaveBeenCalledWith(
-        "english",
-        "time",
-        "60",
-      );
+      expect(getScoreHistogramMock).toHaveBeenCalledWith("time", "4");
     });
 
-    it("gets for mode", async () => {
-      for (const mode of ["time", "words", "quote", "zen", "custom"]) {
-        const response = await mockApp
-          .get("/public/speedHistogram")
-          .query({ language: "english", mode, mode2: "custom" });
-        expect(response.status, `for mode ${mode}`).toEqual(200);
-      }
-    });
+    //SB-176: leaderboards, and therefore the histogram, exist for time 4 and 8 only
+    it("gets for every leaderboard mode2", async () => {
+      getScoreHistogramMock.mockResolvedValue({});
 
-    it("gets for mode2", async () => {
-      for (const mode2 of [
-        "10",
-        "25",
-        "50",
-        "100",
-        "15",
-        "30",
-        "60",
-        "120",
-        "zen",
-        "custom",
-      ]) {
+      for (const mode2 of ["4", "8"]) {
         const response = await mockApp
-          .get("/public/speedHistogram")
-          .query({ language: "english", mode: "words", mode2 });
+          .get("/public/scoreHistogram")
+          .query({ mode: "time", mode2 });
 
         expect(response.status, `for mode2 ${mode2}`).toEqual(200);
       }
     });
+
+    it("fails for a non-leaderboard mode2", async () => {
+      for (const mode2 of ["1", "2", "15", "60"]) {
+        const response = await mockApp
+          .get("/public/scoreHistogram")
+          .query({ mode: "time", mode2 });
+
+        expect(response.status, `for mode2 ${mode2}`).toEqual(422);
+      }
+    });
+
     it("fails for missing query", async () => {
-      const { body } = await mockApp.get("/public/speedHistogram").expect(422);
+      const { body } = await mockApp.get("/public/scoreHistogram").expect(422);
 
       expect(body).toEqual({
         message: "Invalid query schema",
-        validationErrors: [
-          '"language" Required',
-          '"mode" Required',
-          '"mode2" Needs to be either a number, "zen" or "custom".',
-        ],
+        validationErrors: ['"mode" Required', '"mode2" Required'],
       });
     });
+
     it("fails for invalid query", async () => {
       const { body } = await mockApp
-        .get("/public/speedHistogram")
+        .get("/public/scoreHistogram")
         .query({
-          language: "en?gli.sh",
           mode: "unknownMode",
           mode2: "unknownMode2",
         })
@@ -89,50 +75,52 @@ describe("PublicController", () => {
       expect(body).toEqual({
         message: "Invalid query schema",
         validationErrors: [
-          '"language" Invalid enum value. Must be a supported language',
-          `"mode" Invalid enum value. Expected 'time' | 'words' | 'quote' | 'custom' | 'zen', received 'unknownMode'`,
-          '"mode2" Needs to be a number or a number represented as a string e.g. "10".',
+          `"mode" Invalid enum value. Expected 'time', received 'unknownMode'`,
+          `"mode2" Invalid enum value. Expected '4' | '8', received 'unknownMode2'`,
         ],
       });
     });
+
+    //AC-090 / INV-153: there is no language axis any more
     it("fails for unknown query", async () => {
       const { body } = await mockApp
-        .get("/public/speedHistogram")
+        .get("/public/scoreHistogram")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
-          extra: "value",
+          mode2: "4",
+          language: "english",
         })
         .expect(422);
 
       expect(body).toEqual({
         message: "Invalid query schema",
-        validationErrors: ["Unrecognized key(s) in object: 'extra'"],
+        validationErrors: ["Unrecognized key(s) in object: 'language'"],
       });
     });
   });
-  describe("get typing stats", () => {
-    const getTypingStatsMock = vi.spyOn(PublicDal, "getTypingStats");
+
+  describe("get site stats", () => {
+    const getSiteStatsMock = vi.spyOn(PublicDal, "getSiteStats");
 
     afterEach(() => {
-      getTypingStatsMock.mockClear();
+      getSiteStatsMock.mockClear();
     });
 
     it("gets without authentication", async () => {
       //GIVEN
-      getTypingStatsMock.mockResolvedValue({
+      getSiteStatsMock.mockResolvedValue({
+        _id: "stats",
         testsCompleted: 23,
         testsStarted: 42,
         timeSpent: 1000,
-      } as any);
+      });
 
       //WHEN
-      const { body } = await mockApp.get("/public/typingStats").expect(200);
+      const { body } = await mockApp.get("/public/siteStats").expect(200);
 
       //THEN
       expect(body).toEqual({
-        message: "Public typing stats retrieved",
+        message: "Public site stats retrieved",
         data: {
           testsCompleted: 23,
           testsStarted: 42,

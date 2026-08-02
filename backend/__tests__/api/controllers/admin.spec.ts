@@ -6,8 +6,6 @@ import * as AdminUuidDal from "../../../src/dal/admin-uids";
 import * as UserDal from "../../../src/dal/user";
 import * as ReportDal from "../../../src/dal/report";
 import * as LogsDal from "../../../src/dal/logs";
-import GeorgeQueue from "../../../src/queues/george-queue";
-import * as AuthUtil from "../../../src/utils/auth";
 
 import { enableRateLimitExpects } from "../../__testData__/rate-limit";
 import Test from "supertest/lib/test";
@@ -64,22 +62,19 @@ describe("AdminController", () => {
 
   describe("toggle ban", () => {
     const userBannedMock = vi.spyOn(UserDal, "setBanned");
-    const georgeBannedMock = vi.spyOn(GeorgeQueue, "userBanned");
     const getUserMock = vi.spyOn(UserDal, "getPartialUser");
 
     beforeEach(() => {
-      [userBannedMock, georgeBannedMock, getUserMock].forEach((it) =>
-        it.mockClear(),
-      );
+      [userBannedMock, getUserMock].forEach((it) => it.mockClear());
       userBannedMock.mockResolvedValue();
     });
 
-    it("should ban user with discordId", async () => {
+    //INV-190: banning no longer announces anything to Discord
+    it("should ban user", async () => {
       //GIVEN
       const victimUid = new ObjectId().toHexString();
       getUserMock.mockResolvedValue({
         banned: false,
-        discordId: "discordId",
       } as any);
 
       //WHEN
@@ -97,12 +92,10 @@ describe("AdminController", () => {
 
       expect(getUserMock).toHaveBeenCalledWith(victimUid, "toggle ban", [
         "banned",
-        "discordId",
       ]);
       expect(userBannedMock).toHaveBeenCalledWith(victimUid, true);
-      expect(georgeBannedMock).toHaveBeenCalledWith("discordId", true);
     });
-    it("should unban user without discordId", async () => {
+    it("should unban user", async () => {
       //GIVEN
       const victimUid = new ObjectId().toHexString();
       getUserMock.mockResolvedValue({
@@ -124,10 +117,8 @@ describe("AdminController", () => {
 
       expect(getUserMock).toHaveBeenCalledWith(victimUid, "toggle ban", [
         "banned",
-        "discordId",
       ]);
       expect(userBannedMock).toHaveBeenCalledWith(victimUid, false);
-      expect(georgeBannedMock).not.toHaveBeenCalled();
     });
     it("should fail without mandatory properties", async () => {
       //GIVEN
@@ -183,102 +174,12 @@ describe("AdminController", () => {
       const victimUid = new ObjectId().toHexString();
       getUserMock.mockResolvedValue({
         banned: false,
-        discordId: "discordId",
       } as any);
 
       //WHEN
       await expect(
         mockApp
           .post("/admin/toggleBan")
-          .send({ uid: victimUid })
-          .set("Authorization", `Bearer ${uid}`),
-      ).toBeRateLimited({ max: 1, windowMs: 5000 });
-    });
-  });
-
-  describe("clear streak hour offset", () => {
-    const clearStreakHourOffset = vi.spyOn(UserDal, "clearStreakHourOffset");
-
-    beforeEach(() => {
-      clearStreakHourOffset.mockClear();
-      clearStreakHourOffset.mockResolvedValue();
-    });
-
-    it("should clear streak hour offset for user", async () => {
-      //GIVEN
-      const victimUid = new ObjectId().toHexString();
-
-      //WHEN
-      const { body } = await mockApp
-        .post("/admin/clearStreakHourOffset")
-        .send({ uid: victimUid })
-        .set("Authorization", `Bearer ${uid}`)
-        .expect(200);
-
-      //THEN
-      expect(body).toEqual({
-        message: "Streak hour offset cleared",
-        data: null,
-      });
-      expect(clearStreakHourOffset).toHaveBeenCalledWith(victimUid);
-    });
-    it("should fail without mandatory properties", async () => {
-      //GIVEN
-
-      //WHEN
-      const { body } = await mockApp
-        .post("/admin/clearStreakHourOffset")
-        .send({})
-        .set("Authorization", `Bearer ${uid}`)
-        .expect(422);
-
-      //THEN
-      expect(body).toEqual({
-        message: "Invalid request data schema",
-        validationErrors: ['"uid" Required'],
-      });
-    });
-    it("should fail with unknown properties", async () => {
-      //GIVEN
-
-      //WHEN
-      const { body } = await mockApp
-        .post("/admin/clearStreakHourOffset")
-        .send({ uid: new ObjectId().toHexString(), extra: "value" })
-        .set("Authorization", `Bearer ${uid}`)
-        .expect(422);
-
-      //THEN
-      expect(body).toEqual({
-        message: "Invalid request data schema",
-        validationErrors: ["Unrecognized key(s) in object: 'extra'"],
-      });
-    });
-    it("should fail if user is no admin", async () => {
-      await expectFailForNonAdmin(
-        mockApp
-          .post("/admin/clearStreakHourOffset")
-          .send({ uid: new ObjectId().toHexString() })
-          .set("Authorization", `Bearer ${uid}`),
-      );
-    });
-    it("should fail if admin endpoints are disabled", async () => {
-      //GIVEN
-      await expectFailForDisabledEndpoint(
-        mockApp
-          .post("/admin/clearStreakHourOffset")
-          .send({ uid: new ObjectId().toHexString() })
-          .set("Authorization", `Bearer ${uid}`),
-      );
-    });
-    it("should be rate limited", async () => {
-      //GIVEN
-      const victimUid = new ObjectId().toHexString();
-
-      //WHEN
-      await expect(
-        mockApp
-          .post("/admin/clearStreakHourOffset")
           .send({ uid: victimUid })
           .set("Authorization", `Bearer ${uid}`),
       ).toBeRateLimited({ max: 1, windowMs: 5000 });
@@ -514,46 +415,6 @@ describe("AdminController", () => {
         mockApp
           .post("/admin/report/reject")
           .send({ reports: [{ reportId: "1" }] })
-          .set("Authorization", `Bearer ${uid}`),
-      ).toBeRateLimited({ max: 1, windowMs: 5000 });
-    });
-  });
-  describe("send forgot password email", () => {
-    const sendForgotPasswordEmailMock = vi.spyOn(
-      AuthUtil,
-      "sendForgotPasswordEmail",
-    );
-
-    beforeEach(() => {
-      sendForgotPasswordEmailMock.mockClear();
-    });
-
-    it("should send forgot password link", async () => {
-      //GIVEN
-
-      //WHEN
-      const { body } = await mockApp
-        .post("/admin/sendForgotPasswordEmail")
-        .send({ email: "meowdec@example.com" })
-        .set("Authorization", `Bearer ${uid}`)
-        .expect(200);
-
-      //THEN
-      expect(body).toEqual({
-        message: "Password reset request email sent.",
-        data: null,
-      });
-
-      expect(sendForgotPasswordEmailMock).toHaveBeenCalledWith(
-        "meowdec@example.com",
-      );
-    });
-    it("should be rate limited", async () => {
-      //WHEN
-      await expect(
-        mockApp
-          .post("/admin/sendForgotPasswordEmail")
-          .send({ email: "meowdec@example.com" })
           .set("Authorization", `Bearer ${uid}`),
       ).toBeRateLimited({ max: 1, windowMs: 5000 });
     });

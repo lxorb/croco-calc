@@ -44,8 +44,8 @@ describe("configuration middleware", () => {
   it("should pass for enabled configuration with complex path", () => {
     //GIVEN
     const req = givenRequest(
-      { path: "users.xp.streak.enabled" },
-      { users: { xp: { streak: { enabled: true } as any } as any } as any },
+      { path: "leaderboards.weeklyXp.enabled" },
+      { leaderboards: { weeklyXp: { enabled: true } as any } as any },
     );
 
     //WHEN

@@ -112,7 +112,7 @@ describe("Configuration Controller", () => {
       mockAuth.noAuth();
       const patch = {
         users: {
-          premium: {
+          profiles: {
             enabled: true,
           },
         },
