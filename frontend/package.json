@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@croco-calc/contracts": "workspace:*",
+    "@croco-calc/math-engine": "workspace:*",
     "@croco-calc/schemas": "workspace:*",
     "@croco-calc/util": "workspace:*",
     "@date-fns/utc": "1.2.0",
