@@ -5,7 +5,7 @@ import {
   getContributorsList,
   getReleasesFromGitHub,
   getSupportersList,
-} from "../utils/json-data";
+} from "../utils/static-data";
 import { getNumberWithMagnitude, numberWithSpaces } from "../utils/numbers";
 import { baseKey } from "./utils/keys";
 import { format as dateFormat } from "date-fns/format";
@@ -14,8 +14,8 @@ const queryKeys = {
   root: () => baseKey("public"),
   contributors: () => [...queryKeys.root(), "contributors"],
   supporters: () => [...queryKeys.root(), "supporters"],
-  typingStats: () => [...queryKeys.root(), "typingStats"],
-  speedHistogram: () => [...queryKeys.root(), "speedHistogram"],
+  trainingStats: () => [...queryKeys.root(), "trainingStats"],
+  scoreHistogram: () => [...queryKeys.root(), "scoreHistogram"],
   versionHistory: () => [...queryKeys.root(), "versionHistory"],
 };
 
@@ -39,18 +39,18 @@ export const getSupportersQueryOptions = () =>
   });
 
 // oxlint-disable-next-line typescript/explicit-function-return-type
-export const getTypingStatsQueryOptions = () =>
+export const getTrainingStatsQueryOptions = () =>
   queryOptions({
-    queryKey: queryKeys.typingStats(),
-    queryFn: fetchTypingStats,
+    queryKey: queryKeys.trainingStats(),
+    queryFn: fetchTrainingStats,
     staleTime,
   });
 
 // oxlint-disable-next-line typescript/explicit-function-return-type
-export const getSpeedHistogramQueryOptions = () =>
+export const getScoreHistogramQueryOptions = () =>
   queryOptions({
-    queryKey: queryKeys.speedHistogram(),
-    queryFn: fetchSpeedHistogram,
+    queryKey: queryKeys.scoreHistogram(),
+    queryFn: fetchScoreHistogram,
     staleTime,
   });
 
@@ -64,18 +64,22 @@ export const getVersionHistoryQueryOptions = () =>
     initialPageParam: 1,
   });
 
-async function fetchSpeedHistogram(): Promise<
+/**
+ * CP-137 — the distribution of personal-best scores of `time 8` leaderboard
+ * results, bucketed in steps of ten score points. `language` is gone from the
+ * query because the brief removes language from the leaderboard entirely.
+ */
+async function fetchScoreHistogram(): Promise<
   | {
       labels: string[];
       data: { x: number; y: number }[];
     }
   | undefined
 > {
-  const response = await Ape.public.getSpeedHistogram({
+  const response = await Ape.public.getScoreHistogram({
     query: {
-      language: "english",
       mode: "time",
-      mode2: "60",
+      mode2: "8",
     },
   });
 
@@ -124,30 +128,31 @@ type GroupDisplay = {
   subText: string;
 };
 
-async function fetchTypingStats(): Promise<{
-  timeTyping: GroupDisplay;
+/** CP-134 / CP-135 — the three-up global stats hero. */
+async function fetchTrainingStats(): Promise<{
+  timeTraining: GroupDisplay;
   testsStarted: GroupDisplay;
   testsCompleted: GroupDisplay;
 }> {
-  const response = await Ape.public.getTypingStats();
+  const response = await Ape.public.getSiteStats();
 
   if (response.status !== 200) {
     throw new Error(response.body.message);
   }
   const data = response.body.data;
 
-  const typingSecondsRounded = Math.round(data.timeTyping);
-  const typingDuration = intervalToDuration({
+  const trainingSecondsRounded = Math.round(data.timeSpent);
+  const trainingDuration = intervalToDuration({
     start: 0,
-    end: typingSecondsRounded * 1000,
+    end: trainingSecondsRounded * 1000,
   });
   const startedWithMagnitude = getNumberWithMagnitude(data.testsStarted);
   const completedWithMagnitude = getNumberWithMagnitude(data.testsCompleted);
 
   const result = {
-    timeTyping: {
-      label: `${numberWithSpaces(Math.round(typingSecondsRounded / 3600))} hours`,
-      text: typingDuration.years?.toString() ?? "",
+    timeTraining: {
+      label: `${numberWithSpaces(Math.round(trainingSecondsRounded / 3600))} hours`,
+      text: trainingDuration.years?.toString() ?? "",
       subText: "years",
     },
     testsStarted: {
