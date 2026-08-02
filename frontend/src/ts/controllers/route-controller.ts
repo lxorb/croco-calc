@@ -2,15 +2,9 @@ import * as PageController from "./page-controller";
 import * as PageTransition from "../legacy-states/page-transition";
 import { isAuthAvailable } from "../firebase";
 import { isAuthenticated } from "../states/core";
-import { isFunboxActive } from "../test/funbox/list";
-import { showNoticeNotification } from "../states/notifications";
 import { navigationEvent, type NavigateOptions } from "../events/navigation";
 import { authEvent } from "../events/auth";
-import {
-  isTestRestarting,
-  isResultCalculating,
-  isTestActive,
-} from "../states/test";
+import { isResultCalculating, isTestRestarting } from "../states/test";
 
 //source: https://www.youtube.com/watch?v=OstALBk-jTc
 // https://www.youtube.com/watch?v=OstALBk-jTc
@@ -71,12 +65,6 @@ const routes: Route[] = [
     path: "/about",
     load: async (_params, options) => {
       await PageController.change("about", options);
-    },
-  },
-  {
-    path: "/settings",
-    load: async (_params, options) => {
-      await PageController.change("settings", options);
     },
   },
   {
@@ -170,19 +158,6 @@ export async function navigate(
     console.debug(
       `navigate: ${url} ignored, page is busy (testRestarting: ${isTestRestarting()}, resultCalculating: ${isResultCalculating()}, pageTransition: ${PageTransition.get()})`,
     );
-    return;
-  }
-
-  const noQuit = isFunboxActive("no_quit");
-  if (isTestActive() && noQuit) {
-    showNoticeNotification(
-      "No quit funbox is active. Please finish the test.",
-      {
-        important: true,
-      },
-    );
-    //todo: figure out if this was ever used
-    // event?.preventDefault();
     return;
   }
 

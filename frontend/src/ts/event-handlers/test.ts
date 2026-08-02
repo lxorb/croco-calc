@@ -1,65 +1,36 @@
 import { Config } from "../config/store";
-import { __nonReactive } from "../collections/tags";
-import {
-  showNoticeNotification,
-  showErrorNotification,
-} from "../states/notifications";
-import { showQuoteRateModal } from "../states/quote-rate";
-import { showQuoteReportModal } from "../states/quote-report";
-import * as PractiseWordsModal from "../modals/practise-words";
 import { navigate } from "../controllers/route-controller";
-import { getMode2 } from "../utils/misc";
+import { restartTestEvent } from "../events/test";
+import { focusInputElement } from "../input/input-element";
 import { qs } from "../utils/dom";
-import { getCurrentQuote } from "../states/test";
-import { showEditResultTagsModal } from "../states/edit-result-tags";
 
 const testPage = qs(".pageTest");
 
-testPage?.onChild("click", ".tags .editTagsButton", () => {
-  if (__nonReactive.getTags().length > 0) {
-    const resultid =
-      qs(".pageTest .tags .editTagsButton")?.getAttribute("data-result-id") ??
-      "";
-    const activeTagIds =
-      qs(".pageTest .tags .editTagsButton")?.getAttribute(
-        "data-active-tag-ids",
-      ) ?? "";
-    const tags = activeTagIds === "" ? [] : activeTagIds.split(",");
-    showEditResultTagsModal({ _id: resultid, tags, source: "resultPage" });
-  }
+// CP-098 kept the tags block, but master C15 / INV-186 cut tags entirely, so
+// there is no edit-tags handler to register.
+
+/**
+ * CP-086 / CP-088 — the restart button. It routes through `restartTestEvent`
+ * like every other restart path (a settings change, the logo, the quick-restart
+ * hotkey), so `preStart` is re-applied exactly once per restart (CP-052).
+ */
+testPage?.onChild("click", "#restartTestButton", () => {
+  restartTestEvent.dispatch();
+  focusInputElement();
 });
 
-qs(".pageTest #rateQuoteButton")?.on("click", async () => {
-  const currentQuote = getCurrentQuote();
-  if (currentQuote === null) {
-    showErrorNotification("Failed to show quote rating popup: no quote");
-    return;
-  }
-  showQuoteRateModal(currentQuote);
+/** CP-022 — the restart button inside the generation-failed panel. */
+testPage?.onChild("click", "#testInitFailed .restart", () => {
+  restartTestEvent.dispatch();
 });
 
-qs(".pageTest #reportQuoteButton")?.on("click", async () => {
-  const currentQuote = getCurrentQuote();
-  if (currentQuote === null) {
-    showErrorNotification("Failed to show quote report popup: no quote");
-    return;
-  }
-  showQuoteReportModal(currentQuote?.id);
-});
-
-testPage?.onChild("click", "#practiseWordsButton", () => {
-  if (Config.mode === "zen") {
-    showNoticeNotification("Practice words is unsupported in zen mode");
-    return;
-  }
-  PractiseWordsModal.show();
+/** Clicking the stream focuses the hidden capture textarea (CP-083). */
+testPage?.onChild("click", "#tasksWrapper", () => {
+  focusInputElement();
 });
 
 qs(".pageTest #dailyLeaderboardRank")?.on("click", async () => {
   void navigate(
-    `/leaderboards?type=daily&language=${Config.language}&mode2=${getMode2(
-      Config,
-      null,
-    )}&goToUserPage=true`,
+    `/leaderboards?type=daily&mode2=${Config.time}&goToUserPage=true`,
   );
 });

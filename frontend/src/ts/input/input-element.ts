@@ -1,50 +1,46 @@
-const el = document.querySelector("#wordsInput") as HTMLTextAreaElement;
+/**
+ * The hidden capture textarea (CP-053, CP-054).
+ *
+ * Renamed from `#wordsInput`. Every anti-interference attribute monkeytype
+ * carried is preserved in `test.html`, plus `inputmode="decimal"` so mobile
+ * browsers open a numeric keypad — which is exactly why the CP-191 symbol row
+ * exists, since that keypad has no `/` and no `-`.
+ *
+ * Unlike monkeytype there is no leading-space sentinel and the element's value
+ * is never read: the input listeners `preventDefault()` everything and feed
+ * characters straight to the engine, so the textarea is a pure focus target.
+ */
+
+const el = document.querySelector("#tasksInput") as HTMLTextAreaElement | null;
 
 if (el === null) {
-  throw new Error("Words input element not found");
+  throw new Error("Tasks input element not found");
 }
+
+const input: HTMLTextAreaElement = el;
 
 export function getInputElement(): HTMLTextAreaElement {
-  return el;
-}
-
-export function setInputElementValue(value: string): void {
-  el.value = ` ${value}`;
-}
-
-export function appendToInputElementValue(value: string): void {
-  el.value += value;
-}
-
-export function getInputElementValue(): {
-  inputValue: string;
-  realInputValue: string;
-} {
-  return {
-    inputValue: el.value.slice(1),
-    realInputValue: el.value,
-  };
-}
-
-export function moveInputElementCaretToTheEnd(): void {
-  el.setSelectionRange(el.value.length, el.value.length);
-}
-
-export function replaceInputElementLastValueChar(char: string): void {
-  const { inputValue } = getInputElementValue();
-  setInputElementValue(inputValue.slice(0, -1) + char);
+  return input;
 }
 
 export function isInputElementFocused(): boolean {
-  return document.activeElement === el;
+  return document.activeElement === input;
 }
 
 export function focusInputElement(preventScroll = false): void {
-  el.focus({
-    preventScroll,
-  });
+  input.focus({ preventScroll });
 }
 
 export function blurInputElement(): void {
-  el.blur();
+  input.blur();
+}
+
+/** Keeps the (invisible) native selection collapsed at the end. */
+export function moveInputElementCaretToTheEnd(): void {
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+/** The textarea must never accumulate text — the engine owns the buffer. */
+export function clearInputElement(): void {
+  input.value = "";
 }

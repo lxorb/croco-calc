@@ -16,10 +16,8 @@ export function BarTimerProgress() {
     animate(barEl, target);
   });
 
-  const shown = () =>
-    showLiveStats() &&
-    getConfig.mode !== "zen" &&
-    getConfig.timerStyle === "bar";
+  // CP-073: there is no zen mode to exclude — every test is time-limited.
+  const shown = () => showLiveStats() && getConfig.timerStyle === "bar";
 
   return (
     <div class="relative z-99" style={{ opacity: getConfig.timerOpacity }}>

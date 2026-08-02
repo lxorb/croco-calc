@@ -1,10 +1,8 @@
-import * as TestLogic from "../test/test-logic";
-import * as Funbox from "../test/funbox/funbox";
 import Page from "./page";
-import { updateFooterAndVerticalAds } from "../controllers/ad-controller";
 import { blurInputElement } from "../input/input-element";
-import { qsr } from "../utils/dom";
 import { resetIncompleteTests } from "../states/test";
+import * as TestLogic from "../test/test-logic";
+import { qsr } from "../utils/dom";
 
 export const page = new Page({
   id: "test",
@@ -14,17 +12,11 @@ export const page = new Page({
     blurInputElement();
   },
   afterHide: async (): Promise<void> => {
-    void TestLogic.restart({
-      noAnim: true,
-    });
-    void Funbox.clear();
-    updateFooterAndVerticalAds(true);
+    // CP-052 — leaving the page abandons the run and re-hides the stream.
+    TestLogic.restart();
   },
   beforeShow: async (): Promise<void> => {
-    updateFooterAndVerticalAds(false);
     resetIncompleteTests();
-    void TestLogic.restart({
-      noAnim: true,
-    });
+    TestLogic.restart();
   },
 });

@@ -1,131 +1,76 @@
+/**
+ * Derived live-stat text (CP-073 … CP-081).
+ *
+ * Every branch for word-count / quote / zen / custom mode is gone — croco calc
+ * is time-limited only (CP-073) — which is what collapses monkeytype's
+ * `live-stats.ts` to this. Live burst is removed (CP-078); the live readouts
+ * are the timer, live **acc** and live **tpm** (master C13).
+ */
+
 import { createMemo } from "solid-js";
 
 import { getConfig } from "../config/store";
-import Format from "../singletons/format";
-import * as CustomText from "../test/custom-text";
-import * as TestWords from "../test/test-words";
 import { secondsToString } from "../utils/date-and-time";
-import {
-  currentLiveStats,
-  getActiveWordIndex,
-  getBailedOut,
-  getCurrentQuote,
-  getFocus,
-  isResultCalculating,
-  isTestActive,
-} from "./test";
+import { currentLiveStats, getFocus, isTestActive } from "./test";
 
-/** Whether this test counts down a time limit rather than a number of words. */
-function isTimeLimitedTest(): boolean {
-  return (
-    getConfig.mode === "time" ||
-    (getConfig.mode === "custom" && CustomText.getLimitMode() === "time")
-  );
-}
-
-/** Seconds the test counts down from. Only meaningful when {@link isTimeLimitedTest}. */
+/** Seconds the test counts down from — CP-073, `time` is minutes (C31). */
 function getTestTimeLimit(): number {
-  return getConfig.mode === "custom"
-    ? CustomText.getLimitValue()
-    : getConfig.time;
+  return getConfig.time * 60;
 }
 
 /**
- * Words completed so far. Derived from the activeWordIndex signal, so it must be
- * read inside a computation — never snapshotted into the store, since the input
- * handlers advance the index *after* the live stat updates run.
+ * CP-076 — the fixed full-width progress bar at the top of the viewport.
+ * Unchanged arithmetic: it empties left-to-right over the test duration.
  */
-function getCurrentWordCount(): number {
-  if (getConfig.mode === "custom" && CustomText.getLimitMode() === "section") {
-    const sectionIndex =
-      TestWords.words.get(getActiveWordIndex())?.sectionIndex;
-    return sectionIndex === undefined ? 0 : sectionIndex - 1;
-  }
-  return getActiveWordIndex();
-}
-
-function getWordsTotal(): number {
-  if (getConfig.mode === "words") return getConfig.words;
-  if (getConfig.mode === "custom") return CustomText.getLimitValue();
-  if (getConfig.mode === "quote") {
-    return getCurrentQuote()?.textSplit.length ?? 1;
-  }
-  return TestWords.words.length;
-}
-
 export function getBarTarget(): {
   width: string;
   duration: number;
   ease?: string;
 } {
-  if (isTimeLimitedTest()) {
-    const { seconds } = currentLiveStats;
-    const limit = getTestTimeLimit();
-    if (seconds === undefined || limit === 0) {
-      return { width: "100vw", duration: 0 };
-    }
-    return {
-      width: `${100 - ((seconds + 1) / limit) * 100}vw`,
-      duration: 1000,
-      ease: "linear",
-    };
-  }
-  const wordsTotal = getWordsTotal();
-  // no elapsed time means the test was reset, so snap back instead of animating
-  if (currentLiveStats.seconds === undefined || wordsTotal === 0) {
-    return { width: "0vw", duration: 0 };
-  }
-  // the active word index stops on the last word instead of going one past it,
-  // so the word count alone tops out at (n-1)/n — fill the bar on finish.
-  // isResultCalculating flips on the first line of finish(); getResultVisible
-  // would be a fade-out too late, since the bar outlives the words fading out.
-  if (isResultCalculating() && !getBailedOut()) {
-    return { width: "100vw", duration: 125 };
+  const { seconds } = currentLiveStats;
+  const limit = getTestTimeLimit();
+  if (seconds === undefined || limit === 0) {
+    return { width: "100vw", duration: 0 };
   }
   return {
-    width: `${Math.floor((getCurrentWordCount() / wordsTotal) * 100)}vw`,
-    duration: 250,
+    width: `${100 - ((seconds + 1) / limit) * 100}vw`,
+    duration: 1000,
+    ease: "linear",
   };
 }
 
+/** CP-081 — live stats show only while the test is running and focused. */
 export const showLiveStats = createMemo(() => isTestActive() && getFocus());
+
+/** CP-079 — live tpm, displayed as an integer. */
 export const getLiveSpeedText = createMemo(() =>
-  Format.typingSpeed(
-    (getConfig.blindMode ? currentLiveStats.raw : currentLiveStats.wpm) ?? 0,
-    { showDecimalPlaces: false },
-  ),
-);
-export const getLiveAccText = createMemo(
-  () =>
-    `${getConfig.blindMode ? 100 : Math.floor(currentLiveStats.acc ?? 100)}%`,
-);
-export const getLiveBurstText = createMemo(() =>
-  Format.typingSpeed(currentLiveStats.burst ?? 0, { showDecimalPlaces: false }),
+  Math.floor(currentLiveStats.tpm ?? 0).toString(),
 );
 
-/** Countdown / word counter shown by the timer displays. */
+/** CP-080 — live acc, `NN%`, `100%` with nothing answered yet. */
+export const getLiveAccText = createMemo(
+  () => `${Math.floor(currentLiveStats.acc ?? 100)}%`,
+);
+
+/** CP-074 — the countdown, `m:ss` above 60 s. */
 export const getTimerText = createMemo(() => {
-  if (isTimeLimitedTest()) {
-    const limit = getTestTimeLimit();
-    const seconds = currentLiveStats.seconds ?? 0;
-    return secondsToString(limit === 0 ? seconds : limit - seconds);
-  }
-  // read the signal first so the memo subscribes to it on every branch below
-  const wordCount = getCurrentWordCount();
-  const wordsTotal = getWordsTotal();
-  if (getConfig.mode === "zen" || wordsTotal === 0) {
-    return `${getActiveWordIndex()}`;
-  }
-  return `${wordCount}/${wordsTotal}`;
+  const limit = getTestTimeLimit();
+  const seconds = currentLiveStats.seconds ?? 0;
+  return secondsToString(limit === 0 ? seconds : limit - seconds);
 });
+
+/** CP-189 — the raw remaining seconds, for the `data-seconds-remaining` hook. */
+export const getSecondsRemaining = createMemo(() =>
+  Math.max(0, getTestTimeLimit() - (currentLiveStats.seconds ?? 0)),
+);
+
 /**
- * The flash timer styles only reveal the time every 15 seconds. Only the flash
- * styles hide, and only on time limited tests — a word counter is always shown.
+ * CP-076 — the two flash styles only reveal the time every 15 seconds.
  */
 export const isTimerFlashHidden = createMemo(() => {
   const isFlashStyle =
     getConfig.timerStyle === "flash_mini" ||
     getConfig.timerStyle === "flash_text";
-  if (!isFlashStyle || !isTimeLimitedTest()) return false;
+  if (!isFlashStyle) return false;
   return (getTestTimeLimit() - (currentLiveStats.seconds ?? 0)) % 15 !== 0;
 });

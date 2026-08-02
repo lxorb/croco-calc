@@ -1,7 +1,6 @@
 import { getConfig } from "../../../../config/store";
 import {
   getLiveAccText,
-  getLiveBurstText,
   getLiveSpeedText,
   getTimerText,
   isTimerFlashHidden,
@@ -12,20 +11,17 @@ import { AnimeShow } from "../../../common/anime";
 import { liveStatsTextColor } from "./styles";
 
 export function LiveStatsMini() {
-  const isTape = () => getConfig.tapeMode !== "off";
-
   return (
     <div class="full-width">
       <div
-        class={cn("mt-[-1.25em] flex h-0 w-0 gap-[0.5em] leading-[1em]", {
-          "justify-center": isTape(),
-          "justify-start": !isTape(),
-          ...liveStatsTextColor(),
-        })}
+        class={cn(
+          "mt-[-1.25em] flex h-0 w-0 justify-start gap-[0.5em] leading-[1em]",
+          liveStatsTextColor(),
+        )}
         style={{
           "font-size": `${getConfig.fontSize}rem`,
           opacity: getConfig.timerOpacity,
-          "margin-left": isTape() ? `${getConfig.tapeMargin}%` : "0.25em",
+          "margin-left": "0.25em",
         }}
       >
         <AnimeShow
@@ -46,11 +42,6 @@ export function LiveStatsMini() {
         </AnimeShow>
         <AnimeShow when={showLiveStats() && getConfig.liveAccStyle === "mini"}>
           {getLiveAccText()}
-        </AnimeShow>
-        <AnimeShow
-          when={showLiveStats() && getConfig.liveBurstStyle === "mini"}
-        >
-          {getLiveBurstText()}
         </AnimeShow>
       </div>
     </div>

@@ -1,40 +1,37 @@
-import { createEffect, createMemo, createSignal } from "solid-js";
-import { z } from "zod";
-import { getConfig } from "../config/store";
-import { useLocalStorage } from "../hooks/useLocalStorage";
-import { EventLog } from "../test/events/types";
+/**
+ * Reactive test state (WP-06).
+ *
+ * The engine (`test/test-engine.ts`) owns the authoritative state; this module
+ * mirrors the parts Solid components need to re-render on, as plain numbers and
+ * booleans. Nothing here holds a `Task`, so master C29 cannot be violated
+ * through a signal.
+ *
+ * Cut relative to monkeytype: quotes, challenges, keymap/layout resources,
+ * IME composition, RTL/Korean flags, `bailedOut` (master C38) and the pace
+ * caret (CP-071).
+ */
 
-import { Challenge } from "@monkeytype/challenges";
-import { LayoutObject } from "@croco-calc/schemas/layouts";
-import { CompletedEvent, IncompleteTest } from "@croco-calc/schemas/results";
+import { createMemo, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { keymapEvent } from "../events/keymap";
+
+import type {
+  CompletedEvent,
+  IncompleteTest,
+} from "@croco-calc/schemas/results";
+import { getConfig } from "../config/store";
 import { createSignalWithSetters } from "../hooks/createSignalWithSetters";
-import * as CustomText from "../test/custom-text";
-import { QuoteWithTextSplit } from "../types/quotes";
-import { getLayout } from "../utils/json-data";
-import { mirrorLayoutKeys } from "../utils/key-converter";
-import { canQuickRestart } from "../utils/quick-restart";
-import { replaceUnderscoresWithSpaces } from "../utils/strings";
-import { getActivePage, getCustomTextIndicator } from "./core";
-import { useResourceWithPromise } from "../hooks/useResourceWithPromise";
 import { clearTimeouts } from "../utils/misc";
 
-export const [wordsHaveNewline, setWordsHaveNewline] = createSignal(false);
-export const [wordsHaveTab, setWordsHaveTab] = createSignal(false);
-export const [wordsHaveNumbers, setWordsHaveNumbers] = createSignal(false);
-
-export const [getLoadedChallenge, setLoadedChallenge] =
-  createSignal<Challenge | null>(null);
 export const [getResultVisible, setResultVisible] = createSignal(false);
-// True from the first line of TestLogic.finish() until the result is built, so
-// it covers the words fade-out that getResultVisible() is still false during.
+/**
+ * True from the first line of `TestLogic.finish()` until the result is built,
+ * so it covers the stream fade-out that `getResultVisible()` is still false during.
+ */
 export const [isResultCalculating, setResultCalculating] = createSignal(false);
-// Set when the user bails out of a test early; reset by TestLogic.restart().
-export const [getBailedOut, setBailedOut] = createSignal(false);
 export const [getFocus, setFocus] = createSignal(false);
-// #words is still vanilla so it's blurred imperatively (see test/test-ui);
-// the Solid-owned composition display + OutOfFocusWarning read this signal.
+
+// #tasks is vanilla DOM, so it is blurred imperatively (see test/test-ui);
+// the Solid-owned OutOfFocusWarning and PreStartHint read these signals.
 const outOfFocusTimeouts: (number | NodeJS.Timeout)[] = [];
 export type TestFocusState = "focused" | "unfocused" | "unfocusedWindow";
 export const [testFocusState, { setTestFocusState }] =
@@ -44,6 +41,7 @@ export const [testFocusState, { setTestFocusState }] =
         clearTimeouts(outOfFocusTimeouts);
         set(val);
       } else {
+        // CP-083 — the warning appears after 1 s of lost focus.
         outOfFocusTimeouts.push(
           setTimeout(() => {
             set(val);
@@ -57,19 +55,17 @@ export const showOutOfFocusWarning = createMemo(
   () => getConfig.showOutOfFocusWarning && testFocusState() !== "focused",
 );
 
-// max-height of the warning, kept in sync with the words wrapper by test-ui.
+// max-height of the warning, kept in sync with the tasks wrapper by test-ui.
 export const [outOfFocusMaxHeight, setOutOfFocusMaxHeight] = createSignal<
   number | undefined
 >(undefined);
 
-// live IME composition text, pushed from the compositionupdate/end events.
-export const [getCompositionText, setCompositionText] = createSignal("");
 export const [isTestInvalid, setIsTestInvalid] = createSignal(false);
-export const [isLongTest, setIsLongTest] = createSignal(false);
 export const [getLastResult, setLastResult] = createSignal<Omit<
   CompletedEvent,
   "hash" | "uid"
 > | null>(null);
+
 export const [
   getIncompleteTests,
   { push: pushIncompleteTest, reset: resetIncompleteTests },
@@ -82,168 +78,50 @@ export const getIncompleteSeconds = createMemo(() =>
   getIncompleteTests().reduce((sum, test) => sum + test.seconds, 0),
 );
 
+/** CP-089 — "repeat test" replays the identical seeded sequence. */
 export const [isRepeated, setIsRepeated] = createSignal(false);
-export const [isPaceRepeat, setIsPaceRepeat] = createSignal(false);
-export const [getPaceCaretWpm, setPaceCaretWpm] = createSignal<
-  number | undefined
->(undefined);
-export const [getCurrentQuote, setCurrentQuote] =
-  createSignal<QuoteWithTextSplit | null>(null);
 
 export const [getLastSignedOutResult, setLastSignedOutResult] =
   createSignal<CompletedEvent | null>(null);
 
 export const [isTestActive, setTestActive] = createSignal(false);
+export const [isTestRestarting, setIsTestRestarting] = createSignal(false);
+
+/**
+ * CP-046 / CP-052 — true from page load and from every restart until the first
+ * accepted input character reveals the stream.
+ */
+export const [isPreStart, setPreStart] = createSignal(true);
 
 export const [
-  getActiveWordIndex,
-  {
-    increase: increaseActiveWordIndex,
-    decrease: decreaseActiveWordIndex,
-    reset: resetActiveWordIndex,
-  },
+  getActiveTaskIndex,
+  { set: setActiveTaskIndex, reset: resetActiveTaskIndex },
 ] = createSignalWithSetters<number>(0)({
-  increase: (set) => set((n) => n + 1),
-  decrease: (set) => set((n) => n - 1),
+  set: (set, val: number) => set(val),
   reset: (set) => set(0),
 });
 
 /**
- * Live test stats, rendered by the Solid live stat displays (the mini and text
- * variants and the progress bar). The test engine is still vanilla, so it pushes
- * plain numbers in here as it goes; everything shown on screen is derived below.
- * `undefined` means "no data yet" and is what the displays fall back to defaults on.
+ * Length of the live answer buffer. The **contents** deliberately do not live
+ * in a signal — the rendered `<letter>` elements are the display, and the
+ * engine is the source of truth (C29 keeps everything else private).
+ */
+export const [getAnswerLength, setAnswerLength] = createSignal(0);
+
+/**
+ * Live test stats, rendered by the Solid live-stat displays (the mini and text
+ * variants and the progress bar). The test engine is vanilla, so it pushes
+ * plain numbers in here as it goes. `undefined` means "no data yet".
  */
 export const [currentLiveStats, setCurrentLiveStats] = createStore<{
-  wpm?: number;
+  /** CP-079 — responses per minute, wrong answers included. */
+  tpm?: number;
+  /** CP-080 — `floor(correct / answered * 100)`. */
   acc?: number;
-  raw?: number;
-  burst?: number;
+  /** Whole seconds elapsed since the test started. */
   seconds?: number;
 }>({});
 
-createEffect(() => {
-  getActivePage(); // depend on active page
-  setIsLongTest(
-    !canQuickRestart(
-      getConfig.mode,
-      getConfig.words,
-      getConfig.time,
-      CustomText.getData(),
-      getCustomTextIndicator()?.isLong ?? false,
-    ),
-  );
-});
-
-export const getKeymapLayout = createMemo<{
-  layout: string;
-  layoutNameDisplayString: string;
-  isMirrored: boolean;
-}>(() => {
-  const isOverride = getConfig.keymapLayout === "overrideSync";
-  const raw = isOverride ? getConfig.layout : getConfig.keymapLayout;
-
-  const layout = raw === "default" ? "qwerty" : raw;
-  const layoutNameDisplayString = replaceUnderscoresWithSpaces(raw);
-  const isMirrored = getConfig.funbox.includes("layout_mirror");
-
-  return { layout: layout, layoutNameDisplayString, isMirrored };
-});
-
-const [getKeymapHighlightKey, setKeymapHighlightKey] = createSignal<
-  string | undefined
->(undefined);
-
-export { getKeymapHighlightKey };
-
-export type FlashEntry = { tick: number; correct: boolean };
-
-const [getKeymapFlashState, setKeymapFlashState] = createStore<
-  Record<string, FlashEntry | undefined>
->({});
-
-export { getKeymapFlashState, setKeymapFlashState };
-
-keymapEvent.useListener(({ mode, key, correct }) => {
-  const mappedKey = key === "" ? " " : key;
-  setKeymapHighlightKey(mode === "highlight" ? mappedKey : undefined);
-
-  if (mode === "flash" && getConfig.keymapMode === "react") {
-    const existing = getKeymapFlashState[mappedKey];
-    setKeymapFlashState(mappedKey, {
-      tick: existing ? existing.tick + 1 : 1,
-      correct: correct ?? true,
-    });
-  }
-});
-
-const getInputLayout = createMemo<{
-  layout: string;
-  isMirrored: boolean;
-}>(() => {
-  return {
-    layout: getConfig.layout === "default" ? "qwerty" : getConfig.layout,
-    isMirrored: getConfig.funbox.includes("layout_mirror"),
-  };
-});
-
-const [inputLayoutObject, inputLayoutPromise] = useResourceWithPromise(
-  getInputLayout,
-  async (layout) => {
-    const result = await getLayout(layout.layout);
-    if (layout.isMirrored) {
-      return mirrorLayoutKeys(result);
-    }
-    return result;
-  },
-);
-
-const [keymapLayoutObject, keymapLayoutPromise] = useResourceWithPromise(
-  getKeymapLayout,
-  async (layout) => {
-    const result = await getLayout(layout.layout);
-    if (layout.isMirrored) {
-      return mirrorLayoutKeys(result);
-    }
-    return result;
-  },
-);
-export { keymapLayoutObject };
-
-/**
- * Used for non reactive access. Do not use in Solid components.
- */
-export const __nonReactive = {
-  getKeymapLayout: async (): Promise<LayoutObject> => {
-    await keymapLayoutPromise.promise;
-    const result = keymapLayoutObject();
-    if (result === undefined) {
-      throw new Error("Failed to load keymap layout");
-    }
-    return result;
-  },
-  getInputLayout: async (): Promise<LayoutObject> => {
-    await inputLayoutPromise.promise;
-    const result = inputLayoutObject();
-    if (result === undefined) {
-      throw new Error("Failed to load input layout");
-    }
-    return result;
-  },
-};
-
-export const [getSelectedQuoteId, setSelectedQuoteId] = useLocalStorage({
-  key: "selectedQuoteId",
-  schema: z.number().int().min(1),
-  fallback: 1,
-});
-
-export const [isLanguageRightToLeft, setIsLanguageRightToLeft] =
-  createSignal(false);
-export const [isDirectionReversed, setIsDirectionReversed] =
-  createSignal(false);
-export const [isTestRestarting, setIsTestRestarting] = createSignal(false);
-export const [getKoreanStatus, setKoreanStatus] = createSignal(false);
-export const [getLastEventLog, setLastEventLog] = createSignal<EventLog | null>(
-  null,
-);
+export function resetLiveStats(): void {
+  setCurrentLiveStats({ tpm: undefined, acc: undefined, seconds: undefined });
+}

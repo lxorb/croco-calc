@@ -1,149 +1,84 @@
-import { Config } from "@croco-calc/schemas/configs";
-import { Keycode } from "../../constants/keys";
-import {
-  DeleteInputType,
-  InsertInputType,
-} from "../../input/helpers/input-type";
-import { CustomTextLimitMode } from "@croco-calc/schemas/util";
-import { getMode2 } from "../../utils/misc";
+/**
+ * The versioned test event log (INV-089, INV-197).
+ *
+ * monkeytype's architecture is kept — a flat, timestamped, replayable event
+ * stream from which stats and charts are derived post hoc — but the vocabulary
+ * is the math one INV-089 specifies: `taskShown` / `answerSubmitted` / `timer`.
+ * The keystroke-level `keydown` / `keyup` / `input` / `composition` events are
+ * gone; croco calc scores whole answers, not characters (CP-036, ME-152).
+ *
+ * **C29:** no event carries the expected answer of any task. `answerSubmitted`
+ * records what the *user* typed and whether it was right, never what was right.
+ */
 
-export type TestEventType =
-  | "keydown"
-  | "keyup"
-  | "input"
-  | "timer"
-  | "composition";
+export const EVENT_LOG_VERSION = 2;
+
+export type TestEventType = "taskShown" | "answerSubmitted" | "timer";
 
 type EventProps<T extends TestEventType, TData> = {
   type: T;
+  /** Wall-clock `performance.now()` at the moment the event was logged. */
   ms: number;
+  /** Milliseconds since the timer `start` event. */
   testMs: number;
   data: TData;
 };
 
-export type TestEvent =
-  | KeydownEvent
-  | KeyupEvent
-  | TimerEvent
-  | InputEvent
-  | CompositionTestEvent;
-
-export type TestEventNoMs =
-  | Omit<KeydownEvent, "ms">
-  | Omit<KeyupEvent, "ms">
-  | Omit<TimerEvent, "ms">
-  | InputEventNoMs
-  | Omit<CompositionTestEvent, "ms">;
-
-export type InputEventNoMs = Omit<InputEvent, "ms">;
-
-export type TestEventData =
-  | KeydownEventData
-  | KeyupEventData
-  | TimerEventData
-  | InputEventData
-  | CompositionTestEventData;
-
-export type KeydownEvent = EventProps<"keydown", KeydownEventData>;
-
-export type KeydownEventData = {
-  code: Keycode | "NoCode" | `NoCode${number}`;
-  ctrl?: true;
-  shift?: true;
-  alt?: true;
-  meta?: true;
+/** The active pointer moved onto a task (CP-040). */
+export type TaskShownEventData = {
+  taskIndex: number;
+  /** Public information — the prompt is on screen anyway. */
+  prompt: string;
 };
+export type TaskShownEvent = EventProps<"taskShown", TaskShownEventData>;
 
-export type KeyupEvent = EventProps<"keyup", KeyupEventData>;
-
-export type KeyupEventData = {
-  code: Keycode | "NoCode" | `NoCode${number}`;
-  ctrl?: true;
-  shift?: true;
-  alt?: true;
-  meta?: true;
-  estimated?: true; // true if this event never happened, but was estimated (force keyup on test end)
+/** A committed answer (CP-037). Never carries the correct answer (C29). */
+export type AnswerSubmittedEventData = {
+  taskIndex: number;
+  /** The CP-058a-normalised buffer the user committed. */
+  given: string;
+  correct: boolean;
 };
-
-export type TimerEvent = EventProps<"timer", TimerEventData>;
-
-export type TimerEventData =
-  | {
-      event: "step";
-      timer: number;
-      // omitted on catchup steps (they all fire at the same testMs in a
-      // synchronous burst, so per-tick drift isn't a real measurement)
-      drift?: number;
-      slowTimer?: true;
-      // true when this step fired as part of a catch-up burst from a stall
-      // (timerStep ran with the cheap path; only the final step of the burst
-      // has the full WPM/UI side effects)
-      catchup?: true;
-    }
-  | {
-      event: "start" | "end";
-      timer: number;
-      date: number;
-    };
-
-export type InputEvent = EventProps<"input", InputEventData>;
-
-type BaseInputEventData = {
-  charIndex: number;
-  wordIndex: number;
-  inputValue: string;
-};
-
-export type InputEventData =
-  | (BaseInputEventData & {
-      inputType: InsertInputType;
-      data: string;
-      correct: boolean;
-      isCompositionEnding?: true;
-      inputStopped?: true;
-      // true when this was a space that advanced to the next word (commit
-      // attempt) rather than being inserted as a literal character
-      commitsWord?: true;
-      lastWord?: true;
-    })
-  | (BaseInputEventData & {
-      inputType: DeleteInputType;
-      // true on the destination event of a regression that crossed back
-      // over a word with leftover content (e.g. Firefox Ctrl+Backspace
-      // eating sentinel + non-word residue). The cleared word is
-      // wordIndex + 1.
-      clearedNextWord?: true;
-    });
-
-export type CompositionTestEvent = EventProps<
-  "composition",
-  CompositionTestEventData
+export type AnswerSubmittedEvent = EventProps<
+  "answerSubmitted",
+  AnswerSubmittedEventData
 >;
 
-export type CompositionTestEventData =
-  | {
-      event: "start";
-      wordIndex: number;
-    }
-  | {
-      event: "update" | "end";
-      data: string;
-      wordIndex: number;
-    };
+export type TimerEventData = {
+  event: "start" | "tick" | "end";
+  /** Whole seconds elapsed. Present on `tick` and `end`. */
+  seconds?: number;
+};
+export type TimerEvent = EventProps<"timer", TimerEventData>;
 
+export type TestEvent = TaskShownEvent | AnswerSubmittedEvent | TimerEvent;
+
+export type TestEventNoMs =
+  | Omit<TaskShownEvent, "ms">
+  | Omit<AnswerSubmittedEvent, "ms">
+  | Omit<TimerEvent, "ms">;
+
+export type AnswerSubmittedEventNoMs = Omit<AnswerSubmittedEvent, "ms">;
+
+export type TestEventData =
+  | TaskShownEventData
+  | AnswerSubmittedEventData
+  | TimerEventData;
+
+/**
+ * Everything a replay needs that is not in the event stream itself.
+ * `mathSeed` + `settingsId` are what let the sequence be regenerated
+ * (ME-171, ME-174), so a dumped log is fully reproducible.
+ */
 export type EventLogContext = {
-  targetWords: string[];
-  // isTimedTest: boolean;
-  mode: Config["mode"];
-  mode2: ReturnType<typeof getMode2>;
-  customTextLimitMode?: CustomTextLimitMode;
-  customTextLimitValue?: number;
-  isFunboxWithNospacePropertyActive?: boolean;
-  bailedOut: boolean;
-  koreanStatus: boolean;
+  /** The prompts of the tasks that were shown. Prompts only — never answers. */
+  targetPrompts: string[];
+  mode: "time";
+  mode2: string;
+  mathSeed: number;
+  settingsId: string;
 };
 
-export const EVENT_LOG_VERSION = 1;
 export type EventLog = {
   version: typeof EVENT_LOG_VERSION;
   events: TestEventNoMs[];

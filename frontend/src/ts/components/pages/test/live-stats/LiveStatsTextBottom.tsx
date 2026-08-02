@@ -1,7 +1,6 @@
 import { getConfig } from "../../../../config/store";
 import {
   getLiveAccText,
-  getLiveBurstText,
   getLiveSpeedText,
   showLiveStats,
 } from "../../../../states/live-stats";
@@ -29,11 +28,6 @@ export function LiveStatsTextBottom() {
         </AnimeShow>
         <AnimeShow when={showLiveStats() && getConfig.liveAccStyle === "text"}>
           {getLiveAccText()}
-        </AnimeShow>
-        <AnimeShow
-          when={showLiveStats() && getConfig.liveBurstStyle === "text"}
-        >
-          {getLiveBurstText()}
         </AnimeShow>
       </div>
     </div>

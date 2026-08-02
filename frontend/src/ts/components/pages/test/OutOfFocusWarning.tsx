@@ -5,8 +5,13 @@ import {
   showOutOfFocusWarning,
   testFocusState,
 } from "../../../states/test";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 
+/**
+ * CP-083 — appears after 1 s of lost focus, with monkeytype's two messages
+ * unchanged. CP-085: regaining focus lifts *this* blur and never the pre-start
+ * one, which is a separate class on a separate signal.
+ */
 export function OutOfFocusWarning() {
   const message = () =>
     testFocusState() === "unfocusedWindow"
@@ -25,7 +30,7 @@ export function OutOfFocusWarning() {
         }}
       >
         <div>
-          <Fa icon="fa-mouse-pointer" fixedWidth />
+          <Icon icon="ph:cursor-bold" fixedWidth />
         </div>
         <div>{message()}</div>
       </div>

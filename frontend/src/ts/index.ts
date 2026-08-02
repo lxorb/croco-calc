@@ -11,22 +11,18 @@ import { init } from "./firebase";
 import * as Logger from "./utils/logger";
 import * as DB from "./db";
 import "./ui";
-import "./controllers/ad-controller";
 import { Config } from "./config/store";
+import * as TestLogic from "./test/test-logic";
 import * as TestTimer from "./test/test-timer";
-import * as Result from "./test/result";
 import { onAuthStateChanged } from "./auth";
 import { enable } from "./legacy-states/glarses-mode";
 import "./input/listeners";
 import "./controllers/route-controller";
 import "./elements/no-css";
-import { egVideoListener } from "./popups/video-ad-popup";
 import "./legacy-states/connection";
-import "./test/tts";
 import { addToGlobal } from "./utils/misc";
 import * as Focus from "./test/focus";
 import { fetchLatestVersion } from "./utils/version";
-import * as Sentry from "./sentry";
 import * as Cookies from "./cookies";
 import "./elements/psa";
 import "./controllers/url-handler";
@@ -39,7 +35,6 @@ import { loadFromLocalStorage } from "./config/lifecycle";
 
 import "./input/hotkeys";
 import { showModal } from "./states/modals";
-import { getLastEventLog } from "./states/test";
 import { buildEventLog } from "./test/events/data";
 
 // Lock Math.random
@@ -85,15 +80,15 @@ addToGlobal({
   glarsesMode: enable,
   enableTimerDebug: TestTimer.enableTimerDebug,
   getTimerStats: TestTimer.getTimerStats,
-  toggleSmoothedBurst: Result.toggleSmoothedBurst,
-  egVideoListener: egVideoListener,
   toggleDebugLogs: Logger.toggleDebugLogs,
-  toggleSentryDebug: Sentry.toggleDebug,
   qs: qs,
   qsa: qsa,
   qsr: qsr,
-  lastEventLog: () => getLastEventLog(),
   currentEventLog: buildEventLog,
 });
 
 mountComponents();
+
+// Build the first (masked) task stream once the page exists. Nothing is legible
+// and no clock runs until the first accepted character (CP-046, CP-049, CP-075).
+TestLogic.restart({ initial: true });
