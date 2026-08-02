@@ -12,7 +12,7 @@
     "check-assets": "tsx ./scripts/check-assets.ts",
     "audit": "vite-bundle-visualizer",
     "dep-graph": "madge -c -i \"dep-graph.png\" ./src/ts",
-    "ts-check": "tsc --noEmit",
+    "ts-check": "tsc --noEmit && tsc --noEmit -p ./__tests__/tsconfig.json",
     "build": "npm run madge && vite build",
     "madge": " madge --circular --extensions ts ./src",
     "start": "vite preview --port 3000",

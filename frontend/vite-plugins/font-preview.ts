@@ -4,8 +4,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 
 import subsetFont from "subset-font";
-import { Fonts } from "../src/ts/constants/fonts";
-import { KnownFontName } from "@croco-calc/schemas/fonts";
+import { Fonts, KnownFontName } from "../src/ts/constants/fonts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

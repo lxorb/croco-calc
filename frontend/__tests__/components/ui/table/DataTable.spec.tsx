@@ -35,7 +35,7 @@ const columns = [
     header: "Name",
     // oxlint-disable-next-line typescript/no-unsafe-return typescript/no-unsafe-call
     cell: (info: any) => info.getValue(),
-    meta: { maxBreakpoint: "sm" },
+    meta: { maxBreakpoint: "sm" } as const,
   },
   {
     id: "age",
@@ -43,7 +43,7 @@ const columns = [
     header: "Age",
     // oxlint-disable-next-line typescript/no-unsafe-return typescript/no-unsafe-call
     cell: (info: any) => info.getValue(),
-    meta: { breakpoint: "sm" },
+    meta: { breakpoint: "sm" } as const,
   },
 ];
 

@@ -9,7 +9,7 @@
     "build": "npm run gen-docs && tsc --build",
     "watch": "tsc --build --watch",
     "clean": "tsc --build --clean",
-    "ts-check": "tsc --noEmit",
+    "ts-check": "tsc --noEmit && tsc --noEmit -p ./__tests__/tsconfig.json",
     "start": "node ./dist/server.js",
     "test": "vitest run --project=unit",
     "integration-test": "vitest run --project=integration --project=integration-isolated",

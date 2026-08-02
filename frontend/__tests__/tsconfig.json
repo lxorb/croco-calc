@@ -1,15 +1,21 @@
 {
   "extends": "@croco-calc/typescript-config/base.json",
   "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "moduleResolution": "Bundler",
     "module": "ESNext",
     "noEmit": true,
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
-    "types": ["node"]
+    "allowUmdGlobalAccess": true,
+    "types": ["vite/client", "node"],
+    "paths": {
+      "virtual:env-config": ["../src/ts/types/virtual-env-config.d.ts"]
+    }
   },
   "files": ["vitest.d.ts"],
   "include": [
+    "../src/ts/types/**/*.d.ts",
     "./__harness__/**/*.ts",
     "./**/*.spec.ts",
     "./**/*.spec.tsx",
