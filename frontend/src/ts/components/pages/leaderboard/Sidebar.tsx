@@ -47,7 +47,7 @@ export function Sidebar(props: {
 
   return (
     <>
-      {/* AC-110 — `all-time` drops monkeytype's language word. */}
+      {/* AC-110 — `all-time` drops the upstream language segment. */}
       <Group
         selected={props.selection().type}
         onSelect={selectType}

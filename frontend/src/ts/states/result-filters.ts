@@ -7,7 +7,7 @@ import { sanitize } from "../utils/sanitize";
 
 /**
  * AC-081: the filter selection is persisted per user and restored on load.
- * monkeytype's `updateTagsInFilterStorage` is gone with tags (master C15).
+ * The upstream `updateTagsInFilterStorage` is gone with tags (master C15).
  */
 export const [filters, setFilters] = useLocalStorageStore({
   key: "resultFilters",

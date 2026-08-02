@@ -337,8 +337,8 @@ function timestampFilter(val: ResultFilters["date"]): number {
 
 /**
  * AC-013: "time spent" is the test itself plus whatever was burned on restarts,
- * minus idle time. Every croco calc test is a fixed-duration timer, so unlike
- * monkeytype there is no word-mode estimate to fall back on.
+ * minus idle time. Every croco calc test is a fixed-duration timer, so there is
+ * no length-derived estimate to fall back on.
  */
 function calcTimeSpent(result: ResultMinified | SnapshotResult<Mode>): number {
   let tt = result.testDuration;

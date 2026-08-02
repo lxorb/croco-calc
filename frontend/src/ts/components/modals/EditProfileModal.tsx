@@ -24,7 +24,7 @@ import { fromSchema } from "../ui/form/utils";
 
 /**
  * AC-052: the profile details are `bio` and the three social profiles only —
- * monkeytype's `keyboard` field is removed. C16 removes badges, so the badge
+ * the upstream `keyboard` field is removed. C16 removes badges, so the badge
  * picker goes with them. AC-158: the public-activity toggle lives here.
  */
 export function EditProfile(): JSXElement {

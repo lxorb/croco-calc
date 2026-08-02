@@ -13,9 +13,9 @@ import { ChartJs } from "../../common/ChartJs";
 /**
  * AC-102: the per-result graph behind the table's chart-line button.
  *
- * `ChartDataSchema` is now `{ score, tpm, wrong }` (CP-114 … CP-116), so
- * monkeytype's `wpm` / `burst` / `err` series become the cumulative score line,
- * the running-average tpm line and the per-second wrong-answer scatter. The
+ * `ChartDataSchema` is now `{ score, tpm, wrong }` (CP-114 … CP-116), so the
+ * upstream speed / burst / error series become the cumulative score line, the
+ * running-average tpm line and the per-second wrong-answer scatter. The
  * speed-unit conversion is gone with the unit system (AC-007).
  */
 export function MiniResultChart(props: { resultId: string }): JSXElement {

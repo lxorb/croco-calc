@@ -59,7 +59,7 @@ export function LastSignedOutResultModal() {
 
       <div class="grid grid-cols-2 gap-2">
         {/* AC-007: score / accuracy / tpm / correct-wrong; no raw, consistency
-        or character stats anywhere. */}
+        or per-keystroke stats anywhere. */}
         <Value
           class="text-2xl"
           label="score"

@@ -26,7 +26,7 @@ import { EditProfile } from "../../modals/EditProfileModal";
 import { Avatar } from "./Avatar";
 
 /**
- * AC-052: the `keyboard` profile field is cut, so monkeytype's
+ * AC-052: the `keyboard` profile field is cut, so the upstream
  * `hasBioOrKeyboard` variant is renamed `hasBio` and keeps its layout classes
  * byte-for-byte.
  */
@@ -37,7 +37,8 @@ type Variant = "basic" | "hasSocials" | "hasBio" | "full";
  *
  * Streaks (master C17, AC-015) and badges (master C16) are removed; user flags
  * stay. The Discord avatar becomes the crocodile mark (AC-047) and
- * `typingStats` becomes `testStats` carrying `timeSpent` (AC-013, AC-014).
+ * the upstream per-user stats block becomes `testStats` carrying `timeSpent`
+ * (AC-013, AC-014).
  */
 export function UserDetails(props: {
   profile: UserProfile;

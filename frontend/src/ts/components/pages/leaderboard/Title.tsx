@@ -20,7 +20,7 @@ export function Title(props: {
   selection: Selection;
   onPreviousSelect: () => void;
 }): JSXElement {
-  /** AC-116: monkeytype's title minus the language segment. */
+  /** AC-116: the upstream title minus the language segment. */
   const title = createMemo(() => {
     const type =
       props.selection.type === "allTime"

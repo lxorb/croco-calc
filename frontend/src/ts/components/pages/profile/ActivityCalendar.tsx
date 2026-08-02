@@ -74,7 +74,7 @@ export function ActivityCalendar(props: {
       },
     ];
     // AC-069 / AC-017: every year back to the account-creation year is
-    // selectable. monkeytype gated all but the first behind `users.premium`;
+    // selectable. Upstream gated all but the first behind `users.premium`;
     // croco calc has no premium tier, so the gate is gone rather than
     // defaulted-open.
     for (let year = currentYear; year >= startYear; year--) {

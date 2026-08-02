@@ -5,7 +5,7 @@ import { getActivePage } from "./core";
 import { serialize as serializeUrlSearchParams } from "zod-urlsearchparams";
 
 /**
- * AC-162: exactly four tabs, in this order. monkeytype's `apeKeys` tab is gone
+ * AC-162: exactly four tabs, in this order. The upstream `apeKeys` tab is gone
  * in full (AC-163) — the enum member, the two ape-key signals, the tab entry and
  * the component are all removed, and no ape-key artefact remains in the repo.
  */

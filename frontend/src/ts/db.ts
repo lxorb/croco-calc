@@ -92,7 +92,7 @@ export async function initSnapshot(): Promise<Snapshot | false> {
     snap.lbOptOut = userData.lbOptOut;
     snap.verified = userData.verified;
     snap.needsToChangeName = userData.needsToChangeName;
-    //AC-013 / AC-014: "time typing" is "time spent" everywhere.
+    //AC-013 / AC-014: the time-at-the-keyboard total is "time spent" everywhere.
     snap.testStats = {
       timeSpent: userData.timeSpent ?? 0,
       startedTests: userData.startedTests ?? 0,
@@ -187,7 +187,7 @@ function saveLocalPB(
 
 /**
  * AC-128: the "since you last checked" memory is keyed by `(mode, mode2)` only.
- * The language key monkeytype threaded through here is gone (AC-113).
+ * The language key upstream threaded through here is gone (AC-113).
  */
 export async function updateLbMemory<M extends Mode>(
   mode: M,
@@ -306,7 +306,7 @@ export function updateInboxUnreadSize(newSize: number): void {
 
 /**
  * AC-069 / AC-017: every year since the account was created is fetchable — the
- * monkeytype premium gate is gone.
+ * upstream premium gate is gone.
  */
 export async function getTestActivityCalendar(
   yearString: string,

@@ -22,7 +22,7 @@ export function showUpdateNameModal(): void {
       ? "update"
       : "reauthenticate to update",
     text: snapshot.needsToChangeName
-      ? "You need to change your account name. This might be because you have a duplicate name, no account name or your name is not allowed (contains whitespace or invalid characters). Sorry for the inconvenience."
+      ? "You need to change your account name. This might be because you have a duplicate name, no account name or your name is not allowed (contains whitespace or invalid symbols). Sorry for the inconvenience."
       : undefined,
     schema: z.object({
       password: getPasswordSchema(),

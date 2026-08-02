@@ -14,10 +14,10 @@ import AsyncContent from "../../common/AsyncContent";
 import { ChartJs } from "../../common/ChartJs";
 
 /**
- * AC-091 — the time-spent chart. monkeytype's "time typing" bar dataset becomes
- * "Time spent" (AC-014) and its wpm line becomes the average `score` line; the
- * `typingSpeedUnit` prop is gone with the unit system, so the chart takes only
- * the `Formatting` helper. The `Average Consistency` tooltip row is removed —
+ * AC-091 — the time-spent chart. The upstream time-at-the-keyboard bar dataset
+ * becomes "Time spent" (AC-014) and its speed line becomes the average `score`
+ * line; the speed-unit prop is gone with the unit system, so the chart takes
+ * only the `Formatting` helper. The `Average Consistency` tooltip row is gone —
  * master C5 keeps `consistency` off every account surface.
  */
 export function DailyActivityChart(props: {

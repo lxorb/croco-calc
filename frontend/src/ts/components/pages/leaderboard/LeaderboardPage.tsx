@@ -207,7 +207,7 @@ export function LeaderboardPage(): JSXElement {
                 rankQueryData,
                 serverConfigurationQueryData,
               }) => {
-                /** AC-130: croco calc exposes `minScore`, not monkeytype's `minWpm`. */
+                /** AC-130: croco calc exposes `minScore`, not a speed floor. */
                 const minScore = () => {
                   const d = entriesQueryData();
                   return d && "minScore" in d

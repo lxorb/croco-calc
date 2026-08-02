@@ -192,7 +192,7 @@ function getColumns({
         },
       },
     }),
-    // AC-014: "time typing" reads "time spent" everywhere.
+    // AC-014: the time-at-the-keyboard total reads "time spent" everywhere.
     defineColumn("timeSpent", {
       header: "time spent",
       enableSorting: true,
@@ -203,7 +203,7 @@ function getColumns({
       },
     }),
 
-    // AC-148 columns 6+7 — `time 4 pb` / `time 8 pb`, replacing monkeytype's
+    // AC-148 columns 6+7 — `time 4 pb` / `time 8 pb`, replacing the upstream
     // 15/60 second columns; the streak column is gone with C17.
     defineColumn("top4.score", {
       header: "time 4 pb",
@@ -283,7 +283,7 @@ function getColumns({
 
 /**
  * AC-148 column 6/7 balloon: score / tpm / acc / date on separate lines. The
- * monkeytype `raw`, `con` and language rows go with AC-007 and AC-113.
+ * upstream `raw`, `con` and language rows go with AC-007 and AC-113.
  */
 function formatPb(
   entry: PersonalBest | undefined,
