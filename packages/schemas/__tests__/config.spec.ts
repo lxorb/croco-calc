@@ -1,7 +1,131 @@
 import { describe, it, expect } from "vitest";
-import { CustomBackgroundSchema } from "@croco-calc/schemas/configs";
+import {
+  AccountChartSchema,
+  CaretStyleSchema,
+  ConfigGroupNameSchema,
+  ConfigSchema,
+  CustomBackgroundSchema,
+  TEST_CONFIG_KEYS,
+} from "@croco-calc/schemas/configs";
+
+/** §6.1 of the master document: the ConfigSchema MUST contain exactly these keys. */
+const EXPECTED_CONFIG_KEYS = [
+  // the eight settings-bar controls
+  "addition",
+  "multiplication",
+  "division",
+  "fractionAddition",
+  "fractionMultiplication",
+  "decimals",
+  "negatives",
+  "time",
+  // behavior
+  "quickRestart",
+  "resultSaving",
+  "singleListCommandLine",
+  // caret (restored by master C11)
+  "smoothCaret",
+  "caretStyle",
+  // appearance
+  "timerStyle",
+  "liveSpeedStyle",
+  "liveAccStyle",
+  "timerColor",
+  "timerOpacity",
+  "alwaysShowDecimalPlaces",
+  "startGraphsAtZero",
+  "maxLineWidth",
+  "fontSize",
+  "fontFamily",
+  // theme
+  "flipTestColors",
+  "colorfulMode",
+  "customBackground",
+  "customBackgroundSize",
+  "customBackgroundFilter",
+  "autoSwitchTheme",
+  "themeLight",
+  "themeDark",
+  "randomTheme",
+  "favThemes",
+  "theme",
+  "customTheme",
+  "customThemeColors",
+  // hide elements
+  "showKeyTips",
+  "showOutOfFocusWarning",
+  "showAverage",
+  "showPb",
+  // hidden
+  "accountChart",
+];
 
 describe("config schema", () => {
+  it("contains exactly the §6.1 key set and nothing else", () => {
+    expect(Object.keys(ConfigSchema.shape).sort()).toEqual(
+      [...EXPECTED_CONFIG_KEYS].sort(),
+    );
+  });
+
+  it("backs the settings bar with the eight test keys (SB-010, SB-016)", () => {
+    expect(TEST_CONFIG_KEYS).toEqual([
+      "addition",
+      "multiplication",
+      "division",
+      "fractionAddition",
+      "fractionMultiplication",
+      "decimals",
+      "negatives",
+      "time",
+    ]);
+  });
+
+  it("keeps the live speed and live acc styles (review gap 3, CP-078)", () => {
+    expect(Object.keys(ConfigSchema.shape)).toContain("liveSpeedStyle");
+    expect(Object.keys(ConfigSchema.shape)).toContain("liveAccStyle");
+  });
+
+  it("makes accountChart a five-element array (AC-085)", () => {
+    expect(AccountChartSchema.items).toHaveLength(5);
+    expect(
+      AccountChartSchema.safeParse(["on", "on", "on", "on", "on"]).success,
+    ).toBe(true);
+    expect(AccountChartSchema.safeParse(["on", "on", "on", "on"]).success).toBe(
+      false,
+    );
+  });
+
+  it("drops the image caret styles (CP-069)", () => {
+    expect(CaretStyleSchema.options).toEqual([
+      "off",
+      "default",
+      "block",
+      "outline",
+      "underline",
+    ]);
+  });
+
+  it("has config groups without sound, input or ads", () => {
+    expect(ConfigGroupNameSchema.options).toEqual([
+      "test",
+      "behavior",
+      "caret",
+      "appearance",
+      "theme",
+      "hideElements",
+      "hidden",
+    ]);
+  });
+
+  it("is strict, so a removed key cannot be smuggled back", () => {
+    expect(
+      ConfigSchema.partial().safeParse({ punctuation: true }).success,
+    ).toBe(false);
+    expect(ConfigSchema.partial().safeParse({ funBox: [] }).success).toBe(
+      false,
+    );
+  });
+
   describe("CustomBackgroundSchema", () => {
     it.for([
       {
