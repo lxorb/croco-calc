@@ -59,7 +59,7 @@ describe("theme stylesheets (C30, CP-164, INV-062, INV-119)", () => {
     const offenders: string[] = [];
     for (const file of await themeCssFiles()) {
       const css = await readFile(path.join(THEME_CSS_DIR, file), "utf8");
-      if (/#words/.test(css)) offenders.push(file);
+      if (css.includes("#words")) offenders.push(file);
     }
     expect(offenders).toEqual([]);
   });

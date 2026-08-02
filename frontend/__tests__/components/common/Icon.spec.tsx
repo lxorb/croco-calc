@@ -71,9 +71,9 @@ describe("Icon component", () => {
   });
 
   it("renders every bundled icon from inline geometry only (SB-063, AC-021)", () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(() => Promise.reject(new Error("no network")));
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      throw new Error("no network");
+    });
 
     for (const id of bundledIcons()) {
       const { container } = render(() => <Icon icon={id} />);
