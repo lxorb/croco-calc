@@ -1,5 +1,5 @@
 {
-  "name": "@monkeytype/oxlint-config",
+  "name": "@croco-calc/oxlint-config",
   "private": true,
   "type": "module",
   "exports": {

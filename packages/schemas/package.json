@@ -1,5 +1,5 @@
 {
-  "name": "@monkeytype/schemas",
+  "name": "@croco-calc/schemas",
   "private": true,
   "exports": {
     ".": {
@@ -23,11 +23,11 @@
     "lint-fast": "oxlint ."
   },
   "dependencies": {
-    "@monkeytype/util": "workspace:*"
+    "@croco-calc/util": "workspace:*"
   },
   "devDependencies": {
-    "@monkeytype/tsup-config": "workspace:*",
-    "@monkeytype/typescript-config": "workspace:*",
+    "@croco-calc/tsup-config": "workspace:*",
+    "@croco-calc/typescript-config": "workspace:*",
     "@types/node": "24.9.1",
     "madge": "8.0.0",
     "oxlint": "1.75.0",

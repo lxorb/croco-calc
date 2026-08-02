@@ -9,25 +9,25 @@
     "restriction": "off",
     "nursery": "off",
   },
-  "jsPlugins": ["./plugins/monkeytype-rules.js"],
+  "jsPlugins": ["./plugins/croco-calc-rules.js"],
   "rules": {
-    "monkeytype-rules/no-testing-access": "error",
-    "monkeytype-rules/no-mixed-nullish-coalescing": "error",
+    "croco-calc-rules/no-testing-access": "error",
+    "croco-calc-rules/no-mixed-nullish-coalescing": "error",
   },
   "overrides": [
     {
       "files": ["__tests__/**/*.ts"],
       "rules": {
-        "monkeytype-rules/no-testing-access": "off",
+        "croco-calc-rules/no-testing-access": "off",
       },
     },
     {
       "files": ["**/*.tsx"],
       "rules": {
-        "monkeytype-rules/no-non-reactive-access-in-components": "error",
-        "monkeytype-rules/prefer-arrow-in-component": "error",
-        "monkeytype-rules/one-component-per-file": "error",
-        "monkeytype-rules/component-pascal-case": "error",
+        "croco-calc-rules/no-non-reactive-access-in-components": "error",
+        "croco-calc-rules/prefer-arrow-in-component": "error",
+        "croco-calc-rules/one-component-per-file": "error",
+        "croco-calc-rules/component-pascal-case": "error",
       },
     },
   ],
