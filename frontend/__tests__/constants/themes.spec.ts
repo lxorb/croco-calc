@@ -145,9 +145,48 @@ export const C30_REMOVED_SELECTORS: Record<string, string[]> = {
 
 const THEME_CSS_DIR = path.resolve(__dirname, "../../static/themes");
 
+type ThemeStylesheet = {
+  /** File name, e.g. `serika_dark.css`. */
+  file: string;
+  /** Theme name, e.g. `serika_dark`. */
+  name: string;
+  css: string;
+  /** `css` with comments stripped — chaos_theory.css keeps a dead block on record. */
+  code: string;
+};
+
+/**
+ * Every theme stylesheet, read once for the whole file.
+ *
+ * Each case below used to do its own `readdir` + 52 serial `readFile`s. That is
+ * fine on its own but not when ~40 other spec files are competing for the disk:
+ * the sweeps are identical, so six of them just multiplied the I/O until cases
+ * started tripping the 5 s budget at random. One memoised parallel read keeps
+ * every assertion exactly as strict and costs a single sweep per run.
+ */
+let stylesheets: Promise<ThemeStylesheet[]> | undefined;
+
+async function themeStylesheets(): Promise<ThemeStylesheet[]> {
+  stylesheets ??= (async () => {
+    const entries = await readdir(THEME_CSS_DIR);
+    const files = entries.filter((f) => f.endsWith(".css")).sort();
+    return Promise.all(
+      files.map(async (file) => {
+        const css = await readFile(path.join(THEME_CSS_DIR, file), "utf8");
+        return {
+          file,
+          name: file.replace(/\.css$/, ""),
+          css,
+          code: css.replaceAll(/\/\*[\s\S]*?\*\//g, ""),
+        };
+      }),
+    );
+  })();
+  return stylesheets;
+}
+
 async function themeCssFiles(): Promise<string[]> {
-  const entries = await readdir(THEME_CSS_DIR);
-  return entries.filter((f) => f.endsWith(".css")).sort();
+  return (await themeStylesheets()).map((sheet) => sheet.file);
 }
 
 describe("theme palettes (INV-061, CP-165)", () => {
@@ -196,8 +235,7 @@ describe("theme stylesheets (C30, CP-164, INV-062, INV-119)", () => {
 
   it("has no #words selector left anywhere (CP-020)", async () => {
     const offenders: string[] = [];
-    for (const file of await themeCssFiles()) {
-      const css = await readFile(path.join(THEME_CSS_DIR, file), "utf8");
+    for (const { file, css } of await themeStylesheets()) {
       if (css.includes("#words")) offenders.push(file);
     }
     expect(offenders).toEqual([]);
@@ -205,8 +243,7 @@ describe("theme stylesheets (C30, CP-164, INV-062, INV-119)", () => {
 
   it("keeps the data-nav-item hooks the shell must preserve (CP-005, CP-166)", async () => {
     const navItems = new Set<string>();
-    for (const file of await themeCssFiles()) {
-      const css = await readFile(path.join(THEME_CSS_DIR, file), "utf8");
+    for (const { css } of await themeStylesheets()) {
       for (const match of css.matchAll(/\[data-nav-item="([a-z]+)"\]/g)) {
         navItems.add(match[1] as string);
       }
@@ -235,13 +272,18 @@ describe("theme stylesheets (C30, CP-164, INV-062, INV-119)", () => {
   });
 
   it("removed every selector the C30 audit claims it removed", async () => {
+    const byName = new Map(
+      (await themeStylesheets()).map((sheet) => [sheet.name, sheet]),
+    );
+
     const offenders: string[] = [];
     for (const [name, removed] of Object.entries(C30_REMOVED_SELECTORS)) {
-      const css = (
-        await readFile(path.join(THEME_CSS_DIR, `${name}.css`), "utf8")
-      ).replaceAll(/\/\*[\s\S]*?\*\//g, "");
+      const sheet = byName.get(name);
+      expect(sheet, `${name}.css`).toBeDefined();
       for (const selector of removed) {
-        if (css.includes(selector)) offenders.push(`${name}.css: ${selector}`);
+        if ((sheet as ThemeStylesheet).code.includes(selector)) {
+          offenders.push(`${name}.css: ${selector}`);
+        }
       }
     }
     expect(offenders).toEqual([]);
@@ -251,9 +293,8 @@ describe("theme stylesheets (C30, CP-164, INV-062, INV-119)", () => {
     // `#tasks` is the one token these files gained. Any other theme file
     // mentioning it would mean an unaudited edit.
     const renamed: string[] = [];
-    for (const file of await themeCssFiles()) {
-      const css = await readFile(path.join(THEME_CSS_DIR, file), "utf8");
-      if (css.includes("#tasks")) renamed.push(file.replace(/\.css$/, ""));
+    for (const { name, css } of await themeStylesheets()) {
+      if (css.includes("#tasks")) renamed.push(name);
     }
 
     for (const name of renamed) {
@@ -266,12 +307,9 @@ describe("theme stylesheets (C30, CP-164, INV-062, INV-119)", () => {
       /\.word\b|\.highlight-|:not\(\.blind\)|\.pageSettings\b|\.customText\b|#keymap|\.funbox|#watchReplayButton|#watchVideoAdButton|#practiseWordsButton|#showWordHistoryButton/;
 
     const offenders: string[] = [];
-    for (const file of await themeCssFiles()) {
-      const css = await readFile(path.join(THEME_CSS_DIR, file), "utf8");
-      // Strip comments: chaos_theory.css keeps a commented-out block on record.
-      if (dead.test(css.replaceAll(/\/\*[\s\S]*?\*\//g, ""))) {
-        offenders.push(file);
-      }
+    // `code` has comments stripped: chaos_theory.css keeps a dead block on record.
+    for (const { file, code } of await themeStylesheets()) {
+      if (dead.test(code)) offenders.push(file);
     }
     expect(offenders).toEqual([]);
   });
