@@ -1,13 +1,31 @@
 import { roundTo2 } from "@croco-calc/util/numbers";
 import * as db from "../init/db";
 import CrocoError from "../utils/error";
-import { SiteStats, ScoreHistogram } from "@croco-calc/schemas/public";
+import { TrainingStats, ScoreHistogram } from "@croco-calc/schemas/public";
+import { LEADERBOARD_TIMES } from "@croco-calc/schemas/math";
 
-export type PublicSiteStatsDB = SiteStats & { _id: "stats" };
+/** SB-176 / CP-137 — the only two durations that have a leaderboard. */
+export type LeaderboardTime = (typeof LEADERBOARD_TIMES)[number];
 
 /**
- * AC-090: the histogram is bucketed by score and keyed by the leaderboard mode
- * only — there is no language axis (INV-153).
+ * CP-135 renames the wire field `timeSpent` → `timeTraining`. The **stored**
+ * document keeps `timeSpent`: it is a counter that is only ever `$inc`ed, so
+ * renaming the Mongo key would need a migration to buy nothing. `getTrainingStats`
+ * maps it on the way out, which is why this type is spelled out here instead of
+ * being derived from `TrainingStats`.
+ */
+export type PublicTrainingStatsDB = {
+  _id: "stats";
+  /** seconds; serialised as `timeTraining` (CP-135). */
+  timeSpent: number;
+  testsCompleted: number;
+  testsStarted: number;
+};
+
+/**
+ * AC-090: the histogram is bucketed by score and keyed by the leaderboard
+ * duration only — there is no language axis (INV-153) and no `mode` axis, since
+ * `mode` is always `time` (CP-137).
  */
 export type PublicScoreStatsDB = {
   _id: "scoreStatsHistogram";
@@ -19,7 +37,7 @@ export async function updateStats(
   restartCount: number,
   time: number,
 ): Promise<boolean> {
-  await db.collection<PublicSiteStatsDB>("public").updateOne(
+  await db.collection<PublicTrainingStatsDB>("public").updateOne(
     { _id: "stats" },
     {
       $inc: {
@@ -37,18 +55,9 @@ export async function updateStats(
  * @returns an object mapping score => count, eg { '80': 4388, '90': 2149}
  */
 export async function getScoreHistogram(
-  mode: string,
-  mode2: string,
+  time: LeaderboardTime,
 ): Promise<ScoreHistogram> {
-  const key = `${mode}_${mode2}` as keyof PublicScoreStatsDB;
-
-  if (key === "_id") {
-    throw new CrocoError(
-      400,
-      "Invalid score histogram key",
-      "get score histogram",
-    );
-  }
+  const key = `time_${time}` as const satisfies keyof PublicScoreStatsDB;
 
   const stats = await db
     .collection<PublicScoreStatsDB>("public")
@@ -57,13 +66,24 @@ export async function getScoreHistogram(
   return stats?.[key] ?? {};
 }
 
-/** Get site-wide stats such as the total number of tests completed on site */
-export async function getSiteStats(): Promise<PublicSiteStatsDB> {
+/**
+ * CP-135 — site-wide training stats behind `GET /public/trainingStats`.
+ * Returns the wire shape, not the stored one.
+ */
+export async function getTrainingStats(): Promise<TrainingStats> {
   const stats = await db
-    .collection<PublicSiteStatsDB>("public")
+    .collection<PublicTrainingStatsDB>("public")
     .findOne({ _id: "stats" }, { projection: { _id: 0 } });
   if (!stats) {
-    throw new CrocoError(404, "Public site stats not found", "get site stats");
+    throw new CrocoError(
+      404,
+      "Public training stats not found",
+      "get training stats",
+    );
   }
-  return stats;
+  return {
+    timeTraining: stats.timeSpent,
+    testsCompleted: stats.testsCompleted,
+    testsStarted: stats.testsStarted,
+  };
 }

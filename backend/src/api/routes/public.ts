@@ -8,7 +8,7 @@ export default s.router(publicContract, {
   getScoreHistogram: {
     handler: async (r) => callController(PublicController.getScoreHistogram)(r),
   },
-  getSiteStats: {
-    handler: async (r) => callController(PublicController.getSiteStats)(r),
+  getTrainingStats: {
+    handler: async (r) => callController(PublicController.getTrainingStats)(r),
   },
 });
