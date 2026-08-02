@@ -11,10 +11,10 @@ import injectHTML from "vite-plugin-html-inject";
 import childProcess from "child_process";
 import autoprefixer from "autoprefixer";
 import { Fonts } from "./src/ts/constants/fonts";
-import { fontawesomeSubset } from "./vite-plugins/fontawesome-subset";
+import { icons } from "./vite-plugins/icons";
 import { fontPreview } from "./vite-plugins/font-preview";
 import { envConfig } from "./vite-plugins/env-config";
-import { languageHashes } from "./vite-plugins/language-hashes";
+import { firebaseConfig } from "./vite-plugins/firebase-config";
 import { minifyJson } from "./vite-plugins/minify-json";
 import { versionFile } from "./vite-plugins/version-file";
 import { oxlintChecker } from "./vite-plugins/oxlint-checker";
@@ -22,11 +22,16 @@ import { injectPreload } from "./vite-plugins/inject-preload";
 import Inspect from "vite-plugin-inspect";
 import { ViteMinifyPlugin } from "vite-plugin-minify";
 import { VitePWA } from "vite-plugin-pwa";
-import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { KnownFontName } from "@croco-calc/schemas/fonts";
 import solidPlugin from "vite-plugin-solid";
 import devtools from "solid-devtools/vite";
 import tailwindcss from "@tailwindcss/vite";
+
+/** Default theme (`serika_dark`), used for the PWA manifest colours (INF-116). */
+const THEME_BACKGROUND = "#323437";
+
+/** Default theme (`serika_dark`), used for the PWA manifest colours (INF-116). */
+const THEME_BACKGROUND = "#323437";
 
 function getFontsConfig(): string {
   return `\n${Object.keys(Fonts)
@@ -78,27 +83,53 @@ function getClientVersion(isDevelopment: boolean): string {
   }
 }
 
-/** Enable for font awesome v6 */
-/*
-function sassList(values) {
-  return values.map((it) => `"${it}"`).join(",");
+/**
+ * INF-013: a production build MUST NOT be able to fall back to monkeytype's
+ * API. `vite-plugins/env-config.ts` used to default to `api.monkeytype.com`
+ * when `BACKEND_URL` was unset, which would have shipped a frontend talking to
+ * somebody else's backend.
+ */
+function requireBackendUrl(env: Record<string, string>, mode: string): string {
+  const backendUrl = env["BACKEND_URL"];
+  if (backendUrl === undefined || backendUrl.trim() === "") {
+    throw new Error(
+      `${mode}: BACKEND_URL is not defined. Set it to the deployed API origin (Terraform output api_base_url).`,
+    );
+  }
+  if (backendUrl.includes("monkeytype.com")) {
+    throw new Error(
+      `${mode}: BACKEND_URL points at monkeytype.com ("${backendUrl}"). croco calc must not call monkeytype's API.`,
+    );
+  }
+  return backendUrl;
 }
-*/
+
+/** Hostname of the API, so the service worker never caches API responses (INF-031). */
+function getApiHostname(backendUrl: string | undefined): string | null {
+  if (backendUrl === undefined || backendUrl.trim() === "") return null;
+  try {
+    return new URL(backendUrl).hostname;
+  } catch {
+    return null;
+  }
+}
 
 function getPlugins({
   isDevelopment,
   env,
-  useSentry,
 }: {
   isDevelopment: boolean;
   env: Record<string, string>;
-  useSentry: boolean;
 }): PluginOption[] {
   const clientVersion = getClientVersion(isDevelopment);
+  const apiHostname = getApiHostname(env["BACKEND_URL"]);
 
   const plugins: PluginOption[] = [
+    firebaseConfig({ isDevelopment, env }),
+    // WP-04 owns vite-plugins/icons.ts; registering it here turns a missing or
+    // mis-collected icon id into a build failure (CP-002, C10).
+    icons(),
     envConfig({ isDevelopment, clientVersion, env }),
-    languageHashes({ skip: isDevelopment }),
     injectHTML() as PluginOption,
     tailwindcss(),
 
@@ -119,7 +150,6 @@ function getPlugins({
 
   const prodPlugins: PluginOption[] = [
     fontPreview(),
-    fontawesomeSubset(),
     versionFile({ clientVersion }),
     ViteMinifyPlugin(),
     VitePWA({
@@ -127,8 +157,8 @@ function getPlugins({
       injectRegister: null,
       registerType: "autoUpdate",
       manifest: {
-        short_name: "Monkeytype",
-        name: "Monkeytype",
+        short_name: "croco calc",
+        name: "croco calc",
         start_url: "/",
         icons: [
           {
@@ -144,9 +174,9 @@ function getPlugins({
             purpose: "any",
           },
         ],
-        background_color: "#323437",
+        background_color: THEME_BACKGROUND,
         display: "standalone",
-        theme_color: "#323437",
+        theme_color: THEME_BACKGROUND,
       },
       manifestFilename: "manifest.json",
       workbox: {
@@ -158,7 +188,8 @@ function getPlugins({
         runtimeCaching: [
           {
             urlPattern: (options) => {
-              const isApi = options.url.hostname === "api.monkeytype.com";
+              const isApi =
+                apiHostname !== null && options.url.hostname === apiHostname;
               return options.sameOrigin && !isApi;
             },
             handler: "NetworkFirst",
@@ -175,17 +206,6 @@ function getPlugins({
         ],
       },
     }),
-    useSentry
-      ? sentryVitePlugin({
-          authToken: env["SENTRY_AUTH_TOKEN"],
-          org: "monkeytype",
-          project: "frontend",
-          release: {
-            name: clientVersion,
-          },
-          applicationKey: "monkeytype-frontend",
-        })
-      : null,
     injectPreload(),
     minifyJson(),
   ];
@@ -195,19 +215,15 @@ function getPlugins({
   );
 }
 
-function getBuildOptions({
-  enableSourceMaps,
-}: {
-  enableSourceMaps: boolean;
-}): BuildEnvironmentOptions {
+function getBuildOptions(): BuildEnvironmentOptions {
   return {
-    sourcemap: enableSourceMaps,
+    sourcemap: false,
     emptyOutDir: true,
     outDir: "../dist",
     assetsInlineLimit: 0, //dont inline small files as data
     rolldownOptions: {
       input: {
-        monkeytype: path.resolve(__dirname, "src/index.html"),
+        index: path.resolve(__dirname, "src/index.html"),
         email: path.resolve(__dirname, "src/email-handler.html"),
         privacy: path.resolve(__dirname, "src/privacy-policy.html"),
         security: path.resolve(__dirname, "src/security-policy.html"),
@@ -244,10 +260,6 @@ function getBuildOptions({
         codeSplitting: {
           groups: [
             {
-              name: "vendor-sentry",
-              test: /node_modules\/@sentry\//,
-            },
-            {
               name: "vendor-firebase",
               test: /node_modules\/@firebase\//,
             },
@@ -256,15 +268,15 @@ function getBuildOptions({
               test: /node_modules\/@tanstack\//,
             },
             {
-              name: "monkeytype-packages",
-              test: /monkeytype\/packages\//,
+              name: "croco-calc-packages",
+              test: /[\\/]packages[\\/](schemas|contracts|util|math-engine)[\\/]/,
             },
             {
               name: "vendor-chart",
               test: /node_modules\/chart/,
             },
             {
-              name: "monkeytype-utils",
+              name: "app-utils",
               test: /src\/ts\/utils\//,
             },
             {
@@ -292,21 +304,8 @@ function getCssOptions({
       scss: {
         additionalData(source: string, fp: string) {
           if (isDevelopment || fp.endsWith("index.scss")) {
-            /** Enable for font awesome v6 */
-            /*
-                const fontawesomeClasses = getFontawesomeConfig();
-
-                //inject variables into sass context
-                $fontawesomeBrands: ${sassList(
-                  fontawesomeClasses.brands
-                )};             
-                $fontawesomeSolid: ${sassList(fontawesomeClasses.solid)};
-              */
-
             const bypassFonts = isDevelopment
-              ? `
-                $fontAwesomeOverride:"@fortawesome/fontawesome-free/webfonts";
-                $previewFontsPath:"webfonts";`
+              ? `$previewFontsPath:"webfonts";`
               : "";
             const fonts = `
               ${bypassFonts}
@@ -315,7 +314,7 @@ function getCssOptions({
             return `
               //inject variables into sass context
               ${fonts}
-            
+
               ${source}`;
           } else {
             return source;
@@ -328,21 +327,18 @@ function getCssOptions({
 
 export default defineConfig(({ mode }): UserConfig => {
   const env = loadEnv(mode, process.cwd(), "");
-  const useSentry = env["SENTRY"] !== undefined;
   const isDevelopment = mode !== "production";
 
   if (!isDevelopment) {
+    requireBackendUrl(env, mode);
     if (env["RECAPTCHA_SITE_KEY"] === undefined) {
       throw new Error(`${mode}: RECAPTCHA_SITE_KEY is not defined`);
-    }
-    if (useSentry && env["SENTRY_AUTH_TOKEN"] === undefined) {
-      throw new Error(`${mode}: SENTRY_AUTH_TOKEN is not defined`);
     }
   }
 
   return {
-    plugins: getPlugins({ isDevelopment, useSentry: useSentry, env }),
-    build: getBuildOptions({ enableSourceMaps: useSentry }),
+    plugins: getPlugins({ isDevelopment, env }),
+    build: getBuildOptions(),
     css: getCssOptions({ isDevelopment }),
     server: {
       open: env["SERVER_OPEN"] !== "false",
@@ -367,8 +363,5 @@ export default defineConfig(({ mode }): UserConfig => {
     clearScreen: false,
     root: "src",
     publicDir: "../static",
-    optimizeDeps: {
-      exclude: ["@fortawesome/fontawesome-free"],
-    },
   };
 });

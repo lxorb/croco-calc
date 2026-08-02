@@ -34,12 +34,11 @@ export function envConfig(options: {
           quickLoginPassword: options.env["QUICK_LOGIN_PASSWORD"],
         };
 
+        // INF-013: no fallback in production. `vite.config.ts` has already
+        // refused the build if BACKEND_URL is missing or points at monkeytype.
         const prodConfig: EnvConfig = {
           isDevelopment: false,
-          backendUrl: fallback(
-            options.env["BACKEND_URL"],
-            "https://api.monkeytype.com",
-          ),
+          backendUrl: options.env["BACKEND_URL"] as string,
           recaptchaSiteKey: options.env["RECAPTCHA_SITE_KEY"] ?? "",
           quickLoginEmail: undefined,
           quickLoginPassword: undefined,
