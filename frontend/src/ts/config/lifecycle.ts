@@ -16,9 +16,23 @@ import { restartTestEvent } from "../events/test";
 import { migrateConfig } from "./utils";
 import { promiseWithResolvers } from "../utils/misc";
 import { setConfig } from "./setters";
+import { configMetadata } from "./metadata";
 import { repairAllOff } from "./coupling";
 import { deleteConfig } from "../ape/config";
 import { typedKeys } from "@croco-calc/util/objects";
+
+/**
+ * SB-055 — derived from the metadata rather than re-listed, so the restart set
+ * and the flag that declares it can never drift apart. Today this is exactly
+ * the eight settings-bar keys.
+ */
+const restartKeys: (keyof ConfigSchemas.Config)[] = typedKeys(
+  configMetadata,
+).filter((key) => configMetadata[key].changeRequiresRestart);
+
+function readRestartKeys(): string {
+  return JSON.stringify(restartKeys.map((key) => Config[key]));
+}
 
 export async function applyConfigFromJson(json: string): Promise<void> {
   try {
@@ -47,9 +61,9 @@ export async function loadFromLocalStorage(): Promise<void> {
   console.log("loading localStorage config");
   const newConfig = configLS.get();
   if (newConfig === undefined) {
-    await resetConfig();
+    await resetConfig({ initialLoad: true });
   } else {
-    await applyConfig(newConfig);
+    await applyConfig(newConfig, { initialLoad: true });
     saveFullConfigToLocalStorage(true);
   }
   loadDone();
@@ -67,8 +81,25 @@ const lastConfigsToApply: Set<keyof ConfigSchemas.Config> = new Set([
 
 export async function applyConfig(
   partialConfig: Partial<ConfigSchemas.Config>,
+  options?: {
+    /**
+     * Restart even if no restart-relevant key moved. SB-157 restores the
+     * defaults as a single user action and owes the user a fresh test either
+     * way.
+     */
+    forceRestart?: boolean;
+    /**
+     * The boot-time install of the stored config. Nothing is running yet and
+     * `index.ts` builds the first engine itself, so there is nothing to restart.
+     */
+    initialLoad?: boolean;
+  },
 ): Promise<void> {
   if (partialConfig === undefined || partialConfig === null) return;
+
+  // ME-007 / SB-054 — read before the reset-to-defaults loop below, which would
+  // otherwise make every key look changed.
+  const restartKeysBefore = readRestartKeys();
 
   //migrate old values if needed, remove additional keys and merge with default config
   const migrated: ConfigSchemas.Config = migrateConfig(partialConfig);
@@ -119,10 +150,31 @@ export async function applyConfig(
 
   configEvent.dispatch({ key: "fullConfigChangeFinished" });
   setFullConfigStore(fullConfig);
+
+  /*
+   * ME-007 / SB-054 / SB-095. `applyConfig` is the shared tail of the imported
+   * settings JSON (`applyConfigFromJson`), the server config applied at sign-in
+   * (`config/remote.ts`), `resetConfig` and SB-157. All of them run `setConfig`
+   * with `partOfFullConfigChange`, which deliberately says nothing about
+   * restarting, so without this the eight generator keys could be rewritten
+   * underneath a running test: the task stream would keep the old settings
+   * while the submitted `mathSettings` described the new ones, and the server
+   * would answer that with `prompt-mismatch` plus an anti-cheat strike.
+   *
+   * ME-088 — exactly one dispatch per `applyConfig`, however many keys moved
+   * and however many times the SB-090/SB-091 cascade fired inside them.
+   */
+  if (options?.initialLoad === true) return;
+  const changed = readRestartKeys() !== restartKeysBefore;
+  if (options?.forceRestart === true || changed) {
+    restartTestEvent.dispatch();
+  }
 }
 
-export async function resetConfig(): Promise<void> {
-  await applyConfig(getDefaultConfig());
+export async function resetConfig(options?: {
+  initialLoad?: boolean;
+}): Promise<void> {
+  await applyConfig(getDefaultConfig(), options);
   await deleteConfig();
   saveFullConfigToLocalStorage(true);
 }
@@ -133,27 +185,28 @@ export async function resetConfig(): Promise<void> {
  * restart the test. Backs the `restoreDefaultTestSettings` palette command and
  * the clickable "not eligible for leaderboards" notice (SB-181).
  *
- * The restart is dispatched here rather than at the two call sites so both
- * surfaces inherit it, and for the same reason SB-054 requires it of every
- * single-control change: `applyConfig` ran with `nosave`/`partOfFullConfigChange`
- * and therefore skipped the per-key `changeRequiresRestart` path, so without
- * this dispatch the already-generated task list would keep the old settings.
+ * The restart comes from `applyConfig` rather than from the two call sites, so
+ * both surfaces inherit it and it stays a single dispatch (ME-088).
+ * `forceRestart` because SB-157 is one deliberate user action: it owes a fresh
+ * test even in the corner case where the settings were already the defaults.
  */
 export async function restoreDefaultTestSettings(): Promise<void> {
   const defaults = getDefaultConfig();
-  await applyConfig({
-    ...Config,
-    addition: defaults.addition,
-    multiplication: defaults.multiplication,
-    division: defaults.division,
-    fractionAddition: defaults.fractionAddition,
-    fractionMultiplication: defaults.fractionMultiplication,
-    decimals: defaults.decimals,
-    negatives: defaults.negatives,
-    time: defaults.time,
-  });
+  await applyConfig(
+    {
+      ...Config,
+      addition: defaults.addition,
+      multiplication: defaults.multiplication,
+      division: defaults.division,
+      fractionAddition: defaults.fractionAddition,
+      fractionMultiplication: defaults.fractionMultiplication,
+      decimals: defaults.decimals,
+      negatives: defaults.negatives,
+      time: defaults.time,
+    },
+    { forceRestart: true },
+  );
   saveFullConfigToLocalStorage();
-  restartTestEvent.dispatch();
 }
 
 const { promise: configLoadPromise, resolve: loadDone } =

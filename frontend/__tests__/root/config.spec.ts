@@ -310,6 +310,80 @@ describe("Config", () => {
       });
     });
 
+    /**
+     * ME-007 / SB-054 / SB-095 — `applyConfig` is the shared tail of the
+     * imported settings JSON, the server config applied at sign-in and
+     * `resetConfig`. All three can rewrite the eight generator keys underneath
+     * a running test, so all three MUST restart it. ME-088: exactly once.
+     */
+    describe("ME-007 - restarts the test when a generator key moves", () => {
+      const restartSpy = vi.spyOn(restartTestEvent, "dispatch");
+
+      // Deliberately no `mockRestore` here: the SB-157 block below installs its
+      // own spy on top of this one, and restoring would tear that one off too.
+      beforeEach(() => {
+        restartSpy.mockClear();
+      });
+
+      it("dispatches exactly once when generator keys change", async () => {
+        replaceConfig({ ...getDefaultConfig(), addition: "100" });
+
+        await Lifecycle.applyConfig({
+          ...getDefaultConfig(),
+          addition: "1000",
+          negatives: false,
+        });
+
+        expect(restartSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it("ME-088 - one dispatch even when the SB-090 cascade fires", async () => {
+        replaceConfig({
+          ...getDefaultConfig(),
+          multiplication: "off",
+          fractionMultiplication: false,
+        });
+
+        await Lifecycle.applyConfig({
+          ...getDefaultConfig(),
+          multiplication: "off",
+          fractionMultiplication: true,
+        });
+
+        expect(restartSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it("does not dispatch when only appearance keys move", async () => {
+        replaceConfig({ ...getDefaultConfig(), theme: "serika_dark" });
+
+        await Lifecycle.applyConfig({ ...getDefaultConfig(), theme: "nord" });
+
+        expect(restartSpy).not.toHaveBeenCalled();
+      });
+
+      it("does not dispatch on the boot-time install of the stored config", async () => {
+        replaceConfig({ ...getDefaultConfig(), addition: "100" });
+
+        await Lifecycle.applyConfig(
+          { ...getDefaultConfig(), addition: "1000" },
+          { initialLoad: true },
+        );
+
+        expect(restartSpy).not.toHaveBeenCalled();
+      });
+
+      it("restarts when a settings JSON is imported mid-run", async () => {
+        replaceConfig({ ...getDefaultConfig(), division: "threeByTwo" });
+
+        await Lifecycle.applyConfigFromJson(
+          JSON.stringify({ division: "tables" }),
+        );
+
+        expect(getConfig().division).toBe("tables");
+        expect(restartSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
     describe("SB-090 - applies the coupled keys last so a stored pair survives", () => {
       it("keeps fractionMultiplication on and turns multiplication back on", async () => {
         // A stored config that is illegal on its face: the whole-config path
