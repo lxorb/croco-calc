@@ -10,15 +10,28 @@ import {
   Config as ConfigType,
   CaretStyleSchema,
 } from "@croco-calc/schemas/configs";
-import * as FunboxValidation from "../../src/ts/config/funbox-validation";
 import * as ConfigValidation from "../../src/ts/config/validation";
 import { configEvent } from "../../src/ts/events/config";
+import { restartTestEvent } from "../../src/ts/events/test";
 import * as ApeConfig from "../../src/ts/ape/config";
 import * as Notifications from "../../src/ts/states/notifications";
-import * as TestState from "../../src/ts/states/test";
+import { getDefaultConfig } from "../../src/ts/constants/default-config";
 
 const { replaceConfig, getConfig } = __testing;
 
+/**
+ * The generic `setConfig` / `applyConfig` machinery (WP-05 §6.1, SB-053,
+ * SB-095, SB-104, SB-121 … SB-127, SB-157).
+ *
+ * Rewritten for croco calc. monkeytype's version of this file drove the
+ * machinery through typing keys (`funbox`, `tapeMode`, `monkey`, `numbers`,
+ * `punctuation`, `customLayoutfluid`, `minWpm`, `ads`, `keymapLayout`) and the
+ * `config/funbox-validation` module, none of which exist any more — the import
+ * alone made the suite unloadable. The behaviours below are the same ones, but
+ * exercised through the keys §6.1 actually keeps. The bar-specific rules
+ * (cycling, coupling truth table, all-off guard) live in
+ * `__tests__/config/setters.spec.ts` and `__tests__/config/coupling.spec.ts`.
+ */
 describe("Config", () => {
   const isDevEnvironmentMock = vi.spyOn(Env, "isDevEnvironment");
   beforeEach(() => {
@@ -26,11 +39,7 @@ describe("Config", () => {
     replaceConfig({});
   });
 
-  describe("test with mocks", () => {
-    const canSetConfigWithCurrentFunboxesMock = vi.spyOn(
-      FunboxValidation,
-      "canSetConfigWithCurrentFunboxes",
-    );
+  describe("setConfig with mocks", () => {
     const isConfigValueValidMock = vi.spyOn(
       ConfigValidation,
       "isConfigValueValid",
@@ -41,19 +50,14 @@ describe("Config", () => {
       Notifications,
       "showNoticeNotification",
     );
-    const miscReloadAfterMock = vi.spyOn(Misc, "reloadAfter");
     const miscTriggerResizeMock = vi.spyOn(Misc, "triggerResize");
-    const stateIsTestActiveMock = vi.spyOn(TestState, "isTestActive");
 
     const mocks = [
-      canSetConfigWithCurrentFunboxesMock,
       isConfigValueValidMock,
       dispatchConfigEventMock,
       dbSaveConfigMock,
       notificationAddMock,
-      miscReloadAfterMock,
       miscTriggerResizeMock,
-      stateIsTestActiveMock,
     ];
 
     beforeEach(async () => {
@@ -61,9 +65,7 @@ describe("Config", () => {
       mocks.forEach((it) => it.mockClear());
 
       isConfigValueValidMock.mockReturnValue(true);
-      canSetConfigWithCurrentFunboxesMock.mockReturnValue(true);
       dbSaveConfigMock.mockResolvedValue();
-      stateIsTestActiveMock.mockReturnValue(true);
 
       replaceConfig({});
     });
@@ -73,93 +75,42 @@ describe("Config", () => {
       vi.useRealTimers();
     });
 
-    beforeEach(() => isDevEnvironmentMock.mockClear());
-
-    it("should throw if config key in not found in metadata", () => {
+    it("should throw if config key is not found in metadata", () => {
       expect(() => {
         Config.setConfig("nonExistentKey" as ConfigKey, true);
       }).toThrow(`Config metadata for key "nonExistentKey" is not defined.`);
     });
 
-    it("fails if test is active and funbox no_quit", () => {
-      //GIVEN
-      replaceConfig({ funbox: ["no_quit"], numbers: false });
+    it("should fail if config is blocked", () => {
+      //GIVEN — the only enabled generator (SB-101)
+      replaceConfig({
+        addition: "1000",
+        multiplication: "off",
+        division: "off",
+        fractionAddition: "off",
+        fractionMultiplication: false,
+      });
 
-      //WHEN
-      expect(
-        Config.setConfig("numbers", true, {
-          nosave: true,
-        }),
-      ).toBe(false);
-
-      //THEN
+      //WHEN / THEN
+      expect(Config.setConfig("addition", "off")).toBe(false);
       expect(notificationAddMock).toHaveBeenCalledWith(
-        "No quit funbox is active. Please finish the test.",
-        {
-          important: true,
-        },
+        "at least one task type must be enabled",
       );
     });
 
-    //TODO isBlocked
-    it("should fail if config is blocked", () => {
-      //GIVEN
-      replaceConfig({ tapeMode: "letter" });
-
-      //WHEN / THEN
-      expect(Config.setConfig("showAllLines", true)).toBe(false);
-    });
-
-    it("disables live text stats when enabling monkey", () => {
-      //GIVEN
-      replaceConfig({
-        liveSpeedStyle: "text",
-        liveAccStyle: "text",
-        monkey: false,
-      });
-
-      //WHEN / THEN
-      expect(Config.setConfig("monkey", true)).toBe(true);
-      expect(getConfig()).toMatchObject({
-        monkey: true,
-        liveSpeedStyle: "mini",
-        liveAccStyle: "mini",
-      });
-      expect(notificationAddMock).not.toHaveBeenCalled();
-    });
-
-    it("disables monkey when enabling live speed text", () => {
-      //GIVEN
-      replaceConfig({ monkey: true, liveSpeedStyle: "off" });
-
-      //WHEN / THEN
-      expect(Config.setConfig("liveSpeedStyle", "text")).toBe(true);
-      expect(getConfig()).toMatchObject({
-        monkey: false,
-        liveSpeedStyle: "text",
-      });
-      expect(notificationAddMock).not.toHaveBeenCalled();
-    });
-
-    it("disables monkey when enabling live accuracy text", () => {
-      //GIVEN
-      replaceConfig({ monkey: true, liveAccStyle: "off" });
-
-      //WHEN / THEN
-      expect(Config.setConfig("liveAccStyle", "text")).toBe(true);
-      expect(getConfig()).toMatchObject({
-        monkey: false,
-        liveAccStyle: "text",
-      });
-      expect(notificationAddMock).not.toHaveBeenCalled();
-    });
-
     it("should use overrideValue", () => {
-      //WHEN
-      Config.setConfig("customLayoutfluid", ["3l", "ABNT2", "3l"]);
+      //WHEN — maxLineWidth clamps into [20, 1000] (0 stays 0)
+      Config.setConfig("maxLineWidth", 19);
+      expect(getConfig().maxLineWidth).toEqual(20);
 
-      //THEN
-      expect(getConfig().customLayoutfluid).toEqual(["3l", "ABNT2"]);
+      Config.setConfig("maxLineWidth", 1001);
+      expect(getConfig().maxLineWidth).toEqual(1000);
+
+      //and customBackground is trimmed
+      Config.setConfig("customBackground", "  https://example.com/image.png  ");
+      expect(getConfig().customBackground).toEqual(
+        "https://example.com/image.png",
+      );
     });
 
     it("fails if config is invalid", () => {
@@ -167,7 +118,7 @@ describe("Config", () => {
       isConfigValueValidMock.mockReturnValue(false);
 
       //WHEN / THEN
-      expect(Config.setConfig("caretStyle", "banana" as any)).toBe(false);
+      expect(Config.setConfig("caretStyle", "banana" as never)).toBe(false);
       expect(isConfigValueValidMock).toHaveBeenCalledWith(
         "caret style",
         "banana",
@@ -175,93 +126,92 @@ describe("Config", () => {
       );
     });
 
-    it("cannot set if funbox disallows", () => {
-      //GIVEN
-      canSetConfigWithCurrentFunboxesMock.mockReturnValue(false);
-
-      //WHEN / THEN
-      expect(Config.setConfig("numbers", true)).toBe(false);
-    });
-
     it("sets overrideConfigs", () => {
-      //GIVEN
+      //GIVEN — SB-091: switching multiplication off clears fraction
+      //multiplication, and the cascaded key gets its own event (SB-095)
       replaceConfig({
-        confidenceMode: "off",
-        freedomMode: false, //already set correctly
-        stopOnError: "letter", //should get updated
+        addition: "1000",
+        multiplication: "100",
+        fractionMultiplication: true,
       });
 
       //WHEN
-      Config.setConfig("confidenceMode", "max");
+      Config.setConfig("multiplication", "off");
 
       //THEN
-      expect(dispatchConfigEventMock).not.toHaveBeenCalledWith({
-        key: "freedomMode",
+      expect(dispatchConfigEventMock).toHaveBeenCalledWith({
+        key: "fractionMultiplication",
         newValue: false,
-        nosave: true,
+        nosave: false,
         previousValue: true,
       });
 
       expect(dispatchConfigEventMock).toHaveBeenCalledWith({
-        key: "stopOnError",
+        key: "multiplication",
         newValue: "off",
         nosave: false,
-        previousValue: "letter",
-      });
-
-      expect(dispatchConfigEventMock).toHaveBeenCalledWith({
-        key: "confidenceMode",
-        newValue: "max",
-        nosave: false,
-        previousValue: "off",
+        previousValue: "100",
       });
     });
 
-    it("saves to localstorage if nosave=false", async () => {
+    it("does not dispatch for an overrideConfig key that is already correct", () => {
       //GIVEN
-      replaceConfig({ numbers: false });
+      replaceConfig({
+        addition: "1000",
+        multiplication: "100",
+        fractionMultiplication: false,
+      });
 
       //WHEN
-      Config.setConfig("numbers", true);
+      Config.setConfig("multiplication", "off");
 
       //THEN
-      //wait for debounce
-      await vi.advanceTimersByTimeAsync(2500);
-
-      //save
-      expect(dbSaveConfigMock).toHaveBeenCalledWith({ numbers: true });
+      expect(dispatchConfigEventMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ key: "fractionMultiplication" }),
+      );
     });
 
-    it("saves configOverride values to localstorage if nosave=false", async () => {
+    it("SB-121/SB-123 - saves to the database if nosave=false", async () => {
       //GIVEN
-      replaceConfig({});
+      replaceConfig({ decimals: false });
 
       //WHEN
-      Config.setConfig("minWpmCustomSpeed", 120);
+      Config.setConfig("decimals", true);
 
-      //THEN
-      //wait for debounce
+      //THEN — wait for the 1000 ms debounce
       await vi.advanceTimersByTimeAsync(2500);
 
-      //save
+      expect(dbSaveConfigMock).toHaveBeenCalledWith({ decimals: true });
+    });
+
+    it("SB-123 - sends the configOverride keys too", async () => {
+      //GIVEN
+      replaceConfig({
+        addition: "1000",
+        multiplication: "100",
+        fractionMultiplication: true,
+      });
+
+      //WHEN
+      Config.setConfig("multiplication", "off");
+
+      //THEN
+      await vi.advanceTimersByTimeAsync(2500);
+
       expect(dbSaveConfigMock).toHaveBeenCalledWith({
-        minWpmCustomSpeed: 120,
-        minWpm: "custom",
+        multiplication: "off",
+        fractionMultiplication: false,
       });
     });
 
-    it("does not save to localstorage if nosave=true", async () => {
+    it("does not save if nosave=true", async () => {
       //GIVEN
-
-      replaceConfig({ numbers: false });
+      replaceConfig({ decimals: false });
 
       //WHEN
-      Config.setConfig("numbers", true, {
-        nosave: true,
-      });
+      Config.setConfig("decimals", true, { nosave: true });
 
       //THEN
-      //wait for debounce
       await vi.advanceTimersByTimeAsync(2500);
 
       expect(dbSaveConfigMock).not.toHaveBeenCalled();
@@ -269,17 +219,14 @@ describe("Config", () => {
 
     it("dispatches event on set", () => {
       //GIVEN
-      replaceConfig({ numbers: false });
+      replaceConfig({ decimals: false });
 
       //WHEN
-      Config.setConfig("numbers", true, {
-        nosave: true,
-      });
+      Config.setConfig("decimals", true, { nosave: true });
 
       //THEN
-
       expect(dispatchConfigEventMock).toHaveBeenCalledWith({
-        key: "numbers",
+        key: "decimals",
         newValue: true,
         nosave: true,
         previousValue: false,
@@ -287,56 +234,35 @@ describe("Config", () => {
     });
 
     it("triggers resize if property is set", () => {
-      ///WHEN
       Config.setConfig("maxLineWidth", 50);
-
       expect(miscTriggerResizeMock).toHaveBeenCalled();
     });
 
-    it("does not triggers resize if property is not set", () => {
-      ///WHEN
+    it("does not trigger resize if property is not set", () => {
       Config.setConfig("startGraphsAtZero", true);
-
       expect(miscTriggerResizeMock).not.toHaveBeenCalled();
     });
 
-    it("does not triggers resize if property on nosave", () => {
-      ///WHEN
+    it("does not trigger resize on nosave", () => {
       Config.setConfig("maxLineWidth", 50, { nosave: true });
-
       expect(miscTriggerResizeMock).not.toHaveBeenCalled();
-    });
-
-    it("calls afterSet", () => {
-      //GIVEN
-      isDevEnvironmentMock.mockReturnValue(false);
-      replaceConfig({ ads: "off" });
-
-      //WHEN
-      Config.setConfig("ads", "sellout");
-
-      //THEN
-      expect(notificationAddMock).toHaveBeenCalledWith(
-        "Ad settings changed. Refreshing...",
-      );
-      expect(miscReloadAfterMock).toHaveBeenCalledWith(3);
     });
   });
 
   describe("apply", () => {
     it("should fill missing values with defaults", async () => {
       //GIVEN
-      replaceConfig({
-        mode: "words",
-      });
+      replaceConfig({ time: 8, decimals: false });
       await Lifecycle.applyConfig({
-        numbers: true,
-        punctuation: true,
+        addition: "100",
+        negatives: false,
       });
       const config = getConfig();
-      expect(config.mode).toBe("time");
-      expect(config.numbers).toBe(true);
-      expect(config.punctuation).toBe(true);
+      expect(config.addition).toBe("100");
+      expect(config.negatives).toBe(false);
+      // everything not in the partial comes back to the defaults
+      expect(config.time).toBe(getDefaultConfig().time);
+      expect(config.decimals).toBe(getDefaultConfig().decimals);
     });
 
     describe("should reset to default if setting failed", () => {
@@ -346,30 +272,28 @@ describe("Config", () => {
         expected: Partial<ConfigType>;
       }[] = [
         {
-          // invalid funbox
-          display: "invalid funbox",
-          value: { funbox: ["invalid_funbox"] as any },
-          expected: { funbox: [] },
+          display: "invalid enum value",
+          value: { division: "free" as never },
+          expected: { division: getDefaultConfig().division },
         },
         {
-          display: "mode incompatible with funbox",
-          value: { mode: "quote", funbox: ["58008"] },
-          expected: { funbox: [] },
-        },
-        {
-          display: "invalid combination of funboxes",
-          value: { funbox: ["58008", "gibberish"] },
-          expected: { funbox: [] },
-        },
-        {
-          display: "sanitizes config, remove extra keys",
-          value: { mode: "zen", unknownKey: true, unknownArray: [1, 2] } as any,
-          expected: { mode: "zen" },
+          display: "sanitizes config, removes extra keys",
+          value: {
+            time: 2,
+            unknownKey: true,
+            unknownArray: [1, 2],
+          } as never,
+          expected: { time: 2 },
         },
         {
           display: "applies config migration",
-          value: { mode: "zen", swapEscAndTab: true } as any,
-          expected: { mode: "zen", quickRestart: "esc" },
+          value: { time: 2, swapEscAndTab: true } as never,
+          expected: { time: 2, quickRestart: "esc" },
+        },
+        {
+          display: "SB-012 migration of a monkeytype seconds value",
+          value: { time: 120 } as never,
+          expected: { time: 2 },
         },
       ];
 
@@ -386,87 +310,128 @@ describe("Config", () => {
       });
     });
 
-    describe("should apply keys in an order to avoid overrides", () => {
-      const testCases: {
-        display: string;
-        value: Partial<ConfigType>;
-        expected: Partial<ConfigType>;
-      }[] = [
-        {
-          display:
-            "quote length shouldnt override mode, punctuation and numbers",
-          value: {
-            punctuation: true,
-            numbers: true,
-            quoteLength: [0],
-            mode: "time",
-          },
-          expected: {
-            punctuation: true,
-            numbers: true,
-            quoteLength: [0],
-            mode: "time",
-          },
-        },
-      ];
-
-      it.each(testCases)("$display", async ({ value, expected }) => {
-        await Lifecycle.applyConfig(value);
+    describe("SB-090 - applies the coupled keys last so a stored pair survives", () => {
+      it("keeps fractionMultiplication on and turns multiplication back on", async () => {
+        // A stored config that is illegal on its face: the whole-config path
+        // has no `changedKey`, so SB-090 wins and multiplication comes back at
+        // "100" rather than the user's intent being cleared.
+        await Lifecycle.applyConfig({
+          ...getDefaultConfig(),
+          multiplication: "off",
+          fractionMultiplication: true,
+        });
         const config = getConfig();
-        const applied = Object.fromEntries(
-          Object.entries(config).filter(([key]) =>
-            Object.keys(expected).includes(key),
-          ),
-        );
-        expect(applied).toEqual(expected);
+        expect(config.fractionMultiplication).toBe(true);
+        expect(config.multiplication).toBe("100");
       });
+
+      it("leaves a legal pair untouched", async () => {
+        await Lifecycle.applyConfig({
+          ...getDefaultConfig(),
+          multiplication: "20",
+          fractionMultiplication: true,
+        });
+        const config = getConfig();
+        expect(config.multiplication).toBe("20");
+        expect(config.fractionMultiplication).toBe(true);
+      });
+    });
+
+    it("SB-104 - repairs a config that arrives with every generator off", async () => {
+      await Lifecycle.applyConfig({
+        ...getDefaultConfig(),
+        addition: "off",
+        multiplication: "off",
+        division: "off",
+        fractionAddition: "off",
+        fractionMultiplication: false,
+      });
+      const config = getConfig();
+      expect(config.addition).toBe("1000");
+      expect(config.multiplication).toBe("off");
+      expect(config.division).toBe("off");
+      expect(config.fractionAddition).toBe("off");
+      expect(config.fractionMultiplication).toBe(false);
     });
 
     it("should apply a partial config but keep the rest unchanged", async () => {
-      replaceConfig({
-        numbers: true,
-      });
+      replaceConfig({ negatives: false });
       await Lifecycle.applyConfig({
         ...ConfigUtils.getConfigChanges(),
-        punctuation: true,
+        decimals: false,
       });
       const config = getConfig();
-      expect(config.numbers).toBe(true);
+      expect(config.negatives).toBe(false);
+      expect(config.decimals).toBe(false);
     });
+  });
 
-    it("should not enable minWpm if not provided", async () => {
-      replaceConfig({
-        minWpm: "off",
-      });
-      await Lifecycle.applyConfig({
-        minWpmCustomSpeed: 100,
-      });
-      const config = getConfig();
-      expect(config.minWpm).toBe("off");
-      expect(config.minWpmCustomSpeed).toEqual(100);
-    });
+  describe("SB-157 - restoreDefaultTestSettings", () => {
+    const restartSpy = vi.spyOn(restartTestEvent, "dispatch");
 
-    it("should apply minWpm if part of the full config", async () => {
-      replaceConfig({
-        minWpm: "off",
-      });
-      await Lifecycle.applyConfig({
-        minWpm: "custom",
-        minWpmCustomSpeed: 100,
-      });
-      const config = getConfig();
-      expect(config.minWpm).toBe("custom");
-      expect(config.minWpmCustomSpeed).toEqual(100);
-    });
-
-    it("should keep the keymap off when applying keymapLayout", async () => {
+    beforeEach(() => {
+      restartSpy.mockClear();
       replaceConfig({});
-      await Lifecycle.applyConfig({
-        keymapLayout: "qwerty",
+    });
+
+    afterAll(() => {
+      restartSpy.mockRestore();
+    });
+
+    it("puts all eight settings-bar keys back to the SB-110 defaults", async () => {
+      replaceConfig({
+        addition: "100",
+        multiplication: "12",
+        division: "off",
+        fractionAddition: "12",
+        fractionMultiplication: false,
+        decimals: false,
+        negatives: false,
+        time: 8,
       });
+
+      await Lifecycle.restoreDefaultTestSettings();
+
+      const defaults = getDefaultConfig();
       const config = getConfig();
-      expect(config.keymapLayout).toEqual("qwerty");
-      expect(config.keymapMode).toEqual("off");
+      for (const key of [
+        "addition",
+        "multiplication",
+        "division",
+        "fractionAddition",
+        "fractionMultiplication",
+        "decimals",
+        "negatives",
+        "time",
+      ] as const) {
+        expect(config[key], key).toEqual(defaults[key]);
+      }
+    });
+
+    it("SB-054/SB-181 - restarts the test", async () => {
+      replaceConfig({ addition: "100", time: 8 });
+
+      await Lifecycle.restoreDefaultTestSettings();
+
+      expect(restartSpy).toHaveBeenCalled();
+    });
+
+    it("leaves the appearance and behaviour keys alone", async () => {
+      replaceConfig({
+        addition: "100",
+        theme: "nord",
+        fontSize: 3,
+        timerStyle: "text",
+        quickRestart: "esc",
+      });
+
+      await Lifecycle.restoreDefaultTestSettings();
+
+      const config = getConfig();
+      expect(config.theme).toEqual("nord");
+      expect(config.fontSize).toEqual(3);
+      expect(config.timerStyle).toEqual("text");
+      expect(config.quickRestart).toEqual("esc");
     });
   });
 });
