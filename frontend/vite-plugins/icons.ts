@@ -43,11 +43,20 @@ export type IconPrefix = (typeof ICON_PREFIXES)[number];
 export const ICON_ID_PATTERN = /\b(?:ph|tabler):[a-z0-9]+(?:-[a-z0-9]+)*\b/g;
 
 /**
- * The settings bar's own icon set — SB-060's table verbatim, which is the whole
- * of the `tabler:*` exception C10 grants. `tabler:plus-minus` is the one
- * addition: SB-011's negatives control cycles through an ON state that shows
- * both signs. Any other `tabler:*` id anywhere in the tree is a C10 violation,
- * because the exception is the bar's *documented set*, not the collection.
+ * The settings bar's own icon set — SB-060's table, plus the four ids other
+ * requirements force into the bar's surface. That set is the whole of the
+ * `tabler:*` exception C10 grants: any other `tabler:*` id anywhere in the tree
+ * is a C10 violation, because the exception is the bar's *documented set*, not
+ * the collection. Every addition below is traceable to a requirement, so the
+ * set cannot drift into "tabler wherever it looked nicer".
+ *
+ * - `tabler:plus-minus` — SB-011's negatives control cycles through an ON state
+ *   that shows both signs.
+ * - `tabler:chart-bar`, `tabler:crown`, `tabler:device-floppy` — the
+ *   modes-notice strip. SB-180 mandates `tabler:trophy` for the eligibility
+ *   notice and SB-157 `tabler:refresh` for restore-defaults, both rendered in
+ *   that one row, so SB-061's no-mixing rule reaches the strip and its
+ *   remaining three notices (average, pb, saved-settings) must be tabler too.
  */
 export const TABLER_BAR_ICONS = new Set([
   "tabler:plus",
@@ -63,18 +72,34 @@ export const TABLER_BAR_ICONS = new Set([
   "tabler:share",
   "tabler:trophy",
   "tabler:refresh",
+  "tabler:chart-bar",
+  "tabler:crown",
+  "tabler:device-floppy",
 ]);
 
 /**
  * SB-061: the bar reads as one typographic unit, so its own components may not
  * mix collections — inside these paths `ph:*` is prohibited. Paths are
  * `src/`-relative prefixes.
+ *
+ * What counts as "the bar" is decided by whether the path renders an icon
+ * SB-060's table names: `TestConfig.tsx` is the bar, `MobileTestConfigModal` is
+ * the same eight controls below the `md` breakpoint (SB-165 … SB-168), and the
+ * modes-notice strip carries `tabler:trophy` (SB-180) and `tabler:refresh`
+ * (SB-157) in a single row under the bar.
+ *
+ * `ShareTestSettings.tsx` is deliberately **not** here. SB-060 puts
+ * `tabler:share` on the bar *button* (SB-089, rendered in `TestConfig.tsx`);
+ * the modal that button opens contains a URL field, a copy button and a
+ * warning, none of which is a bar control and none of which SB-060 documents.
+ * C10 sends modals to `ph:*`, so that is what it uses. Widening the bar set
+ * with a `tabler:copy` / `tabler:alert-triangle` no requirement asks for would
+ * be the drift this list exists to prevent.
  */
 export const TABLER_ONLY_PATHS = [
   "ts/components/pages/test/TestConfig.tsx",
   "ts/components/pages/test/modes-notice/",
   "ts/components/modals/MobileTestConfigModal.tsx",
-  "ts/components/modals/ShareTestSettings.tsx",
 ];
 
 /**

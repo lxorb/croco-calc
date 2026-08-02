@@ -59,7 +59,7 @@ function ResultSaving() {
   return (
     <Notice
       when={!getConfig.resultSaving}
-      icon="ph:floppy-disk-bold"
+      icon="tabler:device-floppy"
       openCommandline="resultSaving"
       class="text-error"
       text="saving disabled"

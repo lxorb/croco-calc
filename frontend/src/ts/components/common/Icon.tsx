@@ -57,9 +57,17 @@ export const SPEC_ICONS = [
   "tabler:share",
   "tabler:trophy",
   "tabler:refresh",
+  // The modes-notice strip sits directly under the bar and SB-180 puts
+  // `tabler:trophy` in it, so SB-061's no-mixing rule reaches it: its other
+  // three icons have to be tabler too. Same class of addition as
+  // `tabler:plus-minus` above — forced by a requirement, not a free choice.
+  "tabler:chart-bar",
+  "tabler:crown",
+  "tabler:device-floppy",
   // Shell, test, results, about and modals — phosphor (C10).
   "ph:arrow-counter-clockwise-bold",
   "ph:arrows-clockwise-bold",
+  "ph:asterisk-bold",
   "ph:bell-bold",
   "ph:briefcase-bold",
   "ph:bug-bold",
@@ -67,8 +75,10 @@ export const SPEC_ICONS = [
   "ph:caret-right-bold",
   "ph:chart-line-bold",
   "ph:chat-dots-bold",
+  "ph:circle-bold",
   "ph:code-bold",
   "ph:crown-bold",
+  "ph:divide-bold",
   "ph:dots-three-bold",
   "ph:envelope-simple-bold",
   "ph:file-text-bold",
@@ -83,6 +93,7 @@ export const SPEC_ICONS = [
   "ph:lock-bold",
   "ph:megaphone-bold",
   "ph:palette-bold",
+  "ph:plus-minus-bold",
   "ph:question-bold",
   "ph:shield-bold",
   "ph:tag-bold",
@@ -178,6 +189,8 @@ const ICON_BODIES: Record<string, string> = {
     '<path fill="currentColor" d="m216.49 184.49l-32 32a12 12 0 0 1-17-17L179 188H48a12 12 0 0 1 0-24h131l-11.52-11.51a12 12 0 0 1 17-17l32 32a12 12 0 0 1 .01 17m-145-64a12 12 0 0 0 17-17L77 92h131a12 12 0 0 0 0-24H77l11.49-11.51a12 12 0 0 0-17-17l-32 32a12 12 0 0 0 0 17Z"/>',
   "ph:arrows-out-bold":
     '<path fill="currentColor" d="M220 48v48a12 12 0 0 1-24 0V77l-35.51 35.52a12 12 0 0 1-17-17L179 60h-19a12 12 0 0 1 0-24h48a12 12 0 0 1 12 12M95.51 143.51L60 179v-19a12 12 0 0 0-24 0v48a12 12 0 0 0 12 12h48a12 12 0 0 0 0-24H77l35.52-35.51a12 12 0 0 0-17-17ZM208 148a12 12 0 0 0-12 12v19l-35.51-35.52a12 12 0 0 0-17 17L179 196h-19a12 12 0 0 0 0 24h48a12 12 0 0 0 12-12v-48a12 12 0 0 0-12-12M77 60h19a12 12 0 0 0 0-24H48a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0V77l35.51 35.52a12 12 0 0 0 17-17Z"/>',
+  "ph:asterisk-bold":
+    '<path fill="currentColor" d="M218.29 182.17a12 12 0 0 1-16.47 4.12L140 149.19V216a12 12 0 0 1-24 0v-66.81l-61.82 37.1a12 12 0 1 1-12.35-20.58L104.68 128L41.83 90.29a12 12 0 1 1 12.35-20.58l61.82 37.1V40a12 12 0 0 1 24 0v66.81l61.82-37.1a12 12 0 1 1 12.35 20.58L151.32 128l62.85 37.71a12 12 0 0 1 4.12 16.46"/>',
   "ph:at-bold":
     '<path fill="currentColor" d="M128 20a108 108 0 0 0 0 216c22.27 0 45.69-6.73 62.64-18a12 12 0 1 0-13.29-20c-13 8.63-31.89 14-49.35 14a84 84 0 1 1 84-84c0 9.29-1.67 17.08-4.69 21.95c-2.64 4.24-6 6.05-11.31 6.05s-8.67-1.81-11.31-6.05c-3-4.87-4.69-12.66-4.69-21.95V88a12 12 0 0 0-23.49-3.46a52 52 0 1 0 8.86 79.57C172.3 174.3 182.81 180 196 180c24.67 0 40-19.92 40-52A108.12 108.12 0 0 0 128 20m0 136a28 28 0 1 1 28-28a28 28 0 0 1-28 28"/>',
   "ph:backspace-bold":
@@ -224,6 +237,8 @@ const ICON_BODIES: Record<string, string> = {
     '<path fill="currentColor" d="M176.49 95.51a12 12 0 0 1 0 17l-56 56a12 12 0 0 1-17 0l-24-24a12 12 0 1 1 17-17L112 143l47.51-47.52a12 12 0 0 1 16.98.03M236 128A108 108 0 1 1 128 20a108.12 108.12 0 0 1 108 108m-24 0a84 84 0 1 0-84 84a84.09 84.09 0 0 0 84-84"/>',
   "ph:check-square-bold":
     '<path fill="currentColor" d="M79.51 144.49a12 12 0 1 1 17-17L112 143l47.51-47.52a12 12 0 0 1 17 17l-56 56a12 12 0 0 1-17 0ZM228 48v160a20 20 0 0 1-20 20H48a20 20 0 0 1-20-20V48a20 20 0 0 1 20-20h160a20 20 0 0 1 20 20m-24 4H52v152h152Z"/>',
+  "ph:circle-bold":
+    '<path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84"/>',
   "ph:circle-half-bold":
     '<path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m12 24.87a83.5 83.5 0 0 1 24 7.25v151.76a83.5 83.5 0 0 1-24 7.25ZM44 128a84.12 84.12 0 0 1 72-83.13v166.26A84.12 84.12 0 0 1 44 128m144 58.71V69.29a83.81 83.81 0 0 1 0 117.42"/>',
   "ph:circle-notch-bold":
@@ -250,6 +265,8 @@ const ICON_BODIES: Record<string, string> = {
     '<path fill="currentColor" d="M196 35.52C177.62 25.51 153.48 20 128 20s-49.62 5.51-68 15.52C39.37 46.79 28 62.58 28 80v96c0 17.42 11.37 33.21 32 44.48c18.35 10 42.49 15.52 68 15.52s49.62-5.51 68-15.52c20.66-11.27 32-27.06 32-44.48V80c0-17.42-11.37-33.21-32-44.48m8 92.48c0 17-31.21 36-76 36s-76-19-76-36v-8.46a89 89 0 0 0 8 4.94c18.35 10 42.49 15.52 68 15.52s49.62-5.51 68-15.52a89 89 0 0 0 8-4.94Zm-76-84c44.79 0 76 19 76 36s-31.21 36-76 36s-76-19-76-36s31.21-36 76-36m0 168c-44.79 0-76-19-76-36v-8.46a89 89 0 0 0 8 4.94c18.35 10 42.49 15.52 68 15.52s49.62-5.51 68-15.52a89 89 0 0 0 8-4.94V176c0 17-31.21 36-76 36"/>',
   "ph:discord-logo-bold":
     '<path fill="currentColor" d="M108 136a16 16 0 1 1-16-16a16 16 0 0 1 16 16m56-16a16 16 0 1 0 16 16a16 16 0 0 0-16-16m76.07 76.56l-67 29.71A20.15 20.15 0 0 1 146 214.9l-8.54-23.13c-3.13.14-6.27.24-9.45.24s-6.32-.1-9.45-.24L110 214.9a20.19 20.19 0 0 1-27.08 11.37l-67-29.71a19.93 19.93 0 0 1-11.3-23.15L34.15 57a20 20 0 0 1 16.22-14.81l36.06-5.93a20.26 20.26 0 0 1 22.79 14.84l4.41 17.41c4.74-.33 9.52-.51 14.37-.51s9.63.18 14.37.51l4.41-17.41a20.25 20.25 0 0 1 22.79-14.84l36.06 5.93A20 20 0 0 1 221.85 57l29.53 116.38a19.93 19.93 0 0 1-11.31 23.18M227.28 176L199.23 65.46l-30.07-4.94l-2.84 11.17c2.9.58 5.78 1.2 8.61 1.92a12 12 0 1 1-5.86 23.27A168.4 168.4 0 0 0 128 92a168.4 168.4 0 0 0-41.07 4.88a12 12 0 0 1-5.86-23.27c2.83-.72 5.71-1.34 8.61-1.92l-2.83-11.17l-30.08 4.94L28.72 176l60.22 26.7l5-13.57c-4.37-.76-8.67-1.65-12.88-2.71a12 12 0 0 1 5.86-23.28A168.4 168.4 0 0 0 128 168a168.4 168.4 0 0 0 41.07-4.88a12 12 0 0 1 5.86 23.28c-4.21 1.06-8.51 1.95-12.88 2.71l5 13.57Z"/>',
+  "ph:divide-bold":
+    '<path fill="currentColor" d="M228 128a12 12 0 0 1-12 12H40a12 12 0 0 1 0-24h176a12 12 0 0 1 12 12M128 84a20 20 0 1 0-20-20a20 20 0 0 0 20 20m0 88a20 20 0 1 0 20 20a20 20 0 0 0-20-20"/>',
   "ph:dots-six-vertical-bold":
     '<path fill="currentColor" d="M108 60a16 16 0 1 1-16-16a16 16 0 0 1 16 16m56 16a16 16 0 1 0-16-16a16 16 0 0 0 16 16m-72 36a16 16 0 1 0 16 16a16 16 0 0 0-16-16m72 0a16 16 0 1 0 16 16a16 16 0 0 0-16-16m-72 68a16 16 0 1 0 16 16a16 16 0 0 0-16-16m72 0a16 16 0 1 0 16 16a16 16 0 0 0-16-16"/>',
   "ph:dots-three-bold":
@@ -388,6 +405,8 @@ const ICON_BODIES: Record<string, string> = {
     '<path fill="currentColor" d="M234.49 111.07L90.41 22.94A20 20 0 0 0 60 39.87v176.26a20 20 0 0 0 30.41 16.93l144.08-88.13a19.82 19.82 0 0 0 0-33.86M84 208.85V47.15L216.16 128Z"/>',
   "ph:plus-bold":
     '<path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"/>',
+  "ph:plus-minus-bold":
+    '<path fill="currentColor" d="m208.49 64.49l-144 144a12 12 0 0 1-17-17l144-144a12 12 0 0 1 17 17M60 112a12 12 0 0 0 24 0V84h28a12 12 0 0 0 0-24H84V32a12 12 0 0 0-24 0v28H32a12 12 0 0 0 0 24h28Zm164 60h-80a12 12 0 0 0 0 24h80a12 12 0 0 0 0-24"/>',
   "ph:prohibit-bold":
     '<path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m84 108a83.6 83.6 0 0 1-16.75 50.28L77.72 60.75A84 84 0 0 1 212 128m-168 0a83.6 83.6 0 0 1 16.75-50.28l117.53 117.53A84 84 0 0 1 44 128"/>',
   "ph:question-bold":
@@ -476,10 +495,16 @@ const ICON_BODIES: Record<string, string> = {
     '<path fill="currentColor" d="M208.49 191.51a12 12 0 0 1-17 17L128 145l-63.51 63.49a12 12 0 0 1-17-17L111 128L47.51 64.49a12 12 0 0 1 17-17L128 111l63.51-63.52a12 12 0 0 1 17 17L145 128Z"/>',
   "ph:x-circle-bold":
     '<path fill="currentColor" d="M168.49 104.49L145 128l23.52 23.51a12 12 0 0 1-17 17L128 145l-23.51 23.52a12 12 0 0 1-17-17L111 128l-23.49-23.51a12 12 0 0 1 17-17L128 111l23.51-23.52a12 12 0 0 1 17 17ZM236 128A108 108 0 1 1 128 20a108.12 108.12 0 0 1 108 108m-24 0a84 84 0 1 0-84 84a84.09 84.09 0 0 0 84-84"/>',
+  "tabler:chart-bar":
+    '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 13a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zm12-4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1zM9 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1zM4 20h14"/>',
   "tabler:clock":
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0-18 0"/><path d="M12 7v5l3 3"/></g>',
+  "tabler:crown":
+    '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m12 6l4 6l5-4l-2 10H5L3 8l5 4z"/>',
   "tabler:decimal":
     '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8a2 2 0 0 1 2 2v4a2 2 0 1 1-4 0v-4a2 2 0 0 1 2-2m-7 0a2 2 0 0 1 2 2v4a2 2 0 1 1-4 0v-4a2 2 0 0 1 2-2m-5 8h.01"/>',
+  "tabler:device-floppy":
+    '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M6 4h10l4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2"/><path d="M10 14a2 2 0 1 0 4 0a2 2 0 1 0-4 0m4-10v4H8V4"/></g>',
   "tabler:divide":
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path fill="currentColor" d="M11 6a1 1 0 1 0 2 0a1 1 0 1 0-2 0m0 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0"/><path d="M5 12h14"/></g>',
   "tabler:math-1-divide-2":
@@ -506,8 +531,11 @@ const ICON_BODIES: Record<string, string> = {
 
 /** Only listed when it differs from the 0 0 256 256 phosphor default. */
 const ICON_VIEW_BOXES: Record<string, string> = {
+  "tabler:chart-bar": "0 0 24 24",
   "tabler:clock": "0 0 24 24",
+  "tabler:crown": "0 0 24 24",
   "tabler:decimal": "0 0 24 24",
+  "tabler:device-floppy": "0 0 24 24",
   "tabler:divide": "0 0 24 24",
   "tabler:math-1-divide-2": "0 0 24 24",
   "tabler:math-x-divide-y": "0 0 24 24",

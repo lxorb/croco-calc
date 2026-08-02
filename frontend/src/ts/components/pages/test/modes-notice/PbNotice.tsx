@@ -38,7 +38,7 @@ export function PbNotice() {
   return (
     <Notice
       when={isAuthenticated() && getConfig.showPb}
-      icon="ph:crown-bold"
+      icon="tabler:crown"
       openCommandline="showPb"
       text={displayText()}
     />

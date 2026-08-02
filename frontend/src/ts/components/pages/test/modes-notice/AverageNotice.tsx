@@ -35,7 +35,7 @@ export function AverageNotice(): JSXElement {
   return (
     <Notice
       when={isAuthenticated() && getConfig.showAverage !== "off"}
-      icon="ph:chart-bar-bold"
+      icon="tabler:chart-bar"
       openCommandline="showAverage"
       text={displayText()}
     />
