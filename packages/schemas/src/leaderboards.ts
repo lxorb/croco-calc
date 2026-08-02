@@ -1,5 +1,40 @@
 import { z } from "zod";
 import { ScoreSchema, TasksPerMinuteSchema } from "./util";
+import { LeaderboardMode2, LeaderboardMode2Schema } from "./math";
+import { Mode } from "./shared";
+
+/** The three boards the page offers (AC-105 … AC-112). */
+export const LeaderboardTypeSchema = z.enum(["allTime", "weekly", "daily"]);
+export type LeaderboardType = z.infer<typeof LeaderboardTypeSchema>;
+
+/** `mode` → the `mode2` values that board offers; an empty record means "no time axis". */
+export type ValidLeaderboardModes = Readonly<
+  Partial<Record<Mode, readonly LeaderboardMode2[]>>
+>;
+
+/**
+ * AC-114: the valid-leaderboard matrix, replacing monkeytype's hard-coded
+ * `{ time: { "15": ["english"], "60": ["english"] } }` and the
+ * configuration-driven daily rules. `weekly` is XP-only, so it carries no time
+ * axis at all (AC-112 hides the time group for it). Defined here rather than in
+ * the page so the sidebar, the URL parser and the server all read one source.
+ */
+export const VALID_LEADERBOARD_MATRIX = {
+  allTime: { time: LeaderboardMode2Schema.options },
+  weekly: {},
+  daily: { time: LeaderboardMode2Schema.options },
+} as const satisfies Readonly<Record<LeaderboardType, ValidLeaderboardModes>>;
+
+/** AC-114: is this `type`/`mode`/`mode2` triple a board that exists? */
+export function isValidLeaderboard(
+  type: LeaderboardType,
+  mode: string,
+  mode2: string,
+): boolean {
+  const modes: Record<string, readonly string[] | undefined> =
+    VALID_LEADERBOARD_MATRIX[type];
+  return modes[mode]?.includes(mode2) ?? false;
+}
 
 const FriendsRankSchema = z
   .number()
