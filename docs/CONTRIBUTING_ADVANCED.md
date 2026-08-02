@@ -10,8 +10,8 @@
     - [Docker (Recommended but Optional)](#docker-recommended-but-optional)
     - [Firebase (optional)](#firebase-optional)
     - [Config file](#config-file)
-    - [Databases (optional if running frontend only)](#databases-optional-if-running-frontend-only)
-  - [Building and Running Monkeytype](#building-and-running-monkeytype)
+    - [Database (optional if running frontend only)](#database-optional-if-running-frontend-only)
+  - [Building and Running croco calc](#building-and-running-croco-calc)
     - [Dependencies (if running manually)](#dependencies-if-running-manually)
     - [Both Frontend and Backend](#both-frontend-and-backend)
     - [Backend only](#backend-only)
@@ -21,67 +21,62 @@
 
 ## Prerequisites
 
-This contribution guide is for cases in which you need to test the functionality of your changes, or if you need to take screenshots of your changes. You will need a computer with a stable internet connection, a text editor, Git, and NodeJS with version 24.11.0. There are some additional requirements depending on what you're looking to contribute, such as Firebase for authentication, and Mongo and Docker for the backend. Read the below sections to understand how to set up each of these tools.
+This guide covers setting up a local environment so you can test your changes or take screenshots
+of them. You will need a text editor, Git, and NodeJS `24.11.0`. There are additional requirements
+depending on what you're working on — Firebase for authentication, and MongoDB (plus optionally
+Docker) for the backend.
 
 ### Git
 
 > [!WARNING]
 > **If you are on Windows, run `git config --global core.autocrlf false` before cloning this repo to prevent CRLF errors.**
 
-Git is optional but we recommend you utilize it. Monkeytype uses the Git source control management (SCM) system for its version control. Assuming you don't have experience typing commands in the command line, we suggest installing [Sourcetree](https://www.sourcetreeapp.com/). You will be able to utilize the power of Git without needing to remember any cryptic commands. Using a Git client such as Sourcetree won't give you access to the full functionality of Git, but provides an easy-to-understand graphical user interface (GUI). Once you have downloaded Sourcetree, run the installer. While installing Sourcetree, keep your eyes peeled for the option to also install Git with Sourcetree. This is the option you will need to look for in order to install Git. **Make sure to click yes in the installer to install Git with Sourcetree.**
+croco calc uses Git for version control. If you are not comfortable on the command line, a GUI
+client such as [Sourcetree](https://www.sourcetreeapp.com/) or
+[GitHub Desktop](https://desktop.github.com/) will cover everything you need. Both can install Git
+for you.
 
 ### NodeJS and PNPM
 
-Currently, the project is using version `24.11.0 LTS`.
+The project uses Node `24.11.0`. The supported range is `>=24 <25`.
 
-If you use `nvm` (if you use Windows, use [nvm-windows](https://github.com/coreybutler/nvm-windows)) then you can run `nvm install` and `nvm use` (you might need to specify the exact version eg: `nvm install 24.11.0` then `nvm use 24.11.0`) to use the version of Node.js in the `.nvmrc` file.
+If you use `nvm` (on Windows, [nvm-windows](https://github.com/coreybutler/nvm-windows)) you can run
+`nvm install` and `nvm use` to pick up the version in `.nvmrc`. Otherwise download it from the
+[NodeJS website](https://nodejs.org/en/).
 
-Alternatively, you can navigate to the NodeJS [website](https://nodejs.org/en/) to download it from there.
+For package management we use `pnpm`, not `npm` or `yarn`. Install it with
+`npm i -g pnpm@10.28.1`.
 
-For package management, we use `pnpm` instead of `npm` or `yarn`. You can install it by running `npm i -g pnpm@10.28.1`. This will install `pnpm` globally on your machine.
+> [!NOTE]
+> The backend depends on `bcrypt`, a native module. On platforms without a prebuilt binary
+> (for example Windows on ARM64) `pnpm install` will try to compile it and needs a working C++
+> toolchain. If you only intend to work on the frontend you can use `pnpm install --ignore-scripts`.
 
 ### Docker (Recommended but Optional)
 
-You can use docker to run the frontend and backend. This will take care of OS-specific problems but might be a bit more resource-intensive. You can download it from the [Docker website](https://www.docker.com/get-started/#h_installation).
+Docker can run the database, the frontend and the backend for you. It avoids OS-specific problems
+but is more resource-intensive. Download it from the
+[Docker website](https://www.docker.com/get-started/#h_installation).
 
 ### Firebase (optional)
 
-The account system will not let you create an account without a Firebase project. You can skip this if you don't think you will need it (you can always set it up later)
+The account system will not let you create an account without a Firebase project. Skip this if you
+don't need it — you can always set it up later.
 
-1. Create a Firebase account if you already haven't done so.
-1. [Create a new Firebase project.](https://console.firebase.google.com/u/0/)
-   - The project name doesn't matter, but the name `monkeytype` would be preferred.
-   - Google Analytics is not necessary.
-
-1. Enable Firebase Authentication
+1. Create a Firebase account if you haven't already.
+2. [Create a new Firebase project.](https://console.firebase.google.com/u/0/)
+   - The project name doesn't matter. Google Analytics is not necessary.
+3. Enable Firebase Authentication:
    - In the Firebase console, go to `Build > Authentication > Sign-in method`
-   - Click on `Email/Password`, enable it, and save
-   - Click on `Google`, add a support email, and save
-
-1. Generate a Firebase Admin private key (optional, only needed if you want to work on the backend)
-   - In your Firebase console, go to Project Settings > Service Accounts
-   - Click "Generate New Private Key"
-   - Save as `serviceAccountKey.json` inside the `backend/src/credentials/` directory.
-
-1. Run `pnpm add -g firebase-tools` to install the Firebase Command Line Interface.
-1. Run `firebase login` on your terminal to log in to the same Google account you just used to create the project.
-1. Within the `frontend` directory, duplicate `.firebaserc_example`, rename the new file to `.firebaserc` and change the project name to the firebase project id you just created.
-   - Run `firebase projects:list` to find your firebase project ID.
-   - If `.firebaserc_example` does not exist after cloning, create your own with:
-
-   ```.firebaserc
-    {
-        "projects": {
-            "default": "your-firebase-project-id"
-        }
-    }
-   ```
+   - Click `Email/Password`, enable it, and save
+   - Click `Google`, add a support email, and save
 
 ### Config file
 
-Within the `frontend/src/ts/constants` directory, duplicate `firebase-config-example.ts`, rename it to `firebase-config.ts`
+Within `frontend/src/ts/constants`, duplicate `firebase-config-example.ts` and rename the copy to
+`firebase-config.ts`. This file is gitignored — never commit it.
 
-- If you skipped the Firebase step, you can leave the fields blank
+- If you skipped the Firebase step, leave the fields blank.
 - Otherwise:
   1. Navigate to `Project Settings > General > Your apps`
   2. If there are no apps in your project, create a new web app
@@ -90,32 +85,37 @@ Within the `frontend/src/ts/constants` directory, duplicate `firebase-config-exa
   5. Paste the config into `firebase-config.ts`
   6. Ensure there is an `export` statement before `const firebaseConfig`
 
-If you want to access the frontend from other machines on your network create a file `frontend/.env` with this content:
+If you want to access the frontend from other machines on your network, create `frontend/.env` with:
 
 ```
 BACKEND_URL="http://<Your IP>:5005"
 ```
 
-### Databases (optional if running frontend only)
+### Database (optional if running frontend only)
 
-Follow these steps if you want to work on anything involving the database/account system. Otherwise, you can skip this section.
+Follow these steps if you want to work on anything involving the database or account system.
+Otherwise you can skip this section.
 
 1. Inside the backend folder, copy `example.env` to `.env` in the same directory.
+   - The backend Docker scripts read port bindings from this file. If `27017` or `5005` are already
+     in use on your machine, update `DOCKER_DB_PORT` and `DOCKER_SERVER_PORT` before starting Docker.
 
-   - The backend Docker scripts read port bindings from this file. If `27017`, `6379`, or `5005` are already in use on your machine, update `DOCKER_DB_PORT`, `DOCKER_REDIS_PORT`, and `DOCKER_SERVER_PORT` before starting Docker.
+2. Set up the database server:
 
-2. Setup the database server
+| Manual                                                                                                                                                  | Docker (recommended)                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <ol><li>Install [MongoDB Community Edition](https://docs.mongodb.com/manual/administration/install-community/)</li><li>Make sure it is running</li></ol> | <ol><li>Install [Docker](http://www.docker.io/gettingstarted/#h_installation) on your machine</li><li>Run `npm run docker-db-only` from the `./backend` directory</li></ol> |
 
-| Manual                                                                                                                                                                                                                                                         | Docker (recommended)                                                                                                                                                        |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <ol><li>Install [MongoDB Community Edition](https://docs.mongodb.com/manual/administration/install-community/)</li><li>Install [Redis](https://redis.io/docs/latest/operate/oss_and_stack/install/install-stack/)</li><li>Make sure both are running</li></ol> | <ol><li>Install [Docker](http://www.docker.io/gettingstarted/#h_installation) on your machine</li><li>Run `npm run docker-db-only` from the `./backend` directory</li></ol> |
+3. (Optional) Install [MongoDB Compass](https://www.mongodb.com/try/download/compass) to inspect the
+   database visually. To connect, enter `mongodb://localhost:27017` in the connection string box and
+   press connect. The croco calc database is created and shown once the server has started.
 
-3. (Optional) Install [MongoDB-compass](https://www.mongodb.com/try/download/compass?tck=docs_compass). This tool can be used to see and manipulate your database visually.
-   - To connect, type `mongodb://localhost:27017` in the connection string box and press connect. The Monkeytype database will be created and shown after the server is started.
+> [!NOTE]
+> croco calc does not use Redis. Daily leaderboards and background jobs run against MongoDB.
 
-## Building and Running Monkeytype
+## Building and Running croco calc
 
-It's time to run Monkeytype. Just like with the databases, you can run the frontend and backend manually or with Docker.
+Just like the database, you can run the frontend and backend manually or with Docker.
 
 ### Dependencies (if running manually)
 
@@ -123,37 +123,53 @@ Run `pnpm i` in the project root to install all dependencies.
 
 ### Both Frontend and Backend
 
-Manual:
-
 ```
-npm run dev
+pnpm dev
 ```
 
 ### Backend only
 
-| Manual           | Docker                         |
-| ---------------- | ------------------------------ |
-| `npm run dev-be` | `cd backend && npm run docker` |
+| Manual        | Docker                         |
+| ------------- | ------------------------------ |
+| `pnpm dev-be` | `cd backend && npm run docker` |
 
 ### Frontend only
 
-| Manual           | Docker                          |
-| ---------------- | ------------------------------- |
-| `npm run dev-fe` | `cd frontend && npm run docker` |
+| Manual        | Docker                          |
+| ------------- | ------------------------------- |
+| `pnpm dev-fe` | `cd frontend && npm run docker` |
 
-By default, these commands will start a local development website on [port 3000](http://localhost:3000) and a local development server on [port 5005](http://localhost:5005). They will automatically rebuild the website/server when you make changes in the `src/` directory. Use <kbd>Ctrl+C</kbd> to stop them.
+By default these commands start a local development website on
+[port 3000](http://localhost:3000) and a local development server on
+[port 5005](http://localhost:5005). They rebuild automatically when you change anything under
+`src/`. Use <kbd>Ctrl+C</kbd> to stop them.
 
 > [!NOTE]
-> Rebuilding doesn't happen instantaneously and depends on your machine, so be patient for changes to appear.
+> Rebuilding is not instantaneous and depends on your machine, so be patient for changes to appear.
 
-If you are on a UNIX system and you get a spawn error, run npm with `sudo`.
+If you are on a UNIX system and get a spawn error, run the command with `sudo`.
 
 ## Standards and Guidelines
 
-Code formatting and linting is enforced by [Oxc (Oxfmt and Oxlint)](https://github.com/oxc-project/oxc), which automatically runs every time you make a commit.
+Formatting and linting are enforced by [Oxc (oxfmt and oxlint)](https://github.com/oxc-project/oxc),
+which runs automatically on every commit via a pre-commit hook. A commit-msg hook enforces the
+commit message convention.
 
-For guidelines on commit messages, adding themes, languages, or quotes, please refer to [CONTRIBUTING.md](./CONTRIBUTING.md). Following these guidelines will increase the chances of getting your change accepted.
+Useful commands:
+
+```
+pnpm lint          # oxlint
+pnpm ts-check      # typecheck
+pnpm test          # vitest
+pnpm lint-styles   # stylelint
+pnpm format-check  # oxfmt --check
+```
+
+For commit message rules and theme guidelines see [CONTRIBUTING.md](./CONTRIBUTING.md). The
+authoritative specification for the project is [REQUIREMENTS.md](./REQUIREMENTS.md).
 
 ## Questions
 
-If you have any questions, comments, concerns, or problems let me know on [GitHub](https://github.com/Miodec), [Discord](https://discord.gg/monkeytype) in the `#development` channel, or ask a question on Monkeytype's [GitHub discussions](https://github.com/monkeytypegame/monkeytype/discussions) and a contributor will be happy to assist you.
+If you have any questions, comments or problems, open a
+[GitHub issue](https://github.com/lxorb/croco-calc/issues) or email
+[contact@crococalc.com](mailto:contact@crococalc.com).

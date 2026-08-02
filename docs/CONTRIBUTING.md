@@ -5,90 +5,65 @@
 - [Getting Started](#getting-started)
 - [How to Contribute](#how-to-contribute)
 - [Standards and Guidelines](#standards-and-guidelines)
+  - [Commit and Pull Request Naming](#commit-and-pull-request-naming)
   - [Theme Guidelines](#theme-guidelines)
-  - [Language Guidelines](#language-guidelines)
-  - [Quote Guidelines](#quote-guidelines)
-  - [Layout Guidelines](#layout-guidelines)
 - [Questions](#questions)
 
 ## Getting Started
 
-When contributing to Monkeytype, it's good to know our best practices, tips, and tricks. First, Monkeytype is written in ~~JavaScript~~ TypeScript, HTML, and CSS (in order of language usage within the project); thus, we assume you are comfortable with these languages or have basic knowledge of them. Our backend is in NodeJS and we use MongoDB to store our user data. Firebase is used for authentication. Redis is used to store ephemeral data (daily leaderboards, jobs via BullMQ, OAuth state parameters). Furthermore, we use Oxc (Oxfmt and Oxlint) to format and lint our code.
+croco calc is written in TypeScript, SCSS and HTML. The frontend is a SolidJS + Vite single-page
+app styled with SCSS and Tailwind. The backend is Node with Express and stores data in MongoDB.
+Firebase handles authentication. Shared zod schemas and ts-rest contracts live in `packages/`, and
+the arithmetic task generator lives in `packages/math-engine`. We use Oxc (oxfmt and oxlint) to
+format and lint, and Vitest for tests.
+
+The repository is a pnpm + turbo monorepo. See [CONTRIBUTING_ADVANCED.md](/docs/CONTRIBUTING_ADVANCED.md)
+for how to set up a local development environment.
+
+Before making non-trivial changes, read [REQUIREMENTS.md](/docs/REQUIREMENTS.md) — it is the
+authoritative specification for the project, and its requirement IDs are binding.
 
 ## How to Contribute
 
-We have two separate contribution guides based on what you're looking to contribute. If you're simply looking to help us augment our language or quotes data, please refer to [CONTRIBUTING_BASIC.md](/docs/CONTRIBUTING_BASIC.md). This guide will go over how to do so easily and without the need to set up a local development server.
-
-If you're looking to make deeper code changes that affect functionality, or will require screenshots of the changes, please refer to [CONTRIBUTING_ADVANCED.md](/docs/CONTRIBUTING_ADVANCED.md).
+1. Fork the repository and create a branch.
+2. Set up a development environment following [CONTRIBUTING_ADVANCED.md](/docs/CONTRIBUTING_ADVANCED.md).
+3. Make your change, keeping it focused — one concern per pull request.
+4. Run `pnpm lint`, `pnpm ts-check` and `pnpm test` before opening the pull request.
+5. Open a pull request describing what changed and why. Include screenshots for anything visual.
 
 ## Standards and Guidelines
 
-Below is a set of general guidelines for different types of changes.
+### Commit and Pull Request Naming
 
-### Pull Request Naming Guidelines
+croco calc does **not** use Conventional Commits. Commit messages are:
 
-We use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for our pull request titles (and commit messages on the master branch) and also include the author name at the end inside parenthesis. Please follow the guidelines below when naming pull requests.
+- a single line, with no body and no trailers,
+- all lowercase,
+- at most **5 words**.
 
-For types, we use the following:
+For example: `fix leaderboard rank display`.
 
-- `feat`: A new feature
-- `impr`: An improvement to an existing feature
-- `fix`: A bug fix
-- `docs`: Documentation only changes
-- `style`: Changes that do not affect the meaning of the code (white space, formatting, missing semi-colons, etc)
-- `refactor`: A code change that neither fixes a bug nor adds a feature, but makes the code easier to read, understand, or improve
-- `perf`: A code change that improves performance
-- `test`: Adding missing tests or correcting existing tests
-- `build`: Changes that affect the build system or external dependencies (example scopes: vite, tsup-node, npm)
-- `ci`: Changes to our CI configuration files and scripts (example scopes: GitHub Workflows)
-- `revert`: Reverts a previous commit
-- `chore`: Other changes that don't apply to any of the above
+A `commit-msg` git hook enforces this. Never add a `Co-Authored-By:` trailer or any other
+self-attribution — commits are authored by their author alone.
 
-#### Examples
-
-- `feat: add new feature (@github_username)`
-- `impr(quotes): add english quotes (@username)`
-- `fix(leaderboard): show user rank correctly (@user1, @user2, @user3)`
+Pull request titles should follow the same style, but may be a little more descriptive where that
+genuinely helps a reviewer.
 
 ### Theme Guidelines
 
-<!-- TODO: add screenshots to provide examples for dos and don'ts -->
+Before submitting a theme make sure:
 
-Before submitting a theme make sure...
+- your theme is unique and isn't visually similar to one we already have,
+- the text colour is either black or white (or very close to those colours),
+- your theme has been added to the theme list and its `textColor` property is the theme's main
+  colour,
+- your theme is clear and readable with both `flip test colors` and `colorful mode` enabled and
+  disabled.
 
-- your theme is unique and isn't visually similar to any we already have.
-- the text color is either black or white (or very close to these colors)
-- your theme has been added to the `_list` file and the `textColor` property is the theme's main color
-- your theme is clear and readable with both `flip test colors` and `colorful mode` enabled and disabled
-
-If you want to contribute themes but don't know how, check [THEMES.md](/docs/THEMES.md)
-
-### Language Guidelines
-
-- Do not include expletive words
-- Ensure that your contribution meets JSON standards (no trailing comma at the end of a list)
-- Be sure to add your language to the `_list` and `_groups` files
-- Make sure the number of words in the file corresponds to the file name (for example: `languageName.json` is 200 words, `languageName_1k.json` is 1000 words, and so on)
-
-If you want to contribute languages but don't know how, check [LANGUAGES.md](/docs/LANGUAGES.md)
-
-### Quote Guidelines
-
-- Do not include content that contains any libelous or otherwise unlawful, abusive, or obscene text.
-- Ensure that your contribution meets JSON standards (no trailing comma at the end of a list)
-- Verify quotes added aren't duplicates of any already present
-- Verify the `length` property is correct (length of the text in characters)
-- Verify the `id` property is incremented correctly
-- Please do not add extremely short quotes (less than 60 characters)
-- For quotes not in English, please include translations of quotes in the description of your pull request. This assists in the verification process to ensure the integrity of the quotes.
-- Remember to name your pull request properly. For example, if you are adding new quotes for the language `French`, your pull request should be named `impr(quotes): add French quotes`.
-
-If you want to contribute quotes but don't know how, check [QUOTES.md](/docs/QUOTES.md)
-
-### Layout Guidelines
-
-If you want to contribute layouts but don't know how, check [LAYOUTS.md](/docs/LAYOUTS.md)
+If you want to contribute themes but don't know how, see [THEMES.md](/docs/THEMES.md).
 
 ## Questions
 
-If you have any questions, comments, concerns, or problems let me know on [GitHub](https://github.com/Miodec), [Discord](https://discord.gg/monkeytype) in the `#development` channel, or ask a question on Monkeytype's [GitHub discussions](https://github.com/monkeytypegame/monkeytype/discussions) and a contributor will be happy to assist you.
+If you have any questions, comments or problems, open a
+[GitHub issue](https://github.com/lxorb/croco-calc/issues) or email
+[contact@crococalc.com](mailto:contact@crococalc.com).
