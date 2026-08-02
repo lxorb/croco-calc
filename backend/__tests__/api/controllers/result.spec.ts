@@ -552,6 +552,29 @@ describe("result controller test", () => {
       );
     });
 
+    it("DoD-24 — saves a run with acc = 12.5, end to end", async () => {
+      // The literal DoD-24 case. The test above stops at 50 %, which is exactly
+      // where monkeytype's *schema* floor sat (`.min(50)`), so on its own it
+      // cannot tell a removed floor from a floor that happens to be satisfied.
+      // 56 tasks, one right in every eight: 7 / 56 = 12.5 %.
+      const taskLog = honestTaskLog(56).map((entry, i) =>
+        i % 8 === 0 ? entry : { ...entry, given: "999999", correct: false },
+      );
+      const metrics = computeMetrics(taskLog, TEST_DURATION);
+      expect(metrics.acc).toBe(12.5);
+
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({ result: buildCompletedEvent({ taskLog, ...metrics }) })
+        .expect(200);
+
+      expect(resultAddMock).toHaveBeenCalledWith(
+        uid,
+        expect.objectContaining({ acc: 12.5 }),
+      );
+    });
+
     it("should fail if result saving is disabled", async () => {
       //GIVEN
       await enableResultsSaving(false);
