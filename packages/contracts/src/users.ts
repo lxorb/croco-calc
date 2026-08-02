@@ -10,20 +10,15 @@ import {
 } from "./util/api";
 import {
   CountByYearAndDaySchema,
+  CrocoMailSchema,
   CustomThemeNameSchema,
   CustomThemeSchema,
-  FavoriteQuotesSchema,
-  MonkeyMailSchema,
   ResultFiltersSchema,
-  StreakHourOffsetSchema,
-  TagNameSchema,
   TestActivitySchema,
   UserProfileDetailsSchema,
   UserProfileSchema,
   ReportUserReasonSchema,
   UserSchema,
-  UserStreakSchema,
-  UserTagSchema,
   UserEmailSchema,
   UserNameSchema,
   FriendSchema,
@@ -33,8 +28,7 @@ import {
   ModeSchema,
   PersonalBestSchema,
 } from "@croco-calc/schemas/shared";
-import { IdSchema, StringNumberSchema } from "@croco-calc/schemas/util";
-import { LanguageSchema } from "@croco-calc/schemas/languages";
+import { IdSchema } from "@croco-calc/schemas/util";
 import { CustomThemeColorsSchema } from "@croco-calc/schemas/configs";
 
 export const GetUserResponseSchema = responseWithData(
@@ -74,7 +68,6 @@ export type UpdateUserNameRequest = z.infer<typeof UpdateUserNameRequestSchema>;
 export const UpdateLeaderboardMemoryRequestSchema = z.object({
   mode: ModeSchema,
   mode2: Mode2Schema,
-  language: LanguageSchema,
   rank: z.number().int().nonnegative(),
 });
 export type UpdateLeaderboardMemoryRequest = z.infer<
@@ -122,28 +115,6 @@ export type RemoveResultFilterPresetPathParams = z.infer<
   typeof RemoveResultFilterPresetPathParamsSchema
 >;
 
-export const GetTagsResponseSchema = responseWithData(z.array(UserTagSchema));
-export type GetTagsResponse = z.infer<typeof GetTagsResponseSchema>;
-
-export const AddTagRequestSchema = z.object({
-  tagName: TagNameSchema,
-});
-export type AddTagRequest = z.infer<typeof AddTagRequestSchema>;
-
-export const AddTagResponseSchema = responseWithData(UserTagSchema);
-export type AddTagResponse = z.infer<typeof AddTagResponseSchema>;
-
-export const EditTagRequestSchema = z.object({
-  tagId: IdSchema,
-  newName: TagNameSchema,
-});
-export type EditTagRequest = z.infer<typeof EditTagRequestSchema>;
-
-export const TagIdPathParamsSchema = z.object({
-  tagId: IdSchema,
-});
-export type TagIdPathParams = z.infer<typeof TagIdPathParamsSchema>;
-
 export const GetCustomThemesResponseSchema = responseWithData(
   z.array(CustomThemeSchema),
 );
@@ -177,64 +148,14 @@ export const EditCustomThemeRequstSchema = z.object({
 });
 export type EditCustomThemeRequst = z.infer<typeof EditCustomThemeRequstSchema>;
 
-export const GetDiscordOauthLinkResponseSchema = responseWithData(
-  z.object({
-    url: z.string().url(),
-  }),
-);
-export type GetDiscordOauthLinkResponse = z.infer<
-  typeof GetDiscordOauthLinkResponseSchema
->;
-
-export const LinkDiscordRequestSchema = z.object({
-  tokenType: z.string(),
-  accessToken: z.string(),
-  state: z.string().length(20),
-});
-export type LinkDiscordRequest = z.infer<typeof LinkDiscordRequestSchema>;
-
-export const LinkDiscordResponseSchema = responseWithData(
-  UserSchema.pick({ discordId: true, discordAvatar: true }),
-);
-export type LinkDiscordResponse = z.infer<typeof LinkDiscordResponseSchema>;
-
 export const GetStatsResponseSchema = responseWithData(
   UserSchema.pick({
     completedTests: true,
     startedTests: true,
-    timeTyping: true,
+    timeSpent: true,
   }),
 );
 export type GetStatsResponse = z.infer<typeof GetStatsResponseSchema>;
-
-export const SetStreakHourOffsetRequestSchema = z.object({
-  hourOffset: StreakHourOffsetSchema,
-});
-export type SetStreakHourOffsetRequest = z.infer<
-  typeof SetStreakHourOffsetRequestSchema
->;
-
-export const GetFavoriteQuotesResponseSchema =
-  responseWithData(FavoriteQuotesSchema);
-export type GetFavoriteQuotesResponse = z.infer<
-  typeof GetFavoriteQuotesResponseSchema
->;
-
-export const AddFavoriteQuoteRequestSchema = z.object({
-  language: LanguageSchema,
-  quoteId: StringNumberSchema,
-});
-export type AddFavoriteQuoteRequest = z.infer<
-  typeof AddFavoriteQuoteRequestSchema
->;
-
-export const RemoveFavoriteQuoteRequestSchema = z.object({
-  language: LanguageSchema,
-  quoteId: StringNumberSchema,
-});
-export type RemoveFavoriteQuoteRequest = z.infer<
-  typeof RemoveFavoriteQuoteRequestSchema
->;
 
 export const GetProfilePathParamsSchema = z.object({
   uidOrName: z.string(),
@@ -255,14 +176,7 @@ export type GetProfileQuery = z.infer<typeof GetProfileQuerySchema>;
 export const GetProfileResponseSchema = responseWithData(UserProfileSchema);
 export type GetProfileResponse = z.infer<typeof GetProfileResponseSchema>;
 
-export const UpdateUserProfileRequestSchema = UserProfileDetailsSchema.extend({
-  selectedBadgeId: z
-    .number()
-    .int()
-    .nonnegative()
-    .optional()
-    .or(z.literal(-1).describe("no badge selected")), //TODO remove the -1, use optional?
-});
+export const UpdateUserProfileRequestSchema = UserProfileDetailsSchema;
 export type UpdateUserProfileRequest = z.infer<
   typeof UpdateUserProfileRequestSchema
 >;
@@ -276,7 +190,7 @@ export type UpdateUserProfileResponse = z.infer<
 
 export const GetUserInboxResponseSchema = responseWithData(
   z.object({
-    inbox: z.array(MonkeyMailSchema),
+    inbox: z.array(CrocoMailSchema),
     maxMail: z.number().int(),
   }),
 );
@@ -325,10 +239,6 @@ export const GetCurrentTestActivityResponseSchema =
 export type GetCurrentTestActivityResponse = z.infer<
   typeof GetCurrentTestActivityResponseSchema
 >;
-
-export const GetStreakResponseSchema =
-  responseWithNullableData(UserStreakSchema);
-export type GetStreakResponse = z.infer<typeof GetStreakResponseSchema>;
 
 export const GetFriendsResponseSchema = responseWithData(z.array(FriendSchema));
 export type GetFriendsResponse = z.infer<typeof GetFriendsResponseSchema>;
@@ -473,7 +383,6 @@ export const usersContract = c.router(
         200: GetPersonalBestsResponseSchema,
       },
       metadata: meta({
-        authenticationOptions: { acceptApeKeys: true },
         rateLimit: "userGet",
       }),
     },
@@ -542,73 +451,6 @@ export const usersContract = c.router(
         },
       }),
     },
-    getTags: {
-      summary: "get tags",
-      description: "Get the users tags",
-      method: "GET",
-      path: "/tags",
-      responses: {
-        200: GetTagsResponseSchema,
-      },
-      metadata: meta({
-        authenticationOptions: { acceptApeKeys: true },
-        rateLimit: "userTagsGet",
-      }),
-    },
-    createTag: {
-      summary: "add tag",
-      description: "Add a tag for the current user",
-      method: "POST",
-      path: "/tags",
-      body: AddTagRequestSchema.strict(),
-      responses: {
-        200: AddTagResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "userTagsAdd",
-      }),
-    },
-    editTag: {
-      summary: "edit tag",
-      description: "Edit a tag",
-      method: "PATCH",
-      path: "/tags",
-      body: EditTagRequestSchema.strict(),
-      responses: {
-        200: MonkeyResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "userTagsEdit",
-      }),
-    },
-    deleteTag: {
-      summary: "delete tag",
-      description: "Delete a tag",
-      method: "DELETE",
-      path: "/tags/:tagId",
-      pathParams: TagIdPathParamsSchema.strict(),
-      body: c.noBody(),
-      responses: {
-        200: MonkeyResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "userTagsRemove",
-      }),
-    },
-    deleteTagPersonalBest: {
-      summary: "delete tag PBs",
-      description: "Delete personal bests of a tag",
-      method: "DELETE",
-      path: "/tags/:tagId/personalBest",
-      pathParams: TagIdPathParamsSchema.strict(),
-      body: c.noBody(),
-      responses: {
-        200: MonkeyResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "userTagsClearPB",
-      }),
-    },
     getCustomThemes: {
       summary: "get custom themes",
       description: "Get custom themes for the current user",
@@ -660,114 +502,16 @@ export const usersContract = c.router(
         rateLimit: "userCustomThemeEdit",
       }),
     },
-    getDiscordOAuth: {
-      summary: "discord oauth",
-      description: "Start OAuth authentication with discord",
-      method: "GET",
-      path: "/discord/oauth",
-      responses: {
-        200: GetDiscordOauthLinkResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "userDiscordLink",
-        requireConfiguration: {
-          path: "users.discordIntegration.enabled",
-          invalidMessage: "Discord integration is not available at this time",
-        },
-      }),
-    },
-    linkDiscord: {
-      summary: "link with discord",
-      description: "Links a user's account with a discord account",
-      method: "POST",
-      path: "/discord/link",
-      body: LinkDiscordRequestSchema.strict(),
-      responses: {
-        200: LinkDiscordResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "userDiscordLink",
-        requireConfiguration: {
-          path: "users.discordIntegration.enabled",
-          invalidMessage: "Discord integration is not available at this time",
-        },
-      }),
-    },
-    unlinkDiscord: {
-      summary: "unlink discord",
-      description: "Unlinks a user's account with a discord account",
-      method: "POST",
-      path: "/discord/unlink",
-      body: c.noBody(),
-      responses: {
-        200: MonkeyResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "userDiscordUnlink",
-      }),
-    },
     getStats: {
       summary: "get stats",
-      description: "Gets a user's typing stats data",
+      description: "Gets a user's test stats data",
       method: "GET",
       path: "/stats",
       responses: {
         200: GetStatsResponseSchema,
       },
       metadata: meta({
-        authenticationOptions: { acceptApeKeys: true },
         rateLimit: "userGet",
-      }),
-    },
-    setStreakHourOffset: {
-      summary: "set streak hour offset",
-      description: "Sets a user's streak hour offset",
-      method: "POST",
-      path: "/setStreakHourOffset",
-      body: SetStreakHourOffsetRequestSchema.strict(),
-      responses: {
-        200: MonkeyResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "setStreakHourOffset",
-      }),
-    },
-    getFavoriteQuotes: {
-      summary: "get favorite quotes",
-      description: "Gets a user's favorite quotes",
-      method: "GET",
-      path: "/favoriteQuotes",
-      responses: {
-        200: GetFavoriteQuotesResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "quoteFavoriteGet",
-      }),
-    },
-    addQuoteToFavorites: {
-      summary: "add favorite quotes",
-      description: "Add a quote to the user's favorite quotes",
-      method: "POST",
-      path: "/favoriteQuotes",
-      body: AddFavoriteQuoteRequestSchema.strict(),
-      responses: {
-        200: MonkeyResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "quoteFavoritePost",
-      }),
-    },
-    removeQuoteFromFavorites: {
-      summary: "remove favorite quotes",
-      description: "Remove a quote to the user's favorite quotes",
-      method: "DELETE",
-      path: "/favoriteQuotes",
-      body: RemoveFavoriteQuoteRequestSchema.strict(),
-      responses: {
-        200: MonkeyResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "quoteFavoriteDelete",
       }),
     },
     getProfile: {
@@ -850,10 +594,10 @@ export const usersContract = c.router(
         200: MonkeyResponseSchema,
       },
       metadata: meta({
-        rateLimit: "quoteReportSubmit",
+        rateLimit: "userReportSubmit",
         requirePermission: "canReport",
         requireConfiguration: {
-          path: "quotes.reporting.enabled",
+          path: "users.reporting.enabled",
           invalidMessage: "User reporting is unavailable.",
         },
       }),
@@ -921,21 +665,7 @@ export const usersContract = c.router(
         200: GetCurrentTestActivityResponseSchema,
       },
       metadata: meta({
-        authenticationOptions: { acceptApeKeys: true },
         rateLimit: "userCurrentTestActivity",
-      }),
-    },
-    getStreak: {
-      summary: "get streak",
-      description: "Get user's streak data",
-      method: "GET",
-      path: "/streak",
-      responses: {
-        200: GetStreakResponseSchema,
-      },
-      metadata: meta({
-        authenticationOptions: { acceptApeKeys: true },
-        rateLimit: "userStreak",
       }),
     },
     getFriends: {

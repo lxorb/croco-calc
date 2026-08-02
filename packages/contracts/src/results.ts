@@ -64,22 +64,6 @@ export const AddResultResponseSchema = responseWithData(
 );
 export type AddResultResponse = z.infer<typeof AddResultResponseSchema>;
 
-export const UpdateResultTagsRequestSchema = z.object({
-  tagIds: z.array(IdSchema),
-  resultId: IdSchema,
-});
-export type UpdateResultTagsRequest = z.infer<
-  typeof UpdateResultTagsRequestSchema
->;
-export const UpdateResultTagsResponseSchema = responseWithData(
-  z.object({
-    tagPbs: z.array(IdSchema),
-  }),
-);
-export type UpdateResultTagsResponse = z.infer<
-  typeof UpdateResultTagsResponseSchema
->;
-
 export const GetLastResultResponseSchema = responseWithData(ResultSchema);
 export type GetLastResultResponse = z.infer<typeof GetLastResultResponseSchema>;
 
@@ -96,13 +80,7 @@ export const resultsContract = c.router(
         200: GetResultsResponseSchema,
       },
       metadata: meta({
-        authenticationOptions: {
-          acceptApeKeys: true,
-        },
-        rateLimit: {
-          normal: "resultsGet",
-          apeKey: "resultsGetApe",
-        },
+        rateLimit: "resultsGet",
       }),
     },
     getById: {
@@ -115,13 +93,7 @@ export const resultsContract = c.router(
         200: GetResultByIdResponseSchema,
       },
       metadata: meta({
-        authenticationOptions: {
-          acceptApeKeys: true,
-        },
-        rateLimit: {
-          normal: "resultByIdGet",
-          apeKey: "resultByIdGetApe",
-        },
+        rateLimit: "resultByIdGet",
       }),
     },
     add: {
@@ -134,11 +106,11 @@ export const resultsContract = c.router(
         200: AddResultResponseSchema,
         460: MonkeyClientError.describe("Test too short"),
         461: MonkeyClientError.describe("Result hash invalid"),
-        462: MonkeyClientError.describe("Result spacing invalid"),
         463: MonkeyClientError.describe("Result data invalid"),
-        464: MonkeyClientError.describe("Missing key data"),
         465: MonkeyClientError.describe("Bot detected"),
         466: MonkeyClientError.describe("Duplicate result"),
+        467: MonkeyClientError.describe("Task log does not match the seed"),
+        468: MonkeyClientError.describe("Unsupported math engine version"),
       },
       metadata: meta({
         rateLimit: "resultsAdd",
@@ -146,19 +118,6 @@ export const resultsContract = c.router(
           path: "results.savingEnabled",
           invalidMessage: "Results are not being saved at this time.",
         },
-      }),
-    },
-    updateTags: {
-      summary: "update result tags",
-      description: "Labels a result with the specified tags",
-      method: "PATCH",
-      path: "/tags",
-      body: UpdateResultTagsRequestSchema.strict(),
-      responses: {
-        200: UpdateResultTagsResponseSchema,
-      },
-      metadata: meta({
-        rateLimit: "resultsTagsUpdate",
       }),
     },
     deleteAll: {
@@ -186,9 +145,6 @@ export const resultsContract = c.router(
         200: GetLastResultResponseSchema,
       },
       metadata: meta({
-        authenticationOptions: {
-          acceptApeKeys: true,
-        },
         rateLimit: "resultsGet",
       }),
     },

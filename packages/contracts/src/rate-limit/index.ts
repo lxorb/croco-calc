@@ -7,11 +7,6 @@ export type RateLimitOptions = {
 };
 
 export const limits = {
-  defaultApeRateLimit: {
-    window: "minute",
-    max: 30,
-  },
-
   adminLimit: {
     window: 5000, // 5 seconds
     max: 1,
@@ -39,79 +34,10 @@ export const limits = {
     max: 500,
   },
 
-  // New Quotes Routing
-  newQuotesGet: {
-    window: "hour",
-    max: 500,
-  },
-
-  newQuotesIsSubmissionEnabled: {
-    window: "minute",
-    max: 60,
-  },
-
-  newQuotesAdd: {
-    window: "hour",
-    max: 60,
-  },
-
-  newQuotesAction: {
-    window: "hour",
-    max: 500,
-  },
-
-  // Quote Ratings Routing
-  quoteRatingsGet: {
-    window: "hour",
-    max: 500,
-  },
-
-  quoteRatingsSubmit: {
-    window: "hour",
-    max: 500,
-  },
-
-  // Quote reporting
-  quoteReportSubmit: {
+  // User reporting
+  userReportSubmit: {
     window: 30 * 60 * 1000, // 30 minutes
     max: 50,
-  },
-
-  // Quote favorites
-  quoteFavoriteGet: {
-    window: 30 * 60 * 1000, // 30 minutes
-    max: 50,
-  },
-
-  quoteFavoritePost: {
-    window: 30 * 60 * 1000, // 30 minutes
-    max: 50,
-  },
-
-  quoteFavoriteDelete: {
-    window: 30 * 60 * 1000, // 30 minutes
-    max: 50,
-  },
-
-  // Presets Routing
-  presetsGet: {
-    window: "hour",
-    max: 60,
-  },
-
-  presetsAdd: {
-    window: "hour",
-    max: 60,
-  },
-
-  presetsRemove: {
-    window: "hour",
-    max: 60,
-  },
-
-  presetsEdit: {
-    window: "hour",
-    max: 60,
   },
 
   // PSA (Public Service Announcement) Routing
@@ -120,7 +46,7 @@ export const limits = {
     max: 60,
   },
 
-  // Get public speed stats
+  // Get public site stats
   publicStatsGet: {
     window: "minute",
     max: 60,
@@ -132,32 +58,15 @@ export const limits = {
     max: 60,
   },
 
-  // Results Routing
-  resultsGetApe: {
-    window: "day",
-    max: 30,
-  },
-
   // Result by id
   resultByIdGet: {
     window: "hour",
     max: 300,
   },
 
-  // Result by id
-  resultByIdGetApe: {
-    window: "hour",
-    max: 60,
-  },
-
   resultsAdd: {
     window: "hour",
     max: 300,
-  },
-
-  resultsTagsUpdate: {
-    window: "hour",
-    max: 100,
   },
 
   resultsDeleteAll: {
@@ -179,11 +88,6 @@ export const limits = {
   userGet: {
     window: "hour",
     max: 60,
-  },
-
-  setStreakHourOffset: {
-    window: "hour",
-    max: 5,
   },
 
   userSignup: {
@@ -241,31 +145,6 @@ export const limits = {
     max: 60,
   },
 
-  userTagsGet: {
-    window: "hour",
-    max: 60,
-  },
-
-  userTagsRemove: {
-    window: "hour",
-    max: 30,
-  },
-
-  userTagsClearPB: {
-    window: "hour",
-    max: 60,
-  },
-
-  userTagsEdit: {
-    window: "hour",
-    max: 30,
-  },
-
-  userTagsAdd: {
-    window: "hour",
-    max: 30,
-  },
-
   userCustomThemeGet: {
     window: "hour",
     max: 30,
@@ -284,16 +163,6 @@ export const limits = {
   userCustomThemeEdit: {
     window: "hour",
     max: 30,
-  },
-
-  userDiscordLink: {
-    window: "hour",
-    max: 15,
-  },
-
-  userDiscordUnlink: {
-    window: "hour",
-    max: 15,
   },
 
   userRequestVerificationEmail: {
@@ -341,30 +210,9 @@ export const limits = {
     max: 60,
   },
 
-  userStreak: {
-    window: "hour",
-    max: 60,
-  },
-
   userFriendGet: {
     window: "hour",
     max: 60,
-  },
-
-  // ApeKeys Routing
-  apeKeysGet: {
-    window: "hour",
-    max: 120,
-  },
-
-  apeKeysGenerate: {
-    window: "hour",
-    max: 15,
-  },
-
-  webhookLimit: {
-    window: "second",
-    max: 1,
   },
 
   connectionGet: {
@@ -389,23 +237,9 @@ export const limits = {
 } satisfies Record<string, RateLimitOptions>;
 
 export type RateLimiterId = keyof typeof limits;
-export type RateLimitIds = {
-  /** Rate limiter options for non-apeKey requests */
-  normal: RateLimiterId;
-  /** Rate limiter options for apeKey requests */
-  apeKey: RateLimiterId;
-};
 
-export function getLimits(limit: RateLimiterId | RateLimitIds): {
+export function getLimits(limit: RateLimiterId): {
   limiter: RateLimitOptions;
-  apeKeyLimiter?: RateLimitOptions;
 } {
-  const isApeKeyLimiter = typeof limit === "object";
-  const limiter = isApeKeyLimiter ? limit.normal : limit;
-  const apeLimiter = isApeKeyLimiter ? limit.apeKey : undefined;
-
-  return {
-    limiter: limits[limiter],
-    apeKeyLimiter: apeLimiter !== undefined ? limits[apeLimiter] : undefined,
-  };
+  return { limiter: limits[limit] };
 }

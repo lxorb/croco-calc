@@ -32,7 +32,7 @@ export const GenerateDataResponseSchema = responseWithData(
 export type GenerateDataResponse = z.infer<typeof GenerateDataResponseSchema>;
 
 export const AddDebugInboxItemRequestSchema = z.object({
-  rewardType: z.enum(["xp", "badge", "none"]),
+  rewardType: z.enum(["xp", "none"]),
 });
 export type AddDebugInboxItemRequest = z.infer<
   typeof AddDebugInboxItemRequestSchema

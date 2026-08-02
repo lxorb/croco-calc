@@ -2,56 +2,53 @@ import { initContract } from "@ts-rest/core";
 import { z } from "zod";
 import { CommonResponses, meta, responseWithData } from "./util/api";
 import {
-  SpeedHistogramSchema,
-  TypingStatsSchema,
+  ScoreHistogramSchema,
+  SiteStatsSchema,
 } from "@croco-calc/schemas/public";
-import { Mode2Schema, ModeSchema } from "@croco-calc/schemas/shared";
-import { LanguageSchema } from "@croco-calc/schemas/languages";
+import { ModeSchema } from "@croco-calc/schemas/shared";
+import { LeaderboardMode2Schema } from "@croco-calc/schemas/math";
 
-export const GetSpeedHistogramQuerySchema = z
+export const GetScoreHistogramQuerySchema = z
   .object({
-    language: LanguageSchema,
     mode: ModeSchema,
-    mode2: Mode2Schema,
+    mode2: LeaderboardMode2Schema,
   })
   .strict();
-export type GetSpeedHistogramQuery = z.infer<
-  typeof GetSpeedHistogramQuerySchema
+export type GetScoreHistogramQuery = z.infer<
+  typeof GetScoreHistogramQuerySchema
 >;
 
-export const GetSpeedHistogramResponseSchema =
-  responseWithData(SpeedHistogramSchema);
-export type GetSpeedHistogramResponse = z.infer<
-  typeof GetSpeedHistogramResponseSchema
+export const GetScoreHistogramResponseSchema =
+  responseWithData(ScoreHistogramSchema);
+export type GetScoreHistogramResponse = z.infer<
+  typeof GetScoreHistogramResponseSchema
 >;
 
-export const GetTypingStatsResponseSchema = responseWithData(TypingStatsSchema);
-export type GetTypingStatsResponse = z.infer<
-  typeof GetTypingStatsResponseSchema
->;
+export const GetSiteStatsResponseSchema = responseWithData(SiteStatsSchema);
+export type GetSiteStatsResponse = z.infer<typeof GetSiteStatsResponseSchema>;
 
 const c = initContract();
 export const publicContract = c.router(
   {
-    getSpeedHistogram: {
-      summary: "get speed histogram",
+    getScoreHistogram: {
+      summary: "get score histogram",
       description:
-        "get number of users personal bests grouped by wpm level (multiples of ten)",
+        "get number of users personal bests grouped by score level (multiples of ten)",
       method: "GET",
-      path: "/speedHistogram",
-      query: GetSpeedHistogramQuerySchema,
+      path: "/scoreHistogram",
+      query: GetScoreHistogramQuerySchema,
       responses: {
-        200: GetSpeedHistogramResponseSchema,
+        200: GetScoreHistogramResponseSchema,
       },
     },
 
-    getTypingStats: {
-      summary: "get typing stats",
-      description: "get number of tests and time users spend typing.",
+    getSiteStats: {
+      summary: "get site stats",
+      description: "get number of tests and time users spend solving.",
       method: "GET",
-      path: "/typingStats",
+      path: "/siteStats",
       responses: {
-        200: GetTypingStatsResponseSchema,
+        200: GetSiteStatsResponseSchema,
       },
     },
   },

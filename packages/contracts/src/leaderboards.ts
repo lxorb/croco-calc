@@ -10,15 +10,15 @@ import {
   LeaderboardEntrySchema,
   XpLeaderboardEntrySchema,
 } from "@croco-calc/schemas/leaderboards";
-import { Mode2Schema, ModeSchema } from "@croco-calc/schemas/shared";
+import { ModeSchema } from "@croco-calc/schemas/shared";
+import { LeaderboardMode2Schema } from "@croco-calc/schemas/math";
 import { initContract } from "@ts-rest/core";
-import { LanguageSchema } from "@croco-calc/schemas/languages";
-import { PageNumberSchema } from "@croco-calc/schemas/util";
+import { ScoreSchema, PageNumberSchema } from "@croco-calc/schemas/util";
 
-const LanguageAndModeQuerySchema = z.object({
-  language: LanguageSchema,
+/** SB-176 / AC-113: the only boards are `time 4` and `time 8`. */
+const ModeQuerySchema = z.object({
   mode: ModeSchema,
-  mode2: Mode2Schema,
+  mode2: LeaderboardMode2Schema,
 });
 
 const PaginationQuerySchema = z.object({
@@ -43,7 +43,7 @@ const LeaderboardResponseSchema = z.object({
 
 //--------------------------------------------------------------------------
 
-export const GetLeaderboardQuerySchema = LanguageAndModeQuerySchema.merge(
+export const GetLeaderboardQuerySchema = ModeQuerySchema.merge(
   PaginationQuerySchema,
 ).merge(FriendsOnlyQuerySchema);
 export type GetLeaderboardQuery = z.infer<typeof GetLeaderboardQuerySchema>;
@@ -59,7 +59,7 @@ export type GetLeaderboardResponse = z.infer<
 
 //--------------------------------------------------------------------------
 
-export const GetLeaderboardRankQuerySchema = LanguageAndModeQuerySchema.merge(
+export const GetLeaderboardRankQuerySchema = ModeQuerySchema.merge(
   FriendsOnlyQuerySchema,
 );
 export type GetLeaderboardRankQuery = z.infer<
@@ -74,7 +74,7 @@ export type GetLeaderboardRankResponse = z.infer<
 
 //--------------------------------------------------------------------------
 
-export const DailyLeaderboardQuerySchema = LanguageAndModeQuerySchema.extend({
+export const DailyLeaderboardQuerySchema = ModeQuerySchema.extend({
   daysBefore: z.literal(1).optional(),
 }).merge(FriendsOnlyQuerySchema);
 export type DailyLeaderboardQuery = z.infer<typeof DailyLeaderboardQuerySchema>;
@@ -88,7 +88,7 @@ export type GetDailyLeaderboardQuery = z.infer<
 export const GetDailyLeaderboardResponseSchema = responseWithData(
   LeaderboardResponseSchema.extend({
     entries: z.array(LeaderboardEntrySchema),
-    minWpm: z.number().nonnegative(),
+    minScore: ScoreSchema,
   }),
 );
 export type GetDailyLeaderboardResponse = z.infer<
@@ -175,9 +175,7 @@ export const leaderboardsContract = c.router(
       responses: {
         200: GetLeaderboardRankResponseSchema,
       },
-      metadata: meta({
-        authenticationOptions: { acceptApeKeys: true },
-      }),
+      metadata: meta({}),
     },
     getDaily: {
       summary: "get daily leaderboard",
