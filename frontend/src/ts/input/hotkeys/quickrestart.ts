@@ -3,10 +3,8 @@ import { isAnyPopupVisible } from "../../utils/misc";
 import { navigate } from "../../controllers/route-controller";
 import { restartTestEvent } from "../../events/test";
 import { getActivePage } from "../../states/core";
-import { hotkeys, quickRestartHotkeyMap } from "../../states/hotkeys";
+import { hotkeys } from "../../states/hotkeys";
 import { createHotkey } from "./utils";
-import { getConfig } from "../../config/store";
-import { isLongTest, wordsHaveNewline, wordsHaveTab } from "../../states/test";
 
 function quickRestart(e: KeyboardEvent): void {
   if (isAnyPopupVisible()) {
@@ -22,25 +20,16 @@ function quickRestart(e: KeyboardEvent): void {
   }
 }
 
-// Disable restart when we're in long test and quick restart key is enter, because `shift + enter, shift +
-// enter` is already reserved for bail out keybind.
-createHotkey(
-  () => hotkeys.quickRestart,
-  quickRestart,
-  () => ({ enabled: !isLongTest() || getConfig.quickRestart !== "enter" }),
-);
-
-// We also want to have a hotkey for quick restart key without shift, so when the
-// test is considered long (which means that we can't quick restart), we show a
-// notification when the user tries to press the quick restart key without shift,
-// and we'll restart when it's pressed with shift.
-createHotkey(
-  () => quickRestartHotkeyMap[getConfig.quickRestart],
-  quickRestart,
-  () => ({
-    enabled:
-      isLongTest() &&
-      !(wordsHaveTab() && getConfig.quickRestart === "tab") &&
-      !(wordsHaveNewline() && getConfig.quickRestart === "enter"),
-  }),
-);
+// CP-087 — one unconditional registration.
+//
+// Upstream needed two. The first was disabled on a long test bound to `enter`,
+// because `Shift+Enter, Shift+Enter` was the bail-out keybind; the second
+// existed only to catch the unshifted press on a long test and explain why it
+// did nothing. croco calc has neither half of that: bail-out is cut (C38) and
+// `canQuickRestart()` is permanently true at the 8-minute maximum (C2 /
+// ME-119), so `hotkeys.quickRestart` never carries a `Shift+` prefix and the
+// second registration would only shadow the first with the same key.
+//
+// `enabled` is left to `createHotkey`'s default, which is `!== NoKey` — that is
+// what turns the binding off for `quickRestart === "off"` (SB-151's default).
+createHotkey(() => hotkeys.quickRestart, quickRestart);

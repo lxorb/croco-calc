@@ -150,9 +150,12 @@ export function loadTestSettingsFromUrl(getOverride?: string): void {
     applied[key] = getBarLabel(key, Config[key] as never);
   });
 
-  void restartTest({
-    nosave: true,
-  });
+  // SB-054 — the applied settings must reach the already-generated task list.
+  // The `nosave` flag this used to pass is gone: WP-06's `restart()` takes only
+  // `repeat` and `initial`, and neither applies here. `nosave` never meant
+  // "don't save the config" anyway (the `setConfig` calls above carry that);
+  // it meant "don't save a *result*", and a restart never saves one (C38).
+  restartTest();
 
   const appliedEntries = Object.entries(applied).filter(
     ([, v]) => v !== undefined,

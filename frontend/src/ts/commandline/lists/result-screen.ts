@@ -1,5 +1,5 @@
 import * as TestLogic from "../../test/test-logic";
-import * as TestUI from "../../test/test-ui";
+import * as Result from "../../test/result";
 import * as TestScreenshot from "../../test/test-screenshot";
 import { getResultVisible } from "../../states/test";
 import { Command } from "../types";
@@ -29,7 +29,7 @@ const commands: Command[] = [
       return getResultVisible();
     },
     exec: (): void => {
-      void TestLogic.restart();
+      TestLogic.restart();
     },
   },
   {
@@ -38,9 +38,8 @@ const commands: Command[] = [
     alias: "again same",
     icon: "ph:arrows-clockwise-bold",
     exec: (): void => {
-      void TestLogic.restart({
-        withSameWordset: true,
-      });
+      // CP-089 — "same task set" is a seeded replay, not a word list.
+      TestLogic.restart({ repeat: true });
     },
     available: (): boolean => {
       return getResultVisible();
@@ -52,7 +51,8 @@ const commands: Command[] = [
     alias: "tasks history answers",
     icon: "ph:list-bullets-bold",
     exec: (): void => {
-      void TestUI.toggleResultWords();
+      // CP-123 item 4 — the same function the action-row button calls.
+      Result.toggleTaskHistory();
     },
     available: (): boolean => {
       return getResultVisible();

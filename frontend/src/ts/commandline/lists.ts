@@ -18,7 +18,7 @@ import {
   clearAllNotifications,
   showSuccessNotification,
 } from "../states/notifications";
-import { getLastEventLog } from "../states/test";
+import { buildEventLog, getAllTestEvents } from "../test/events/data";
 import { CommandlineConfigMetadataObject } from "./commandline-metadata";
 import { getIconHtml } from "./icons";
 import AddOrRemoveThemeToFavorite from "./lists/add-or-remove-theme-to-favorites";
@@ -215,12 +215,18 @@ export const commands: CommandsSubgroup = {
       alias: "stats events",
       icon: "ph:clipboard-bold",
       visible: false,
+      // WP-06's recorder replaced the old `getLastEventLog()` signal: the log
+      // now lives in `test/events/data.ts` and is cleared by `resetTestEvents()`
+      // on restart, so "is there a log to copy" is "did this run record events".
+      // The copied JSON is exactly what `EventLogViewerModal` parses and what
+      // the console exposes as `currentEventLog()`, and per INV-089 no event
+      // carries a task's expected answer, so this is C29-safe.
       available: (): boolean => {
-        return getLastEventLog() !== null;
+        return getAllTestEvents().length > 0;
       },
       exec: async (): Promise<void> => {
         navigator.clipboard
-          .writeText(JSON.stringify(getLastEventLog()))
+          .writeText(JSON.stringify(buildEventLog()))
           .then(() => {
             showSuccessNotification("Copied to clipboard");
           })

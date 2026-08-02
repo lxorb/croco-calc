@@ -7,7 +7,6 @@ import {
 } from "@tanstack/solid-hotkeys";
 import { isAnyPopupVisible } from "../../utils/misc";
 import { isInputElementFocused } from "../input-element";
-import * as CompositionState from "../../legacy-states/composition";
 
 export const NoKey = "" as Hotkey;
 
@@ -56,6 +55,16 @@ function isInteractiveElementFocused(): boolean {
   );
 }
 
+/**
+ * Whether the hotkey should yield to whatever currently has focus.
+ *
+ * Upstream had a third branch here: `Escape` was swallowed while the test input
+ * held an in-progress IME composition, so the first `Escape` cancelled the
+ * candidate window rather than the test. `#tasksInput` (CP-053) only ever takes
+ * digits and the operator keys, which no IME composes, so
+ * `legacy-states/composition` was deleted with the rest of the composition
+ * pipeline (CP-064) and `Escape` now always reaches the hotkey.
+ */
 function handleHotkeyOnInteractiveElement(
   e: KeyboardEvent,
   { hotkey }: HotkeyCallbackContext,
@@ -66,12 +75,6 @@ function handleHotkeyOnInteractiveElement(
   ) {
     return true;
   } else if (hotkey === "Escape" && isAnyPopupVisible()) {
-    return true;
-  } else if (
-    hotkey === "Escape" &&
-    isInputElementFocused() &&
-    CompositionState.getData() !== ""
-  ) {
     return true;
   }
 

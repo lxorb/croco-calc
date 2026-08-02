@@ -3,8 +3,6 @@ import { Hotkey } from "@tanstack/solid-hotkeys";
 import { createEffect } from "solid-js";
 import { createStore } from "solid-js/store";
 import { getConfig } from "../config/store";
-import { wordsHaveNewline, wordsHaveTab, isLongTest } from "./test";
-import { getActivePage } from "./core";
 import { NoKey } from "../input/hotkeys/utils";
 
 export const quickRestartHotkeyMap: Record<QuickRestart, Hotkey> = {
@@ -21,44 +19,32 @@ type Hotkeys = {
 
 export const [hotkeys, setHotkeys] = createStore<Hotkeys>(updateHotkeys());
 
+// `quickRestart` is the only input left, so the effect tracks it through
+// `updateHotkeys()` and no longer has to re-read the active page.
 createEffect(() => {
-  getActivePage(); // depend on active page
   setHotkeys(updateHotkeys());
 });
 
+/**
+ * Neither hotkey ever needs the shift modifier any more.
+ *
+ * Upstream added `Shift+` when the key the user had bound also had to reach the
+ * test input — a tab character inside the words, a newline inside the words, or
+ * a funbox that swallowed it — and when the run was long enough that an
+ * accidental restart would hurt. All three inputs are gone: tasks are numeric
+ * (C29), funboxes were cut (SB-159), and `canQuickRestart()`
+ * (`utils/quick-restart.ts`) is permanently true because the longest test is
+ * 8 minutes (480 s, C2 / ME-119) against upstream's 900 s threshold.
+ *
+ * So both bindings are the plain key, and the only decision left is SB-150's:
+ * `Escape` opens the palette unless `quickRestart === "esc"`, in which case the
+ * palette moves to `Tab`.
+ */
 function updateHotkeys(): Hotkeys {
-  const isOnTestPage = getActivePage() === "test";
-
-  const quickRestartIsTab = getConfig.quickRestart === "tab";
-  const quickRestartIsEnter = getConfig.quickRestart === "enter";
-  // const quickRestartIsEsc = getConfig.quickRestart === "esc";
-
   const commandlineIsTab = getConfig.quickRestart === "esc";
-  // const commandlineIsEsc = getConfig.quickRestart !== "esc";
 
   return {
-    quickRestart: shiftHotkey(
-      quickRestartHotkeyMap[getConfig.quickRestart],
-      isOnTestPage &&
-        ((wordsHaveTab() && quickRestartIsTab) ||
-          // The funbox clause monkeytype had here is gone with funboxes
-          // (SB-159); a long test still requires the shift modifier so an
-          // accidental Enter cannot throw away eight minutes of work.
-          (wordsHaveNewline() && quickRestartIsEnter) ||
-          isLongTest()),
-    ),
-    commandline: shiftHotkey(
-      commandlineIsTab ? "Tab" : "Escape",
-      isOnTestPage && wordsHaveTab() && commandlineIsTab,
-    ),
+    quickRestart: quickRestartHotkeyMap[getConfig.quickRestart],
+    commandline: commandlineIsTab ? "Tab" : "Escape",
   };
-}
-
-function shiftHotkey(hotkey: Hotkey, shift: boolean): Hotkey {
-  if (shift) {
-    if (hotkey === "Tab") return "Shift+Tab";
-    if (hotkey === "Enter") return "Shift+Enter";
-    if (hotkey === "Escape") return "Shift+Escape";
-  }
-  return hotkey;
 }

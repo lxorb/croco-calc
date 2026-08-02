@@ -12,11 +12,10 @@ vi.mock("../../src/ts/utils/file-storage", () => ({
   },
 }));
 
-// `states/test.ts` is WP-06's and is mid-migration: it still imports
-// `utils/key-converter` and `utils/json-data`, which the INV-118c delete set
-// removed. The palette only reads two signals out of it.
+// `states/test.ts` is WP-06's. The palette reads exactly one signal out of it —
+// the result-screen commands' `available` gate — and stubbing it false keeps
+// those commands out of the way of the settings assertions below.
 vi.mock("../../src/ts/states/test", () => ({
-  getLastEventLog: (): null => null,
   getResultVisible: (): boolean => false,
 }));
 
@@ -35,15 +34,16 @@ vi.mock("../../src/ts/controllers/route-controller", () => ({
   navigate: async (): Promise<void> => undefined,
 }));
 
-// The result-screen commands call into WP-06's test engine, which is still
-// mid-migration (`test-logic.ts` imports the deleted `challenge-controller`).
-// SB-162's "identical to clicking" is asserted on the config mutation, not on
-// the restart, so stubs are enough here.
+// The result-screen commands call into WP-06's test engine and WP-07's results
+// screen. SB-162's "identical to clicking" is asserted on the config mutation,
+// not on the restart, so stubs are enough here — and `test/result.ts` pulls in
+// `controllers/chart-controller`, which instantiates chart.js at module scope
+// and cannot load outside a browser.
 vi.mock("../../src/ts/test/test-logic", () => ({
-  restart: async (): Promise<void> => undefined,
+  restart: (): void => undefined,
 }));
-vi.mock("../../src/ts/test/test-ui", () => ({
-  toggleResultWords: async (): Promise<void> => undefined,
+vi.mock("../../src/ts/test/result", () => ({
+  toggleTaskHistory: (): void => undefined,
 }));
 vi.mock("../../src/ts/test/test-screenshot", () => ({
   copyToClipboard: async (): Promise<void> => undefined,
