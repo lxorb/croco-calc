@@ -150,6 +150,10 @@ describe("task stream rendering", () => {
      * substring of the perfectly innocent prompt `0.7 × (−6.2) =`. Committed
      * tasks are excluded because C29 explicitly permits their answer
      * (CP-041's hint, CP-126's history).
+     *
+     * That exclusion is a hole on its own — an answer smuggled *into* a prompt
+     * span would slip through it — so {@link assertPromptsUntampered} closes it
+     * by pinning every rendered prompt to the generator's own string.
      */
     function readableText(): string {
       const clone = document.body.cloneNode(true) as HTMLElement;
@@ -171,6 +175,25 @@ describe("task stream rendering", () => {
         }
       }
       return values;
+    }
+
+    /**
+     * Every `.prompt` in the document is *exactly* the prompt the generator
+     * produced for that index — no suffix, no annotation, nothing appended.
+     * Together with `readableText()` this makes the `.prompt` exclusion safe:
+     * the excluded text is not merely "assumed to be the question", it is
+     * proven byte-for-byte to be the question.
+     */
+    function assertPromptsUntampered(expectedPrompts: string[]): void {
+      const rendered = document.querySelectorAll<HTMLElement>("#tasks .task");
+      expect(rendered.length).toBeGreaterThan(0);
+      for (const task of rendered) {
+        const index = Number(task.dataset["taskindex"]);
+        const expected = expectedPrompts[index];
+        if (expected === undefined) continue;
+        const prompt = task.querySelector<HTMLElement>(".prompt");
+        expect(prompt?.textContent?.trim()).toBe(expected);
+      }
     }
 
     /** C29's own acceptance test, run over a full simulated stream. */
@@ -200,9 +223,11 @@ describe("task stream rendering", () => {
       // which is the point, so the test regenerates them from the same seed.
       const batcher = createTaskBatcher(20260802, SETTINGS);
       const answers: string[] = [];
+      const prompts: string[] = [];
       for (let i = 0; i < 40; i++) {
         const task = batcher.take();
         answers.push(renderAnswerDisplay(task.answer, task.kind));
+        prompts.push(task.prompt);
       }
 
       const views = (): TaskView[] => {
@@ -216,6 +241,7 @@ describe("task stream rendering", () => {
 
       ui.revealStream(views());
       assertNoUncommittedAnswerInDom(answers);
+      assertPromptsUntampered(prompts);
 
       // Answer the first eight tasks deliberately wrongly, so every one of them
       // renders a CP-041 hint, and re-check after each commit.
@@ -226,6 +252,7 @@ describe("task stream rendering", () => {
         engine.commit(1000 + i);
         ui.renderStream(views());
         assertNoUncommittedAnswerInDom(answers);
+        assertPromptsUntampered(prompts);
       }
 
       // The committed ones DO show their answer — that is CP-041, and it is
