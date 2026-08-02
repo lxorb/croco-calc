@@ -1,0 +1,134 @@
+name: deploy-frontend
+
+# INF-126, INF-129. Builds the SPA with real production configuration and
+# publishes it to the assets-only Cloudflare Worker `croco-calc`.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+# INF-132: least privilege. No OIDC, no package writes.
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+env:
+  PNPM_VERSION: "10.28.1"
+  NODE_VERSION: "24.11.0"
+
+jobs:
+  deploy:
+    name: build and deploy
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache node modules
+        uses: actions/cache@v5
+        env:
+          cache-name: node-modules
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-${{ env.NODE_VERSION }}-build-${{ env.cache-name }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install
+
+      # INF-101: the deploy build must never fall back to CI's stub firebase
+      # config, and INF-013 forbids a build without a real BACKEND_URL. Both are
+      # enforced inside the build too (vite.config.ts and
+      # vite-plugins/firebase-config.ts); this check just fails faster and with
+      # a clearer message. Values are compared, never printed.
+      - name: Check required configuration is present
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          RECAPTCHA_SITE_KEY: ${{ secrets.RECAPTCHA_SITE_KEY }}
+          FIREBASE_APIKEY: ${{ secrets.FIREBASE_APIKEY }}
+          FIREBASE_AUTHDOMAIN: ${{ secrets.FIREBASE_AUTHDOMAIN }}
+          FIREBASE_PROJECTID: ${{ secrets.FIREBASE_PROJECTID }}
+          FIREBASE_STORAGEBUCKET: ${{ secrets.FIREBASE_STORAGEBUCKET }}
+          FIREBASE_MESSAGINGSENDERID: ${{ secrets.FIREBASE_MESSAGINGSENDERID }}
+          FIREBASE_APPID: ${{ secrets.FIREBASE_APPID }}
+        run: |
+          missing=""
+          for name in BACKEND_URL RECAPTCHA_SITE_KEY FIREBASE_APIKEY FIREBASE_AUTHDOMAIN \
+                      FIREBASE_PROJECTID FIREBASE_STORAGEBUCKET FIREBASE_MESSAGINGSENDERID FIREBASE_APPID; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::missing required configuration:$missing"
+            exit 1
+          fi
+          case "$BACKEND_URL" in
+            *monkeytype.com*)
+              echo "::error::BACKEND_URL points at monkeytype.com"
+              exit 1
+              ;;
+          esac
+
+      # firebase-config-live.ts is generated inside the build from these
+      # variables (INF-090, INF-099, INF-100) and is never committed.
+      - name: Build
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          RECAPTCHA_SITE_KEY: ${{ secrets.RECAPTCHA_SITE_KEY }}
+          FIREBASE_APIKEY: ${{ secrets.FIREBASE_APIKEY }}
+          FIREBASE_AUTHDOMAIN: ${{ secrets.FIREBASE_AUTHDOMAIN }}
+          FIREBASE_PROJECTID: ${{ secrets.FIREBASE_PROJECTID }}
+          FIREBASE_STORAGEBUCKET: ${{ secrets.FIREBASE_STORAGEBUCKET }}
+          FIREBASE_MESSAGINGSENDERID: ${{ secrets.FIREBASE_MESSAGINGSENDERID }}
+          FIREBASE_APPID: ${{ secrets.FIREBASE_APPID }}
+        run: pnpm run build-fe
+
+      - name: Check build output
+        run: |
+          test -f frontend/dist/index.html || { echo "::error::frontend/dist/index.html was not produced"; exit 1; }
+          test -f frontend/dist/_headers   || { echo "::error::frontend/dist/_headers is missing — cache and security headers would not be applied"; exit 1; }
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: frontend
+          command: deploy --config wrangler.jsonc
+
+      # INF-018 / INF-148 item 4.
+      - name: Smoke check
+        run: |
+          for attempt in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://crococalc.com/ || true)
+            if [ "$code" = "200" ]; then
+              echo "https://crococalc.com/ -> 200"
+              curl -sI https://crococalc.com/ | tr -d '\r' | grep -i -E '^(cache-control|x-frame-options|x-content-type-options|referrer-policy):'
+              exit 0
+            fi
+            echo "attempt $attempt: got $code, retrying"
+            sleep 15
+          done
+          echo "::error::crococalc.com did not return 200 within ~2.5 minutes"
+          exit 1

@@ -1,0 +1,89 @@
+name: backup-db
+
+# INF-061, INF-126. Atlas M0 has no automated backups, so this is the only
+# backup that exists. Weekly `mongodump` into the `backups` container of
+# stcrococalctfstate; a storage lifecycle rule (bootstrap/main.tf) deletes
+# archives older than 30 days.
+#
+# INF-086a chose the credential source: the connection string is read from Key
+# Vault with the CI managed identity, NOT stored as a `DB_URI` repository
+# secret. One copy of the credential, rotated in one place. See docs/RUNBOOK.md.
+
+on:
+  schedule:
+    # 03:17 UTC every Sunday. Off the hour so it does not collide with the
+    # in-process cron jobs.
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: backup-db
+  cancel-in-progress: false
+
+env:
+  KEY_VAULT: kv-crococalc-prod
+  STORAGE_ACCOUNT: stcrococalctfstate
+  CONTAINER: backups
+  DB_NAME: crococalc
+
+jobs:
+  backup:
+    name: mongodump to azure storage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install mongodump
+        run: |
+          curl -fsSL https://pgp.mongodb.com/server-8.0.asc \
+            | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+          echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" \
+            | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+          sudo apt-get update
+          sudo apt-get install -y mongodb-database-tools
+
+      # The URI is written to the environment, never to a log line or a file.
+      - name: Read the connection string from Key Vault
+        run: |
+          uri=$(az keyvault secret show --vault-name "$KEY_VAULT" --name mongodb-uri --query value -o tsv)
+          if [ -z "$uri" ]; then
+            echo "::error::Key Vault secret mongodb-uri is empty"
+            exit 1
+          fi
+          echo "::add-mask::$uri"
+          echo "MONGO_URI=$uri" >> "$GITHUB_ENV"
+
+      - name: Dump
+        run: |
+          stamp=$(date -u +%Y-%m-%dT%H%M%SZ)
+          echo "ARCHIVE=crococalc-$stamp.archive.gz" >> "$GITHUB_ENV"
+          mongodump --uri="$MONGO_URI" --db="$DB_NAME" --archive="crococalc-$stamp.archive.gz" --gzip
+          ls -lh "crococalc-$stamp.archive.gz"
+
+      - name: Upload to the backups container
+        run: |
+          az storage blob upload \
+            --account-name "$STORAGE_ACCOUNT" \
+            --container-name "$CONTAINER" \
+            --name "$ARCHIVE" \
+            --file "$ARCHIVE" \
+            --auth-mode login \
+            --overwrite false
+
+      - name: Verify the blob landed
+        run: |
+          az storage blob show \
+            --account-name "$STORAGE_ACCOUNT" \
+            --container-name "$CONTAINER" \
+            --name "$ARCHIVE" \
+            --auth-mode login \
+            --query "{name:name, size:properties.contentLength}" -o tsv

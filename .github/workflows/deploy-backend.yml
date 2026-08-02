@@ -1,0 +1,117 @@
+name: deploy-backend
+
+# INF-126, INF-130, INF-131. Builds the API image, publishes it to ghcr.io
+# (no Azure Container Registry is provisioned — INF-039) and rolls the Container
+# App forward to the immutable SHA tag.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "packages/**"
+      - "docker/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+# INF-132: id-token for the Azure OIDC login, packages for ghcr.
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/lxorb/croco-calc-api
+  RESOURCE_GROUP: rg-croco-calc-prod
+  CONTAINER_APP: ca-croco-calc-api
+
+jobs:
+  deploy:
+    name: build, push and roll forward
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # INF-043: the SHA tag is what gets deployed; :latest is convenience only.
+      # INF-044: server_version populates /app/backend/dist/server.version.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          build-args: |
+            server_version=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # INF-042: prove the published image carries no BYPASS_* escape hatch.
+      - name: Assert no BYPASS_* in the image
+        run: |
+          docker pull "$IMAGE:${{ github.sha }}"
+          env_json=$(docker inspect --format '{{json .Config.Env}}' "$IMAGE:${{ github.sha }}")
+          echo "$env_json"
+          if echo "$env_json" | grep -q "BYPASS_"; then
+            echo "::error::the image sets a BYPASS_* environment variable"
+            exit 1
+          fi
+
+      # INF-085: OIDC federated credentials, no client secret.
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update the Container App
+        run: |
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$IMAGE:${{ github.sha }}"
+
+      # INF-131
+      - name: Smoke check
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "::error::vars.BACKEND_URL is not set — run infra.yml, which writes it from the Terraform output"
+            exit 1
+          fi
+          deadline=$((SECONDS + 120))
+          while [ $SECONDS -lt $deadline ]; do
+            body=$(curl -sf --max-time 10 "$BACKEND_URL/" || true)
+            case "$body" in
+              *'"message":"ok"'*)
+                echo "$body"
+                exit 0
+                ;;
+            esac
+            sleep 10
+          done
+          echo "::error::$BACKEND_URL/ did not return {\"message\":\"ok\"} within 2 minutes."
+          echo "Roll back with the previous revision:"
+          echo "  az containerapp revision list -n $CONTAINER_APP -g $RESOURCE_GROUP -o table"
+          echo "  az containerapp revision activate -n $CONTAINER_APP -g $RESOURCE_GROUP --revision <previous-revision>"
+          exit 1

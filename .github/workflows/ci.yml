@@ -3,6 +3,13 @@ name: CI
 env:
   PNPM_VERSION: "10.28.1"
   NODE_VERSION: "24.11.0"
+  # CI compiles the frontend but never deploys it, so these are deliberately
+  # throwaway values. Google's public reCAPTCHA test site key is fine here and
+  # only here (INF-107 forbids it in production). BACKEND_URL just has to be a
+  # real URL that is not monkeytype's, so the INF-013 guard is satisfied without
+  # pointing CI at anything live.
+  RECAPTCHA_SITE_KEY: "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+  BACKEND_URL: "http://localhost:5005"
 
 permissions:
   contents: read
@@ -302,6 +309,15 @@ jobs:
         run: pnpm run ts-check-fe
 
       - name: Build
+        env:
+          # The build generates firebase-config-live.ts from these; CI's values
+          # are stubs and never reach a deployed artefact (INF-101).
+          FIREBASE_APIKEY: "ci-stub"
+          FIREBASE_AUTHDOMAIN: "ci-stub.firebaseapp.com"
+          FIREBASE_PROJECTID: "ci-stub"
+          FIREBASE_STORAGEBUCKET: "ci-stub.appspot.com"
+          FIREBASE_MESSAGINGSENDERID: "0"
+          FIREBASE_APPID: "1:0:web:ci-stub"
         run: pnpm run build-fe
 
       - name: Test
