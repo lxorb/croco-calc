@@ -30,9 +30,6 @@ import tailwindcss from "@tailwindcss/vite";
 /** Default theme (`serika_dark`), used for the PWA manifest colours (INF-116). */
 const THEME_BACKGROUND = "#323437";
 
-/** Default theme (`serika_dark`), used for the PWA manifest colours (INF-116). */
-const THEME_BACKGROUND = "#323437";
-
 function getFontsConfig(): string {
   return `\n${Object.keys(Fonts)
     .sort()
@@ -127,8 +124,9 @@ function getPlugins({
   const plugins: PluginOption[] = [
     firebaseConfig({ isDevelopment, env }),
     // WP-04 owns vite-plugins/icons.ts; registering it here turns a missing or
-    // mis-collected icon id into a build failure (CP-002, C10).
-    icons(),
+    // mis-collected icon id into a build failure (CP-002, C10). `srcDir` is
+    // explicit because vite's `root` is already `frontend/src`.
+    icons({ srcDir: path.resolve(__dirname, "src") }),
     envConfig({ isDevelopment, clientVersion, env }),
     injectHTML() as PluginOption,
     tailwindcss(),
