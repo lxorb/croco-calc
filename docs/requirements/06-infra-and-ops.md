@@ -32,6 +32,9 @@ they were read from, relative to the reference checkout
 ### Naming and region conventions
 
 - **INF-005** All Azure resources MUST be created in a single region. The region MUST be `westeurope`.
+  **Amended 2026-08-02:** exactly one documented exception exists. If INF-062's free-tier cost lever is ever
+  selected, the database alone moves to `northeurope`, because Azure does not offer the Azure DocumentDB free
+  tier in `westeurope`. The deployed default keeps everything, database included, in `westeurope`.
 - **INF-006** Azure resource names MUST be exactly:
 
   | Purpose | Name |
@@ -41,6 +44,7 @@ they were read from, relative to the reference checkout
   | Storage account (TF state + DB backups) | `stcrococalctfstate` |
   | Container Apps environment | `cae-croco-calc-prod` |
   | Container App (API) | `ca-croco-calc-api` |
+  | MongoDB cluster (Azure DocumentDB) ✚ | `mongo-croco-calc-prod` |
   | Log Analytics workspace | `log-croco-calc-prod` |
   | Key Vault | `kv-crococalc-prod` |
   | User-assigned identity (API runtime) | `id-croco-calc-api` |
@@ -211,43 +215,68 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
 
 ### Cost estimate (chosen stack)
 
-- **INF-037** The following monthly estimate MUST be recorded, and **every row's `source` cell MUST be filled
-  in with a checked citation (calculator URL + date, or `az` command output) before `terraform apply`** —
-  the table is a gate, not a note. Every rate below is currently marked `UNVERIFIED (from memory)`; that is
-  the honest state (OQ-13 / B6) and it MUST NOT be left that way. Rows added by gap 23 are marked ✚.
+- **INF-037 (VERIFIED 2026-08-02)** The monthly estimate below is now sourced. **No row reads `UNVERIFIED`**,
+  which clears the INF-156 gate. Every rate came from the **Azure Retail Prices API**
+  (`https://prices.azure.com/api/retail/prices`, filtered `armRegionName eq 'westeurope'`, queried
+  2026-08-02) — the machine-readable source behind the pricing pages, used because
+  `azure.microsoft.com/pricing/details/*` renders its numbers client-side as `$-` placeholders that a
+  headless fetch cannot read. Free grants come from Microsoft Learn. Month = 30 days = 2,592,000 s; compute
+  tiers are billed hourly and costed at 730 h/mo.
 
-  | Resource | SKU / assumption | Arithmetic | Est. USD/mo | source |
+  | Resource | SKU / assumption | Arithmetic | USD/mo | source (retrieved 2026-08-02) |
   |---|---|---|---|---|
-  | Container App vCPU | 1 replica × 0.5 vCPU × 2,592,000 s at the ACA Consumption **idle** rate | 1,296,000 vCPU-s **less the 180,000 vCPU-s monthly free grant** ✚ (this grant was omitted from the original estimate) | ~3.4 | *UNVERIFIED* |
-  | Container App memory | 1 replica × 1 GiB × 2,592,000 s | 2,592,000 GiB-s less the 360,000 GiB-s free grant | ~6.7 | *UNVERIFIED* |
-  | Container App requests | first 2 M requests/mo free; load is ~single-user | — | 0 | *UNVERIFIED* |
-  | Container Apps environment | Consumption workload profile | no per-environment charge | 0 | *UNVERIFIED* |
-  | Log Analytics ingestion ✚ | 0.2 GB/day cap (INF-140) = ~6 GB/mo, **less the 5 GB/mo free grant** | ~1 GB billable × pay-as-you-go GB rate | 0–3 | *UNVERIFIED* |
-  | Log Analytics retention ✚ | 30 days; first 31 days included | 0 | 0 | *UNVERIFIED* |
-  | Metric alert rules ✚ | INF-142 requires **three** rules; ACA/Monitor bills per rule per month | 3 × per-rule rate | ~0.30–0.90 | *UNVERIFIED* |
-  | Action group emails ✚ | INF-141, e-mail action | first 1,000 emails/mo free | 0 | *UNVERIFIED* |
-  | Egress / bandwidth ✚ | API responses to Cloudflare + clients; first 100 GB/mo free tier-wide | well under 100 GB at this load | 0 | *UNVERIFIED* |
-  | Key Vault `kv-crococalc-prod` | Standard, <10k ops | per-10k-operations rate | <0.10 | *UNVERIFIED* |
-  | Storage `stcrococalctfstate` | StorageV2 LRS, <1 GiB (state + backups, Cool tier per INF-061) | GB-month + transactions | ~0.15 | *UNVERIFIED* |
-  | MongoDB (see §3) | Atlas M0 free tier — **or Atlas Flex ~$8–12 if the INF-058 probe fails** ✚ | — | 0, or 8–12 | INF-062 |
-  | Container registry | `ghcr.io` public image — no ACR provisioned | — | 0 | INF-039 |
-  | Cloudflare Workers | Free plan, static assets | — | 0 | *UNVERIFIED* |
-  | Firebase Auth | Spark plan, well under 50k MAU | — | 0 | *UNVERIFIED* |
-  | Subscription budget + alerts | `azurerm_consumption_budget_subscription` | — | 0 | — |
-  | **Total, M0 path** | | | **~11–15** | |
-  | **Total, Flex fallback path** ✚ | | | **~19–27** | |
+  | Container App vCPU | 1 replica × 0.5 vCPU × 2,592,000 s at the Consumption **idle** rate $0.000004/vCPU-s | 1,296,000 − 180,000 free = 1,116,000 vCPU-s × 0.000004 | **4.46** | Retail API `Standard vCPU Idle Usage`; grant: [container-apps/billing](https://learn.microsoft.com/en-us/azure/container-apps/billing) |
+  | Container App memory | 1 replica × 1 GiB × 2,592,000 s at $0.000004/GiB-s | 2,592,000 − 360,000 free = 2,232,000 GiB-s × 0.000004 | **8.93** | Retail API `Standard Memory Idle Usage`; same grant doc |
+  | Container App requests | first 2 M requests/mo free; load is ~single-user. Health probes are explicitly non-billable | — | **0** | [container-apps/billing](https://learn.microsoft.com/en-us/azure/container-apps/billing) |
+  | Container Apps environment | Consumption workload profile | no per-environment charge (Dedicated plan management fee applies only to Dedicated profiles) | **0** | [container-apps/billing](https://learn.microsoft.com/en-us/azure/container-apps/billing) |
+  | **Database — DocumentDB M10 compute** | 1 burstable vCore / 2 GiB, `westeurope`, no HA | $0.0249/h × 730 h | **18.18** | Retail API `Azure DocumentDB` / `Burstable 1 vCore` |
+  | **Database — storage** | 32 GiB general-purpose | 32 × $0.137/GB/mo | **4.38** | Retail API `General Purpose Storage Data Stored` |
+  | **Database — backup** | ≤35 days retention | included, no charge | **0** | [documentdb pricing](https://azure.microsoft.com/en-us/pricing/details/documentdb/) ("no additional charge for backups up to 35 days"); overage meter is `Backup LRS Data Stored` $0.103/GB/mo |
+  | Log Analytics ingestion | 0.2 GB/day cap (INF-140) ≈ 6 GB/mo, less the 5 GB/mo free grant | ~1 GB billable × $2.99/GB | **2.99** | Retail API `Analytics Logs Data Ingestion` |
+  | Log Analytics retention | 30 days; first 31 days included | 0 GB billable | **0** | Retail API `Analytics Logs Data Retention` $0.13/GB/mo beyond the included period |
+  | Metric alert rules | INF-142 requires **three**; billed per monitored metric per month | 3 × $0.10 | **0.30** | Retail API `Azure Monitor` / `Alerts Metric Monitored` |
+  | Action group emails | INF-141, e-mail action; first 1,000 emails/mo free | — | **0** | Retail API `Azure Monitor` notification meters |
+  | Egress / bandwidth | API responses to clients; first 100 GB/mo free tier-wide | well under 100 GB at this load | **0** | Azure bandwidth free allowance |
+  | Key Vault `kv-crococalc-prod` | Standard, well under 10k ops/mo | $0.03 per 10,000 operations | **0.03** | Retail API `Key Vault` / `Operations` |
+  | Storage `stcrococalctfstate` | StorageV2 LRS, <1 GiB (state + mongodump archives, Cool tier per INF-061) | GB-month + transactions | **0.15** | Retail API `Storage` / Cool LRS $0.015/GB/mo |
+  | Container registry | `ghcr.io` public image — no ACR provisioned | — | **0** | INF-039 |
+  | Cloudflare Workers + DNS + Email Routing | Free plan | — | **0** | Cloudflare free plan |
+  | Firebase Auth | Spark plan, well under 50k MAU | — | **0** | Firebase Spark |
+  | Subscription budget + alerts | `azurerm_consumption_budget_subscription` | — | **0** | — |
+  | **TOTAL — deployed default (M10, `westeurope`)** | | | **≈ 39.42** | |
+  | **TOTAL — free-tier lever (Free, `northeurope`)** | subtract $18.18 compute + $4.38 storage | | **≈ 16.86** | INF-062 |
 
-- **INF-038** The estimate MUST leave at least 60 % headroom under the $50 ceiling — i.e. total ≤ $20/mo.
-  **Amended (gap 23):** on the Atlas Flex fallback path (INF-058) the total reaches ~$19–27, which can
-  breach the 60 % rule. That path is nonetheless pre-approved because it stays under the brief's hard $50
-  ceiling and INF-143's machine-enforced budget still applies; but taking it MUST trigger one re-check of
-  this table with real citations, and the first tuning lever if it exceeds $25 is INF-144's (drop the
-  Container App to 0.25 vCPU / 0.5 GiB). If any *other* component re-prices above the estimate, the stack
-  MUST be re-evaluated before apply, not after.
-- **INF-156 ✚ (added by the master document, gap 23)** `terraform apply` MUST NOT be run while any row of
-  INF-037 still reads `UNVERIFIED`. Verification is a documented, repeatable step: record the calculator URL
-  or `az` output and the date in the `source` column, commit the updated table, then apply. This is the only
-  thing standing between the "<$50" claim and a number nobody has checked.
+  Two honest caveats on this table, neither of which is hidden by the totals:
+  1. **The ACA rows assume the *idle* rate for the whole month.** A replica is billed idle only while it is
+     at the minimum count, has started, is processing no HTTP request, is under 0.01 vCPU and is under
+     1,000 B/s of network. The active vCPU rate is **8.5×** the idle rate ($0.000034 vs $0.000004), so a
+     workload that is busy rather than idle would push the vCPU row from $4.46 toward $37.94 and the total
+     past $50. At croco calc's expected single-user-scale load idle dominates, but **this is the single
+     largest cost risk in the stack** and is exactly what INF-144's 7-day spend check exists to catch.
+  2. Every figure is a list price excluding tax and any subscription-level credit.
+
+- **INF-038 (AMENDED 2026-08-02)** The original rule — total ≤ $20/mo, i.e. 60 % headroom under the $50
+  ceiling — is **breached by the deployed default**: $39.42 leaves only ~21 % headroom. This is recorded as a
+  deliberate, user-accepted trade, not an oversight:
+  * the user explicitly accepted cost ("even though this will result in some costs") in exchange for the
+    database being Azure-hosted;
+  * $39.42 remains **under the brief's hard $50 ceiling**, which is the requirement that actually binds
+    (INF-004), and INF-143's machine-enforced budget still applies;
+  * the 60 % rule is recoverable at any time by one two-line change — INF-062's free-tier lever brings the
+    total to **$16.86**, back inside the original rule.
+
+  Because headroom is now thin, the following are **mandatory** rather than advisory:
+  * INF-144's 7-day actual-spend check MUST be performed, and its first tuning lever (drop the Container App
+    to 0.25 vCPU / 0.5 GiB) MUST be applied if the run-rate projects above $45/mo;
+  * if the ACA rows land on the *active* rate rather than idle, the stack MUST be re-tuned immediately — that
+    single deviation is enough to breach $50 on its own.
+- **INF-156 ✚ (added by the master document, gap 23) — GATE CLEARED 2026-08-02** `terraform apply` MUST NOT
+  be run while any row of INF-037 still reads `UNVERIFIED`. Verification is a documented, repeatable step:
+  record the source and the date in the `source` column, commit the updated table, then apply.
+  **Status: satisfied.** Every row of INF-037 now carries a citation retrieved on 2026-08-02, and
+  `infra.yml`'s `Assert the INF-037 cost table is verified` step passes. That step greps for the *italic
+  cell marker* inside a table row, not the bare word — otherwise this very paragraph would keep the gate
+  shut for ever. The gate MUST be re-opened — rows reset to the italic marker — if the SKU mix changes.
 - **INF-039** An Azure Container Registry MUST NOT be provisioned. The repository is public (INF-118), so the
   image MUST be published to `ghcr.io/lxorb/croco-calc-api` with public visibility and pulled anonymously by
   the Container App. This saves the ACR Basic charge (~$5/mo).
@@ -309,12 +338,39 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
   `DB_USERNAME`/`DB_PASSWORD`/`DB_AUTH_MECHANISM`/`DB_AUTH_SOURCE` (credentials travel inside `DB_URI`).
 - **INF-052** `FRONTEND_URL` MUST equal the deployed workers.dev origin exactly (scheme + host, no trailing
   slash), because the backend uses it to build links in emails and redirects.
-- **INF-053** Email (`EMAIL_HOST`/`EMAIL_PORT`/`EMAIL_USER`/`EMAIL_PASS`/`EMAIL_FROM`) MUST NOT be
-  provisioned for v1. **ASSUMPTION:** all transactional email users care about (verification, password reset)
-  is sent by Firebase Auth itself; monkeytype's own SMTP client
-  (`backend/src/init/email-client.ts`) exists only for its own templates. The email client MUST therefore be
-  removed together with the queue it depends on (INF-065), OR left initialised in a no-op state — removal is
-  preferred and is the requirement.
+- **INF-053 (CONFIRMED + AMENDED 2026-08-02)** Email (`EMAIL_HOST`/`EMAIL_PORT`/`EMAIL_USER`/`EMAIL_PASS`/
+  `EMAIL_FROM`) MUST NOT be provisioned. The original "ASSUMPTION" is now a **verified fact**, and the
+  removal it required is **already complete** — see INF-053a for the audit. The mail architecture is split
+  in two and neither half involves the backend:
+
+  | Need | Owner | Cost | Status |
+  |---|---|---|---|
+  | **Sending** — account verification, password reset | **Firebase Auth**, from its own Firebase-hosted domain | $0 | No DNS records needed on `crococalc.com`; no backend involvement |
+  | **Receiving** — `contact@crococalc.com`, `support@crococalc.com` (the contact modal uses `mailto:`) | **Cloudflare Email Routing**, forwarding to `me@emilvinu.de` | $0 | **Enabled manually by the user** in the Cloudflare dashboard — the API token in `agent-secrets` lacks Email Routing scope |
+
+  **A user decision of 2026-08-02 fixed this split.** Moving either half to Azure Communication Services was
+  considered and rejected. For receiving the rejection is on capability, not price: **ACS Email cannot
+  deliver to a human-readable mailbox at all.** It has no inbound feature — its Event Grid integration
+  carries only delivery and engagement reports for *outbound* mail, and there is no inbound event type to
+  route. The Azure-family answer to "a person must read `contact@`" is an Exchange Online mailbox at
+  ~$4/user/month, which buys nothing over Cloudflare Email Routing's $0 forward and would consume 10 % of
+  the remaining budget headroom (INF-038). Cloudflare Email Routing is therefore the correct answer and is
+  **retained deliberately**, not by default.
+- **INF-053a (NEW — audit of C24, 2026-08-02)** The backend mail subsystem MUST NOT exist, and **verified
+  today it does not**. Re-checked at amendment time:
+  * `backend/src/init/email-client.ts` — **does not exist** (deleted; `git status` clean);
+  * `nodemailer` — **zero** references in `backend/src` and absent from `backend/package.json`;
+  * `backend/email-templates/`, `backend/src/queues/`, `backend/src/workers/` — **all absent**;
+  * `EMAIL_*` env vars — referenced nowhere in code; the only mentions left are explanatory comments in
+    `docker/example.env` and `docker/backend/Dockerfile`, which already state the correct rationale;
+  * `backend/src/utils/croco-mail.ts` — **present and correct**. It builds the *in-app inbox* message
+    (`buildCrocoMail` → `CrocoMail` schema); it sends no email and imports no transport. C24 always intended
+    it to survive.
+
+  **Conclusion: no backend-sent email survives in croco calc, and nothing remains for WP-11 to delete.**
+  C24's ruling is discharged. If any future requirement reintroduces a backend-sent email, this ruling MUST
+  be revisited first — it would need an SMTP provider, a sending domain and SPF/DKIM records that
+  deliberately do not exist today.
 - **INF-054** CORS: `backend/src/app.ts` line 22 uses `cors()` with default (allow-all) origin. This MUST be
   tightened to an allowlist containing only the workers.dev origin and `http://localhost:3000`
   (the Vite dev port, `frontend/vite.config.ts` line 349), keeping
@@ -326,59 +382,98 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
 
 ## 3. Database
 
-### Options evaluated
+> ### ⚠ AMENDED BY USER DECISION — 2026-08-02
+>
+> The user directed: *"Please just host mongodb via azure, even though this will result in some costs."*
+> This **supersedes** the original INF-057 (Atlas M0), the INF-058 M0-vs-Flex probe fork, INF-058a, INF-062
+> and every use of the `mongodb/mongodbatlas` Terraform provider. **Blocker BL-4 (no Atlas organisation, no
+> Atlas programmatic API key pair) is retired entirely** — the database is now an ordinary Azure resource
+> created with the same `azurerm` credentials as everything else, so no new human account is needed.
+> INF-059, INF-060 and INF-061 survive in amended form. The rulings below are the operative ones.
 
-- **INF-056** Evaluation, grounded in the aggregation features monkeytype actually uses:
-  `backend/src/dal/leaderboards.ts` uses **`$setWindowFields`** (lines 69 and 155) and **`$merge`** (line 318);
-  `backend/src/dal/connections.ts` uses `$lookup` with a sub-pipeline (line 314).
+### Options evaluated (INF-056, re-evaluated 2026-08-02)
 
-  | Option | Cost | Assessment |
-  |---|---|---|
-  | **MongoDB Atlas M0 (free), Azure `westeurope`** | **$0** | Real MongoDB 7/8 — `$setWindowFields`, `$merge`, pipeline `$lookup` all supported. 512 MB storage, shared CPU. **CHOSEN** |
-  | Azure Cosmos DB for MongoDB **vCore**, free tier | $0 (free tier), else ~$73/mo at M10 | Stays inside Azure/Terraform-azurerm, but is a re-implementation of the wire protocol; `$setWindowFields` support is **not confirmed** and the paid tier blows the budget |
-  | Azure Cosmos DB for MongoDB **RU / serverless** | ~$1–5 | Does **not** support `$setWindowFields`; the all-time leaderboard aggregation would fail. Rejected |
-  | MongoDB in a container + Azure Files volume | ~$3 | No backups, no HA, operational burden. Rejected |
+The evaluation is grounded in what the DAL **actually executes today**, re-read at amendment time rather than
+taken from the original requirement text — the code has moved since:
 
-- **INF-057** The database MUST be **MongoDB Atlas M0 (free tier)**, cluster name `croco-calc`, cloud provider
-  `AZURE`, region `EUROPE_WEST` (Atlas' name for Azure `westeurope`), so it is co-located with the Container
-  App. **ASSUMPTION:** the brief said "Backend on Azure, provisioned with Terraform" but explicitly listed
-  "Mongo Atlas free tier" as a candidate; Atlas is provisioned by Terraform too (provider `mongodb/mongodbatlas`),
-  so the Terraform requirement holds even though the DB itself is not an Azure resource. Flagged as a
-  deliberate deviation.
-- **INF-058** Before `terraform apply`, a compatibility probe MUST be run against the chosen cluster: a script
-  committed at `infra/scripts/db-probe.ts` that executes (a) a `$setWindowFields` rank pipeline, (b) a
-  `$merge` into a temp collection, (c) a `$lookup` with a sub-pipeline, and exits non-zero on any failure.
-  It MUST print which of the three failed. **This is a decision requirement with a named outcome, not an
-  open-ended "revisit" (gap 14):**
-  * **Probe passes** → Atlas **M0** is the database, as INF-057 states. No further action.
-  * **Probe fails on any clause** → the database MUST become **Atlas Flex** in the same Atlas project,
-    region `EUROPE_WEST`, via the one-line Terraform tier variable INF-062 already requires. No other
-    option may be selected: INF-056 has already rejected Cosmos RU/serverless (no `$setWindowFields`),
-    Cosmos vCore (unconfirmed support, $73/mo at M10) and self-hosted Mongo (no backups, operational
-    burden), so re-opening the evaluation would only re-derive the same answer. `$merge` in particular is
-    a documented restriction area on Atlas free/shared tiers, which makes clause (b) the most likely
-    failure and makes this fallback the expected path rather than a remote contingency.
-  * The Flex fallback costs ~$8–12/mo, is already priced in INF-062, and keeps the total (INF-037) at
-    ~$19–26/mo — still inside INF-038's 60 % headroom rule. It therefore requires no re-approval.
-  * The probe **cannot be run until BL-4 clears** (no Atlas org exists yet). Until then the Terraform code
-    MUST be written so the tier is a variable with default `M0`, and `terraform apply` MUST NOT be run.
-- **INF-058a** If the Flex fallback is taken, INF-037's cost table MUST be updated with the actual Flex line
-  item **before** `terraform apply`, and INF-038 re-checked. If Flex also fails the probe, that is a hard
-  stop requiring human sign-off — no third option is pre-approved.
-- **INF-059** Atlas network access MUST allow the Container App's egress. **ASSUMPTION:** ACA Consumption in
-  a non-VNet environment has no stable outbound IP, so the Atlas project IP access list MUST be `0.0.0.0/0`
-  with security carried entirely by SCRAM credentials + TLS. If a stable egress IP is later required, the
-  Container Apps environment MUST be moved into a VNet with a NAT gateway — which costs ~$32/mo and would
-  breach the headroom rule (INF-038), so it is explicitly out of scope for v1.
-- **INF-060** A single Atlas database user MUST be created with `readWrite` on database `crococalc` only
-  (no `atlasAdmin`). Its password MUST be generated by Terraform (`random_password`, length ≥ 32) and stored
-  only in Key Vault as `mongodb-uri`.
-- **INF-061** Atlas M0 has no automated backups. A scheduled GitHub Actions workflow MUST run weekly,
-  `mongodump` the `crococalc` database, and upload the archive to the `backups` container of
-  `stcrococalctfstate` (Cool tier) using the CI managed identity. A storage lifecycle rule MUST delete
-  backups older than 30 days.
-- **INF-062** The upgrade path if 512 MB is exceeded MUST be documented: move to Atlas Flex (~$8–12/mo), which
-  still fits the ceiling. A Terraform variable MUST make the tier a one-line change.
+| Stage | Where | Load-bearing? |
+|---|---|---|
+| **`$setWindowFields`** + `$documentNumber` / `$denseRank` | `backend/src/dal/leaderboards.ts` (lines 79, 151, 233), `backend/src/utils/daily-leaderboards.ts` (163, 202, 270), `backend/src/services/weekly-xp-leaderboard.ts` (127, 173, 199) | **Yes — critical.** INF-064 moved the daily and weekly-XP boards off Redis onto this stage, so it is now used in *nine* places, not the two the original INF-056 recorded |
+| **`$out`** | `backend/src/dal/leaderboards.ts:251` | **Yes.** Atomically replaces the board collection; this is what makes the rebuild idempotent (INF-153) |
+| **`$lookup` with `let` + sub-pipeline** | `backend/src/dal/connections.ts:314`, via `includeMetaData` from `backend/src/dal/user.ts:800` | **Yes.** The friends/connections list |
+| **`$bucket`** | `backend/src/dal/leaderboards.ts` (score histogram) | **Yes** |
+| **`$merge`** | `backend/src/api/controllers/dev.ts:418` **only** | **No.** That controller sits behind `onlyAvailableOnDev()` (`backend/src/api/routes/dev.ts`). The leaderboard rewrite already replaced its `$merge` with `$out` plus an ordinary upsert. The original INF-056 named `$merge` as production-critical; that is **no longer true** |
+
+| Option | Verified cost, `westeurope` | Assessment |
+|---|---|---|
+| **Azure DocumentDB — Azure Cosmos DB for MongoDB *vCore*, tier M10** | **$22.56/mo** ($18.18 compute + $4.38 storage) | **CHOSEN.** Every stage above is documented as supported; `$lookup` with `let`+`pipeline` has a worked example in the operator reference. Backups ≤35 days included at no charge. Native `azurerm` resource, so no extra provider and no BL-4 |
+| Azure DocumentDB **free tier** | **$0** | Same engine, same compatibility, 32 GiB. Rejected *as the default* only because Azure does not offer it in `westeurope` and it has **no backup/restore and no HA**. Retained as the documented one-line cost lever (INF-062) |
+| Azure Cosmos DB for MongoDB **RU / serverless** | ~$1–5 | **Rejected, now with evidence.** `$setWindowFields` does not appear in the aggregation-stage table at all; `$bucket` is marked ✖️ No; and `$lookup` is ❓Partial with the explicit note that `let`+`pipeline` "results in an error message indicating that `let` isn't supported". Three independent breakages |
+| **Self-hosted MongoDB** on Container Apps / ACI + Azure Files | ~$8–14 | **Rejected.** Real MongoDB, so full aggregation support — but MongoDB's own Production Notes warn that remote filesystems "may degrade performance" and recommend against NFS for `dbPath`, and are **silent on SMB entirely** (which is what Azure Files offers outside a VNet). NFS v4.1 needs Premium Files *and* a custom VNet, pushing cost above M10 while still being undocumented territory. Single instance, no managed backups, and a restore story we would own |
+| MongoDB Atlas M0 / Flex | $0 / ~$8–12 | **Superseded by the user decision.** Not Azure-hosted |
+
+  Citations for every claim above are in the source column of INF-037.
+
+- **INF-057 (AMENDED)** The database MUST be **Azure DocumentDB — i.e. Azure Cosmos DB for MongoDB *vCore***
+  (resource type `Microsoft.DocumentDB/mongoClusters`, Terraform `azurerm_mongo_cluster`), cluster name
+  `mongo-croco-calc-prod`, server version `8.0`, `shard_count = 1`,
+  `high_availability_mode = "Disabled"`, in `westeurope` so it is co-located with the Container App.
+  The deployed compute tier MUST be **M10** (1 burstable vCore / 2 GiB) with 32 GiB of storage.
+  The engine is confirmed available in `westeurope` (`az provider show -n Microsoft.DocumentDB` lists
+  `West Europe` for `mongoClusters`, checked 2026-08-02).
+- **INF-058 (AMENDED)** `infra/scripts/db-probe.ts` MUST still be run against the provisioned cluster before
+  the stack is declared done, but it **no longer decides a tier** — the M0-vs-Flex fork it existed to resolve
+  is gone. Its job now is to prove on the live server that the documented compatibility is real, because
+  vCore is a re-implementation of the wire protocol (Microsoft states 99.03 % compatibility) rather than the
+  MongoDB server. It MUST exercise, and report individually:
+  (a) `$setWindowFields` with `$documentNumber` and `$denseRank`, (b) `$out` **run twice**, asserting it
+  *replaces* rather than appends (this is INF-153's idempotency guarantee), (c) `$lookup` with `let` + a
+  sub-pipeline, (d) `$bucket`, and (e) `$merge`.
+  Clauses (a)–(d) are **required**: a failure exits 1 and MUST block deployment, because the leaderboards
+  depend on them. Clause (e) is **advisory only** and a failure exits 0 with a warning, because no production
+  code path uses `$merge` any more. Exit 2 means `DB_URI` was unset; exit 3 means the probe could not run at
+  all (connectivity/credentials) and is explicitly **not** a compatibility verdict.
+  Unlike the original INF-058 this is no longer blocked on a human: the cluster is created by the same
+  `terraform apply` as the rest of the stack.
+- **INF-058a (AMENDED)** There is no pre-approved fallback tier. If a **required** clause fails, that is a
+  hard stop requiring human sign-off — changing engines is a design change, not a variable flip. If clause
+  (e) alone fails, `backend/src/api/controllers/dev.ts` must be rewritten off `$merge` (WP-10 territory), but
+  nothing about the deployment changes.
+- **INF-059 (AMENDED)** Network access MUST be an `azurerm_mongo_cluster_firewall_rule` spanning
+  `0.0.0.0`–`255.255.255.255` with `public_network_access = "Enabled"`. **ASSUMPTION (unchanged in
+  substance):** ACA Consumption in a non-VNet environment has no stable outbound IP, so security is carried
+  entirely by SCRAM-SHA-256 credentials over mandatory TLS. A VNet + NAT gateway for a stable egress IP would
+  cost ~$32/mo and would breach the ceiling, so it stays out of scope for v1.
+- **INF-060 (AMENDED)** The cluster MUST have exactly one administrator account, username `crococalcapi`,
+  whose password is generated by Terraform (`random_password`, length 40, restricted to `-` and `_` for
+  specials so the value needs no percent-encoding inside the URI) and comes to rest **only** in Key Vault as
+  `mongodb-uri`. vCore has no per-database role grant equivalent to Atlas' `readWrite`-on-one-database, so
+  the "no `atlasAdmin`" clause of the original INF-060 has no counterpart and is struck.
+- **INF-061 (AMENDED)** The weekly `mongodump` GitHub Actions workflow (`backup-db.yml` → `backups` container
+  of `stcrococalctfstate`, 30-day lifecycle rule) MUST be kept. On the M10 tier it is now **defence in
+  depth** rather than the only copy — Azure DocumentDB retains its own backups for up to 35 days at no
+  additional charge — but it MUST NOT be removed: it is the only copy that survives the cluster itself being
+  deleted, and it becomes the *only* backup if the free tier is ever selected.
+- **INF-062 (AMENDED)** The cost lever MUST be two Terraform variables and nothing more:
+  `mongodb_tier` and `mongodb_location` in `infra/terraform/prod/terraform.tfvars`.
+  * `mongodb_tier = "M10"`, `mongodb_location = "westeurope"` — the deployed default, $22.56/mo.
+  * `mongodb_tier = "Free"`, `mongodb_location = "northeurope"` — **$0**, 32 GiB, same engine and same
+    aggregation support, but: not offered in `westeurope` (so the database stops being co-located, adding
+    cross-region latency and deviating from INF-005), **no backup/restore**, **no HA**, no diagnostic
+    logging, one per subscription, and paused after 60 days of inactivity (a non-issue for an app whose
+    Container App holds an open pool).
+    Taking this lever makes INF-061's `mongodump` the *only* backup.
+  * Scaling up (M20/M25/M30) is the same one-line change. Storage can only ever be increased, never shrunk.
+
+  The module MUST reject `tier = "Free"` paired with a region Azure does not offer it in, at **plan** time —
+  the free-tier region list is encoded as a variable validation in
+  `infra/terraform/modules/mongodb/main.tf`, verified to fire correctly on 2026-08-02.
+- **INF-062a (NEW, added by the amendment)** The connection string written to Key Vault MUST carry
+  **`retrywrites=false`**. This is not cosmetic: vCore rejects the retryable writes the Node driver enables
+  by default, so the Atlas-era URI suffix `?retryWrites=true&w=majority` would fail on the first write. The
+  full option set MUST be
+  `?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000`, and the host MUST be
+  `<cluster-name>.global.mongocluster.cosmos.azure.com`. `db-probe.ts` warns if `DB_URI` lacks the flag.
 
 ---
 
@@ -459,7 +554,8 @@ no leader election anywhere in the design. Therefore:
 
 ## 5. Terraform
 
-- **INF-070** All Azure and Atlas infrastructure MUST be defined in Terraform under `infra/terraform/`.
+- **INF-070** All infrastructure MUST be defined in Terraform under `infra/terraform/`. Since the 2026-08-02
+  amendment this is wholly Azure — there is no second cloud provider left in the stack.
   Manual portal changes are forbidden; drift MUST be fixed by editing Terraform, not the portal.
 - **INF-071** Directory layout MUST be exactly:
 
@@ -471,7 +567,7 @@ no leader election anywhere in the design. Therefore:
       backend.tf providers.tf main.tf variables.tf outputs.tf terraform.tfvars
     modules/
       container-app/      # cae-*, ca-*, id-croco-calc-api, ingress, probes, scale rules
-      mongodb-atlas/      # project, M0 cluster, db user, ip access list
+      mongodb/            # azurerm_mongo_cluster + firewall rule + generated password
       key-vault/          # kv-*, access policies / RBAC, secret placeholders
       observability/      # log analytics workspace, alerts, action group
       budget/             # azurerm_consumption_budget_subscription
@@ -486,15 +582,18 @@ no leader election anywhere in the design. Therefore:
   `resource_group_name = "rg-croco-calc-tfstate"`, `storage_account_name = "stcrococalctfstate"`,
   `container_name = "tfstate"`, `key = "prod.terraform.tfstate"`, `use_azuread_auth = true` (no storage
   account keys), and the subscription id from INF-009.
-- **INF-074** Provider versions MUST be pinned with `~>` at the minor level in `required_providers`
-  (`azurerm`, `mongodbatlas`, `random`), and `required_version` MUST be `"~> 1.14"` (installed Terraform is
-  v1.14.8, verified with `terraform version`).
+- **INF-074 (AMENDED)** Provider versions MUST be pinned with `~>` at the minor level in `required_providers`
+  — **`azurerm` and `random` only**. The `mongodbatlas` provider MUST NOT appear in any `.tf` file or in
+  `.terraform.lock.hcl`; the database is a native `azurerm` resource now. `required_version` MUST be
+  `"~> 1.14"` (installed Terraform is v1.14.8, verified with `terraform version`).
+  `azurerm_mongo_cluster` and `azurerm_mongo_cluster_firewall_rule` are both present in the pinned
+  azurerm 4.81.0 (verified: `terraform validate` passes against them).
 - **INF-075** `.terraform.lock.hcl` MUST be committed. `.terraform/`, `*.tfstate`, `*.tfstate.backup`,
   `*.tfvars` containing secrets, and `crash.log` MUST be gitignored.
 - **INF-076** No secret value may appear in any `.tf` or committed `.tfvars` file. Secrets MUST enter
   Terraform only through `TF_VAR_*` environment variables, and every such variable MUST be declared
   `sensitive = true`.
-- **INF-077** Because remote state will contain the Atlas connection string and generated password, access to
+- **INF-077** Because remote state will contain the database connection string and generated password, access to
   the `tfstate` container MUST be restricted to the operator's own Azure identity and `id-croco-calc-cicd`
   via the `Storage Blob Data Contributor` role. No SAS tokens, no anonymous access.
 - **INF-078** The `prod` root module MUST expose these outputs: `api_base_url`, `container_app_fqdn`,
@@ -528,12 +627,15 @@ no leader election anywhere in the design. Therefore:
   `repo:lxorb/croco-calc:ref:refs/heads/main` and `repo:lxorb/croco-calc:pull_request`, and the roles
   `Contributor` on `rg-croco-calc-prod`, `Storage Blob Data Contributor` on `stcrococalctfstate`,
   `Key Vault Secrets Officer` on `kv-crococalc-prod`.
-- **INF-086** Required GitHub Actions repository **secrets** (names are normative):
+- **INF-086 (AMENDED)** Required GitHub Actions repository **secrets** (names are normative):
   `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `CLOUDFLARE_API_TOKEN`,
-  `CLOUDFLARE_ACCOUNT_ID`, `MONGODB_ATLAS_PUBLIC_KEY`, `MONGODB_ATLAS_PRIVATE_KEY`,
-  `RECAPTCHA_SITE_KEY`, `FIREBASE_APIKEY`, `FIREBASE_AUTHDOMAIN`, `FIREBASE_PROJECTID`,
-  `FIREBASE_STORAGEBUCKET`, `FIREBASE_MESSAGINGSENDERID`, `FIREBASE_APPID`.
+  `CLOUDFLARE_ACCOUNT_ID`, `RECAPTCHA_SITE_KEY`, `FIREBASE_APIKEY`, `FIREBASE_AUTHDOMAIN`,
+  `FIREBASE_PROJECTID`, `FIREBASE_STORAGEBUCKET`, `FIREBASE_MESSAGINGSENDERID`, `FIREBASE_APPID`,
+  plus `FIREBASE_SERVICE_ACCOUNT_JSON` and `RECAPTCHA_SECRET` (consumed by `infra.yml` as `TF_VAR_*`).
   (The `FIREBASE_*` naming mirrors `docker/example.env` lines 23–28 so the existing convention is kept.)
+  **`MONGODB_ATLAS_PUBLIC_KEY`, `MONGODB_ATLAS_PRIVATE_KEY` and `MONGODB_ATLAS_ORG_ID` are struck** — the
+  amendment of §3 removed the Atlas provider, so these secrets have no consumer. They have been removed from
+  `.github/workflows/infra.yml`; if they were ever created in the repository they SHOULD be deleted.
 - **INF-086a (added by the master document, gap 13)** Two values that INF-012/INF-013/INF-061/INF-129 make
   hard requirements had **no defined source** and MUST be added:
   | name | kind | source | consumed by |
@@ -849,7 +951,7 @@ croco calc keeps monkeytype's Firebase Auth integration unchanged in shape:
   the stack MUST be re-tuned (first lever: drop `ca-croco-calc-api` to 0.25 vCPU / 0.5 GiB).
 - **INF-145** A short runbook MUST be committed at `docs/RUNBOOK.md` covering: how to roll back the backend
   (activate the previous ACA revision), how to roll back the frontend (`wrangler rollback` / redeploy a prior
-  version), how to rotate the Cloudflare token, the Atlas password and the Firebase service account, how to
+  version), how to rotate the Cloudflare token, the database administrator password and the Firebase service account, how to
   restore a `mongodump` backup, and how to read logs
   (`az containerapp logs show -n ca-croco-calc-api -g rg-croco-calc-prod --follow`).
 - **INF-146** Sentry MUST NOT be provisioned for v1. It is optional in the build already
@@ -902,18 +1004,19 @@ croco calc keeps monkeytype's Firebase Auth integration unchanged in shape:
 | # | Item | Reading chosen |
 |---|---|---|
 | A1 | Brief says "base on its **main** branch"; monkeytype's branch is `master` | ASSUMPTION: rename `master` → `main`, keep all history (INF-120, INF-119) |
-| A2 | "Backend on Azure, provisioned with Terraform" vs. the brief also offering "Mongo Atlas free tier" as a DB candidate | ASSUMPTION: compute + all supporting resources on Azure; the database is Atlas M0, still Terraform-managed via the `mongodbatlas` provider (INF-057) |
+| A2 | "Backend on Azure, provisioned with Terraform" vs. the brief also offering "Mongo Atlas free tier" as a DB candidate | **RESOLVED 2026-08-02 by user decision — the ambiguity is gone.** Everything, database included, is on Azure: Azure DocumentDB (Cosmos DB for MongoDB vCore) via `azurerm_mongo_cluster` (INF-057 amended). No `mongodbatlas` provider, no deviation left to flag |
 | A3 | Redis was never explicitly discussed in the brief | Decision: removed entirely; leaderboards move to MongoDB, queues to cron (§4). Saves ~$16/mo. Flagged to the backend workstream (INF-002) |
 | A4 | Exact workers.dev subdomain unknown | ASSUMPTION: resolve once at first deploy, then propagate to five places (INF-024) |
 | A5 | Azure region not specified | ASSUMPTION: `westeurope` (INF-005) |
 | A6 | Backend hostname/domain not specified | ASSUMPTION: default `*.azurecontainerapps.io` FQDN, no custom domain (INF-047) |
-| A7 | Whether transactional email is needed | ASSUMPTION: no SMTP; Firebase Auth sends verification/reset mail (INF-053) |
+| A7 | Whether transactional email is needed | **RESOLVED 2026-08-02 — no longer an assumption.** Audited (INF-053a): no backend mail code exists, `nodemailer` is gone, `croco-mail.ts` is the in-app inbox only. Sending = Firebase Auth; receiving = Cloudflare Email Routing forwarding `contact@`/`support@` to `me@emilvinu.de`. ACS Email was evaluated and rejected — it has **no inbound capability at all** (INF-053) |
 | A8 | Whether reCAPTCHA survives the fork | Decision: keep — the production build hard-fails without a site key (INF-105) |
 | A9 | Commit convention vs. inherited commitlint | ASSUMPTION: user convention wins; commitlint replaced by a 5-word lowercase hook (INF-136) |
-| A10 | Atlas egress restriction | ASSUMPTION: `0.0.0.0/0` + SCRAM/TLS, because a NAT gateway for a stable egress IP would cost ~$32/mo (INF-059) |
+| A10 | Database egress restriction | ASSUMPTION unchanged in substance, new mechanism: an `azurerm_mongo_cluster_firewall_rule` spanning `0.0.0.0`–`255.255.255.255` + SCRAM-SHA-256/TLS, because a VNet + NAT gateway for a stable egress IP would cost ~$32/mo (INF-059 amended) |
 | **B1** | **BLOCKER: no Firebase credentials locally** (`C:\Users\me\agent-secrets\` has only `cloudflare.txt` and `openai.txt`) | Auth is code-complete but unverifiable until a human performs INF-091 – INF-096 and INF-102 |
 | **B2** | **BLOCKER: GitHub OAuth App cannot be automated** — no REST API for creating OAuth Apps, and the local `gh` token lacks developer-settings scope | Human action, INF-094 |
 | **B3** | **BLOCKER: reCAPTCHA v2 keys do not exist** — the production frontend build cannot succeed without a site key | Human action, INF-106 |
-| **B4** | **BLOCKER: MongoDB Atlas account/API keys do not exist** — Terraform cannot create the cluster without an Atlas org and programmatic API key pair | Human action; then GH secrets `MONGODB_ATLAS_PUBLIC_KEY` / `MONGODB_ATLAS_PRIVATE_KEY` (INF-086) |
+| ~~**B4**~~ | ~~**BLOCKER: MongoDB Atlas account/API keys do not exist**~~ | **RETIRED 2026-08-02.** The user's decision to host MongoDB on Azure removed the Atlas provider entirely. The cluster is created by the same `azurerm` credentials as every other resource, so no Atlas organisation, no programmatic API key pair and no `MONGODB_ATLAS_*` secrets are needed. **This blocker no longer blocks anything and requires no human action.** |
 | **B5** | Cloudflare `_headers` support on Workers static assets is assumed, not verified | Verify per INF-022; documented fallback is a minimal Worker script |
-| **B6** | Azure per-second ACA rates used in INF-037 are from memory | MUST be re-verified against the Azure pricing calculator before apply (INF-037) |
+| ~~**B6**~~ | ~~Azure per-second ACA rates used in INF-037 are from memory~~ | **RESOLVED 2026-08-02.** Every rate in INF-037 now comes from the Azure Retail Prices API for `westeurope`, retrieved and cited on that date. The residual risk is not the *rate* but the *assumption* that the Container App bills at the idle rather than active rate — recorded as caveat 1 under INF-037 and policed by INF-144 |
+| **B7 ✚** | **Cloudflare Email Routing is not yet enabled on `crococalc.com`** — the API token in `agent-secrets` lacks Email Routing scope (every endpoint 403s), and Cloudflare requires a human to click the destination-verification link mailed to `me@emilvinu.de` | **The user has taken this on**: they will enable Email Routing and verify the destination in the dashboard themselves. Until they do, `contact@` and `support@` do not deliver. The zone currently holds **zero DNS records**, so Cloudflare's own MX/SPF records will be created cleanly with nothing to conflict against |

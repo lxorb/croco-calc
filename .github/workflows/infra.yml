@@ -133,12 +133,17 @@ jobs:
       # file this gate reads — checking anything else makes the gate vacuous.
       # See docs/RUNBOOK.md section 1 for the verified rates and the citations
       # that have to be transcribed into the `source` column to clear it.
+      # The pattern matches a markdown TABLE CELL holding the italic marker
+      # `*UNVERIFIED*` — not the bare word. INF-156's own prose has to be able
+      # to name the marker it forbids, and a naive `grep -c UNVERIFIED` made the
+      # gate fire on that prose, i.e. it could never pass once the table was
+      # actually verified. Keep the `|` anchor.
       - name: Assert the INF-037 cost table is verified
         run: |
           table=docs/requirements/06-infra-and-ops.md
-          rows=$(grep -c "UNVERIFIED" "$table" || true)
+          rows=$(grep -c '|.*\*UNVERIFIED\*' "$table" || true)
           if [ "$rows" -ne 0 ]; then
-            echo "::error file=$table::$rows row(s) of the INF-037 cost table still read UNVERIFIED; terraform apply is blocked (INF-156). Transcribe the citations from docs/RUNBOOK.md section 1 into the source column first."
+            echo "::error file=$table::$rows row(s) of the INF-037 cost table still read *UNVERIFIED*; terraform apply is blocked (INF-156). Fill the source column with a checked citation first."
             exit 1
           fi
 
