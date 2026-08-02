@@ -22,7 +22,6 @@ import { Formatting } from "../../../utils/format";
 import { formatXp, getXpDetails } from "../../../utils/levels";
 import { formatTypingStatsRatio } from "../../../utils/misc";
 import { remoteValidation } from "../../../utils/remote-validation";
-import { getLanguageDisplayString } from "../../../utils/strings";
 import AsyncContent from "../../common/AsyncContent";
 import { Button } from "../../common/Button";
 import { H2 } from "../../common/Headers";
@@ -45,12 +44,12 @@ export function FriendsList() {
   return (
     <div>
       <div class="items-bottom flex">
-        <H2 text="Friends" fa={{ icon: "fa-user-friends", fixedWidth: true }} />
+        <H2 text="Friends" icon={{ icon: "ph:users-bold", fixedWidth: true }} />
         <Show when={query.isRefetching}>
           <LoadingCircle />
         </Show>
         <Button
-          fa={{ icon: "fa-plus", fixedWidth: true }}
+          icon={{ icon: "ph:plus-bold", fixedWidth: true }}
           class="ml-auto"
           text="add friend"
           onClick={() =>
@@ -143,7 +142,6 @@ function getColumns({
           isFriend={false}
           class="w-min **:data-[ui-element='button']:[--themable-button-text:var(--text-color)]"
           linkToProfile
-          hideBadgeTextOnWidth="lg"
         />
       ),
     }),
@@ -194,8 +192,9 @@ function getColumns({
         },
       },
     }),
-    defineColumn("timeTyping", {
-      header: "time typing",
+    // AC-014: "time typing" reads "time spent" everywhere.
+    defineColumn("timeSpent", {
+      header: "time spent",
       enableSorting: true,
       cell: ({ getValue }) =>
         secondsToString(Math.round(getValue() ?? 0), true, true),
@@ -204,33 +203,16 @@ function getColumns({
       },
     }),
 
-    defineColumn("streak.length", {
-      header: "streak",
-      enableSorting: true,
-      cell: ({ getValue }) => formatStreak(getValue()),
-      meta: {
-        breakpoint: "sm",
-        cellMeta: ({ row }) => {
-          const value = row.streak?.maxLength;
-          return value === undefined
-            ? {}
-            : {
-                "data-balloon-pos": "up",
-                "aria-label": formatStreak(value, "longest streak"),
-              };
-        },
-      },
-    }),
-
-    defineColumn("top15.wpm", {
-      header: "time 15 pb",
-
+    // AC-148 columns 6+7 — `time 4 pb` / `time 8 pb`, replacing monkeytype's
+    // 15/60 second columns; the streak column is gone with C17.
+    defineColumn("top4.score", {
+      header: "time 4 pb",
       enableSorting: true,
       cell: (info) => {
-        const pb = formatPb(info.row.original.top15, { format });
+        const pb = formatPb(info.row.original.top4, { format });
         return (
           <>
-            {pb?.wpm ?? "-"}
+            {pb?.score ?? "-"}
             <div class="opacity-50">{pb?.acc ?? "-"}</div>
           </>
         );
@@ -241,19 +223,18 @@ function getColumns({
           class: "text-xs sm:text-xs md:text-xs xl:text-sm",
           "data-balloon-pos": "up",
           "data-balloon-break": "",
-          "aria-label": formatPb(row.top15 as PersonalBest, { format })
-            ?.details,
+          "aria-label": formatPb(row.top4, { format })?.details,
         }),
       },
     }),
-    defineColumn("top60.wpm", {
-      header: "time 60 pb",
+    defineColumn("top8.score", {
+      header: "time 8 pb",
       enableSorting: true,
       cell: (info) => {
-        const pb = formatPb(info.row.original.top60, { format });
+        const pb = formatPb(info.row.original.top8, { format });
         return (
           <>
-            {pb?.wpm ?? "-"}
+            {pb?.score ?? "-"}
             <div class="opacity-50">{pb?.acc ?? "-"}</div>
           </>
         );
@@ -264,7 +245,7 @@ function getColumns({
           class: "text-xs sm:text-xs md:text-xs xl:text-sm",
           "data-balloon-pos": "up",
           "data-balloon-break": "",
-          "aria-label": formatPb(row.top60, { format })?.details,
+          "aria-label": formatPb(row.top8, { format })?.details,
         }),
       },
     }),
@@ -289,7 +270,7 @@ function getColumns({
               })
             }
             balloon={{ text: "remove friend" }}
-            fa={{ icon: "fa-user-times", fixedWidth: true }}
+            icon={{ icon: "ph:user-minus-bold", fixedWidth: true }}
           />
         ) : (
           ""
@@ -300,22 +281,18 @@ function getColumns({
   return cols;
 }
 
-function formatStreak(length?: number, prefix?: string): string {
-  if (length === 1) return "-";
-  return isSafeNumber(length)
-    ? `${prefix !== undefined ? `${prefix} ` : ""}${length} days`
-    : "-";
-}
-
+/**
+ * AC-148 column 6/7 balloon: score / tpm / acc / date on separate lines. The
+ * monkeytype `raw`, `con` and language rows go with AC-007 and AC-113.
+ */
 function formatPb(
   entry: PersonalBest | undefined,
   options: { format: Formatting },
 ):
   | {
-      wpm: string;
+      score: string;
       acc: string;
-      raw: string;
-      con: string;
+      tpm: string;
       details: string;
     }
   | undefined {
@@ -323,28 +300,19 @@ function formatPb(
     return undefined;
   }
   const result = {
-    wpm: options.format.typingSpeed(entry.wpm, { showDecimalPlaces: true }),
+    score: options.format.score(entry.score),
     acc: options.format.percentage(entry.acc, { showDecimalPlaces: true }),
-    raw: options.format.typingSpeed(entry.raw, { showDecimalPlaces: true }),
-    con: options.format.percentage(entry.consistency, {
-      showDecimalPlaces: true,
-    }),
+    tpm: options.format.tpm(entry.tpm, { showDecimalPlaces: true }),
     details: "",
   };
 
-  const details = [
-    `${getLanguageDisplayString(entry.language)}`,
-    `${result.wpm} ${options.format.typingSpeedUnit}`,
-  ];
+  const details = [`${result.score} score`];
 
+  if (isSafeNumber(entry.tpm)) {
+    details.push(`${result.tpm} tpm`);
+  }
   if (isSafeNumber(entry.acc)) {
     details.push(`${result.acc} acc`);
-  }
-  if (isSafeNumber(entry.raw)) {
-    details.push(`${result.raw} raw`);
-  }
-  if (isSafeNumber(entry.consistency)) {
-    details.push(`${result.con} con`);
   }
   if (isSafeNumber(entry.timestamp)) {
     details.push(`${dateFormat(entry.timestamp, "dd MMM yyyy")}`);

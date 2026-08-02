@@ -24,6 +24,7 @@ import { Formatting } from "../../utils/format";
 import { AnimatedModal } from "../common/AnimatedModal";
 import { Button } from "../common/Button";
 import { Separator } from "../common/Separator";
+import { enabledSettings, settingBalloon } from "../pages/account/utils";
 
 const modalId = "LastSignedOutResult";
 
@@ -32,7 +33,6 @@ export function LastSignedOutResultModal() {
     () =>
       new Formatting({
         alwaysShowDecimalPlaces: getConfig.alwaysShowDecimalPlaces,
-        typingSpeedUnit: getConfig.typingSpeedUnit,
       }),
   );
 
@@ -58,10 +58,12 @@ export function LastSignedOutResultModal() {
       <Separator />
 
       <div class="grid grid-cols-2 gap-2">
+        {/* AC-007: score / accuracy / tpm / correct-wrong; no raw, consistency
+        or character stats anywhere. */}
         <Value
           class="text-2xl"
-          label={format().typingSpeedUnit}
-          value={format().typingSpeed(getLastSignedOutResult()?.wpm ?? 0)}
+          label="score"
+          value={format().score(getLastSignedOutResult()?.score ?? 0)}
         />
         <Value
           class="text-2xl"
@@ -69,19 +71,16 @@ export function LastSignedOutResultModal() {
           value={format().accuracy(getLastSignedOutResult()?.acc ?? 0)}
         />
         <Value
-          label="raw"
-          value={format().typingSpeed(getLastSignedOutResult()?.rawWpm ?? 0)}
+          label="tpm"
+          value={format().tpm(getLastSignedOutResult()?.tpm ?? 0, {
+            showDecimalPlaces: true,
+          })}
         />
         <Value
-          label="consistency"
-          value={format().percentage(
-            getLastSignedOutResult()?.consistency ?? 0,
-          )}
-        />
-        <Value
-          class="col-span-2"
-          label="characters"
-          value={getLastSignedOutResult()?.charStats.join("/") ?? "-"}
+          label="correct/wrong"
+          value={`${getLastSignedOutResult()?.correct ?? 0}/${
+            getLastSignedOutResult()?.wrong ?? 0
+          }`}
         />
         <Value
           label="test type"
@@ -118,22 +117,19 @@ function Value(props: {
   );
 }
 
+/**
+ * AC-102's rule: one line per enabled setting, labelled by mapping the stored
+ * C2 literal through the shared table. Language, punctuation, numbers, blind,
+ * lazy, funbox, difficulty and tags are all gone with C15 / C22 / AC-007.
+ */
 function formatTestType(r: CompletedEvent | null): (string | JSX.Element)[] {
   if (r === null) return ["-"];
   const tt: (string | JSX.Element)[] = [`${r.mode} ${r.mode2}`];
 
-  tt.push(<br />, `${r.language}`);
-
-  if (r.numbers) tt.push(<br />, "numbers");
-  if (r.punctuation) tt.push(<br />, "punctuation");
-  if (r.blindMode) tt.push(<br />, "blind");
-  if (r.lazyMode) tt.push(<br />, "lazy");
-  if (r.funbox.length > 0) {
-    const funboxLabel = r.funbox.map((it) => it.replace(/_/g, " ")).join(",");
-    tt.push(<br />, funboxLabel);
+  for (const { key, value } of enabledSettings(r.settings)) {
+    tt.push(<br />, settingBalloon(key, value));
   }
-  if (r.difficulty !== "normal") tt.push(<br />, `${r.difficulty}`);
-  if (r.tags.length > 0) tt.push(<br />, `${r.tags.length} tags`);
+
   return tt;
 }
 
@@ -173,7 +169,6 @@ async function syncLastSignedOutResult(): Promise<void> {
 
   const dataToSave: SaveLocalResultData = {
     xp: response.body.data.xp,
-    streak: response.body.data.streak,
     result,
     isPb: response.body.data.isPb,
   };

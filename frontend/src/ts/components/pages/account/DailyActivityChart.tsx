@@ -10,22 +10,27 @@ import {
 import { getTheme } from "../../../states/theme";
 import { secondsToString } from "../../../utils/date-and-time";
 import { Formatting } from "../../../utils/format";
-import { TypingSpeedUnitSettings } from "../../../utils/typing-speed-units";
 import AsyncContent from "../../common/AsyncContent";
 import { ChartJs } from "../../common/ChartJs";
 
+/**
+ * AC-091 — the time-spent chart. monkeytype's "time typing" bar dataset becomes
+ * "Time spent" (AC-014) and its wpm line becomes the average `score` line; the
+ * `typingSpeedUnit` prop is gone with the unit system, so the chart takes only
+ * the `Formatting` helper. The `Average Consistency` tooltip row is removed —
+ * master C5 keeps `consistency` off every account surface.
+ */
 export function DailyActivityChart(props: {
   queryState: Accessor<ResultsQueryState | undefined>;
   beginAtZero: boolean;
-  typingSpeedUnit: TypingSpeedUnitSettings;
   format: Formatting;
 }): JSXElement {
   const dataQuery = useResultStatsLiveQuery(() => props.queryState(), {
     groupByDay: true,
   });
 
-  const formatSpeed = (wpm: number): string =>
-    props.format.typingSpeed(wpm, { showDecimalPlaces: true });
+  const formatScore = (score: number): string =>
+    props.format.decimals(score, { showDecimalPlaces: true });
 
   return (
     <AsyncContent collections={{ dataQuery }}>
@@ -39,7 +44,7 @@ export function DailyActivityChart(props: {
               datasets: [
                 {
                   yAxisID: "count",
-                  data: dataQueryData().map((it) => it.timeTyping / 60),
+                  data: dataQueryData().map((it) => it.timeSpent / 60),
                   backgroundColor: getTheme().main,
                   trendlineLinear: {
                     lineStyle: "dotted",
@@ -51,10 +56,8 @@ export function DailyActivityChart(props: {
                   order: 3,
                 },
                 {
-                  yAxisID: "avgWpm",
-                  data: dataQueryData().map((it) =>
-                    props.typingSpeedUnit.fromWpm(it.avgWpm),
-                  ),
+                  yAxisID: "avgScore",
+                  data: dataQueryData().map((it) => it.avgScore),
                   borderColor: getTheme().sub,
                   pointBackgroundColor: getTheme().sub,
                   type: "line",
@@ -105,11 +108,11 @@ export function DailyActivityChart(props: {
                   display: true,
                   title: {
                     display: true,
-                    text: "Time typing (minutes)",
+                    text: "Time spent (minutes)",
                   },
                   grid: { display: false },
                 },
-                avgWpm: {
+                avgScore: {
                   axis: "y",
                   beginAtZero: props.beginAtZero,
                   ticks: {
@@ -121,7 +124,7 @@ export function DailyActivityChart(props: {
                   position: "right",
                   title: {
                     display: true,
-                    text: `Average ${props.format.typingSpeedUnit.toUpperCase()}`,
+                    text: "Average score",
                   },
                   grid: {
                     display: false,
@@ -159,13 +162,12 @@ export function DailyActivityChart(props: {
                       if (item === undefined) return "unknown";
 
                       return `
-Time Typing: ${secondsToString(Math.round(item.timeTyping), true, true)}
+Time Spent: ${secondsToString(Math.round(item.timeSpent), true, true)}
 Tests Completed: ${item.completed}
 Restarts per test: ${roundTo2(item.restarted / item.completed)}
-Highest  ${props.format.typingSpeedUnit.toUpperCase()}: ${formatSpeed(item.maxWpm)}
-Average ${props.format.typingSpeedUnit.toUpperCase()}: ${formatSpeed(item.avgWpm)}
+Highest score: ${formatScore(item.maxScore)}
+Average score: ${formatScore(item.avgScore)}
 Average Accuracy: ${props.format.accuracy(item.avgAcc, { showDecimalPlaces: true })}
-Average Consistency: ${props.format.percentage(item.avgConsistency, { showDecimalPlaces: true })}
                       `;
                     },
                     label: function (): string {

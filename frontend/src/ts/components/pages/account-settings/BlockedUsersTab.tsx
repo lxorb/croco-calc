@@ -21,7 +21,7 @@ export function BlockedUsersTab() {
   return (
     <Section
       title="blocked users"
-      fa={{ icon: "fa-ban" }}
+      icon={{ icon: "ph:prohibit-bold" }}
       fullWidth
       description=<>Blocked users cannot send you friend requests.</>
     >
@@ -82,7 +82,7 @@ function getColumns(): DataTableColumnDef<Connection>[] {
             })
           }
           balloon={{ text: "unblock user" }}
-          fa={{ icon: "fa-trash-alt", fixedWidth: true }}
+          icon={{ icon: "ph:trash-bold", fixedWidth: true }}
         />
       ),
     }),

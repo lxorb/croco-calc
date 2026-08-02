@@ -16,7 +16,7 @@ import { secondsToString } from "../../../utils/date-and-time";
 import { qs } from "../../../utils/dom";
 import { Formatting } from "../../../utils/format";
 import { abbreviateNumber } from "../../../utils/numbers";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 import { User } from "../../common/User";
 import { DataTable, DataTableColumnDef } from "../../ui/table/DataTable";
 
@@ -132,9 +132,9 @@ function NoEntriesFound(): JSXElement {
 
 const friendsRankColumn = () =>
   createColumnHelper<SpeedEntry | XpEntry>().accessor("friendsRank", {
-    header: () => <Fa icon="fa-user-friends" />,
+    header: () => <Icon icon="ph:users-bold" />,
     cell: (info) =>
-      info.getValue() === 1 ? <Fa icon="fa-crown" /> : info.getValue(),
+      info.getValue() === 1 ? <Icon icon="ph:crown-bold" /> : info.getValue(),
     meta: {
       align: "center",
       headerMeta: {
@@ -146,9 +146,11 @@ const friendsRankColumn = () =>
 
 const rankColumn = (friendsOnly: boolean) =>
   createColumnHelper<SpeedEntry | XpEntry>().accessor("rank", {
-    header: () => <Fa icon={friendsOnly ? "fa-users" : "fa-hashtag"} />,
+    header: () => (
+      <Icon icon={friendsOnly ? "ph:users-three-bold" : "ph:hash-bold"} />
+    ),
     cell: (info) =>
-      info.getValue() === 1 ? <Fa icon="fa-crown" /> : info.getValue(),
+      info.getValue() === 1 ? <Icon icon="ph:crown-bold" /> : info.getValue(),
     meta: {
       align: "center",
       headerMeta: {
@@ -191,8 +193,8 @@ function defineResponsivePair<T>() {
     subtitleClass = "text-em-xs opacity-50 sm:text-em-base",
   }: {
     columns: [
-      { path: KA; header: string; format: (value: T[KA]) => string },
-      { path: KB; header: string; format: (value: T[KB]) => string },
+      { path: KA; header: string; format: (value: T[KA], row: T) => string },
+      { path: KB; header: string; format: (value: T[KB], row: T) => string },
     ];
     switchBreakpoint: BreakpointKey;
     addHeader?: boolean;
@@ -206,9 +208,9 @@ function defineResponsivePair<T>() {
         id: a.path,
         accessorFn: (row: T) => row[a.path],
         header: a.header,
-        cell: (info: { getValue: () => T[KA] }) =>
+        cell: (info: { getValue: () => T[KA]; row: { original: T } }) =>
           wrapWithHeader({
-            value: a.format(info.getValue()),
+            value: a.format(info.getValue(), info.row.original),
             header: a.header,
             enabled: addHeader,
           }),
@@ -218,9 +220,9 @@ function defineResponsivePair<T>() {
         id: b.path,
         accessorFn: (row: T) => row[b.path],
         header: b.header,
-        cell: (info: { getValue: () => T[KB] }) =>
+        cell: (info: { getValue: () => T[KB]; row: { original: T } }) =>
           wrapWithHeader({
-            value: b.format(info.getValue()),
+            value: b.format(info.getValue(), info.row.original),
             header: b.header,
             enabled: addHeader,
           }),
@@ -237,8 +239,10 @@ function defineResponsivePair<T>() {
         ),
         cell: (info: { getValue: () => T[KA]; row: { original: T } }) => (
           <>
-            <div>{a.format(info.getValue())}</div>
-            <div class="text-sub">{b.format(info.row.original[b.path])}</div>
+            <div>{a.format(info.getValue(), info.row.original)}</div>
+            <div class="text-sub">
+              {b.format(info.row.original[b.path], info.row.original)}
+            </div>
           </>
         ),
         meta: {
@@ -267,12 +271,13 @@ function getSpeedColumns({
     friendsRankColumn() as DataTableColumnDef<SpeedEntry>,
     rankColumn(friendsOnly) as DataTableColumnDef<SpeedEntry>,
     userColumn({ userOverride }) as DataTableColumnDef<SpeedEntry>,
+    // AC-131 columns 4+5 — score / accuracy.
     ...defineResponsivePair<SpeedEntry>()({
       columns: [
         {
-          path: "wpm",
-          header: format.typingSpeedUnit,
-          format: (v) => format.typingSpeed(v, { showDecimalPlaces: true }),
+          path: "score",
+          header: "score",
+          format: (v) => format.score(v),
         },
         {
           path: "acc",
@@ -283,17 +288,18 @@ function getSpeedColumns({
       switchBreakpoint: "xl",
       addHeader,
     }),
+    // AC-131 columns 6+7 — tpm / correct-wrong; the merged cell hides below xs.
     ...defineResponsivePair<SpeedEntry>()({
       columns: [
         {
-          path: "raw",
-          header: "raw",
-          format: (v) => format.typingSpeed(v, { showDecimalPlaces: true }),
+          path: "tpm",
+          header: "tpm",
+          format: (v) => format.tpm(v, { showDecimalPlaces: true }),
         },
         {
-          path: "consistency",
-          header: "consistency",
-          format: (v) => format.percentage(v, { showDecimalPlaces: true }),
+          path: "correct",
+          header: "correct/wrong",
+          format: (_v, row) => `${row.correct}/${row.wrong}`,
         },
       ],
       switchBreakpoint: "xl",
@@ -356,8 +362,8 @@ function getXpColumns({
           format: (v) => (v < 1000 ? v.toFixed(0) : abbreviateNumber(v)),
         },
         {
-          path: "timeTypedSeconds",
-          header: "time typed",
+          path: "timeSpentSeconds",
+          header: "time spent",
           format: (v) => secondsToString(Math.round(v), true, true, ":"),
         },
       ],

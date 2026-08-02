@@ -127,11 +127,11 @@ export function LeaderboardPage(): JSXElement {
     return page;
   };
 
+  /** AC-128: the remembered rank is keyed by `mode2` alone — no language key. */
   const syncLbMemory = () => {
     if (
       rankQuery.data !== undefined &&
       rankQuery.data !== null &&
-      getSelection() !== undefined &&
       getSelection().type === "allTime"
     ) {
       const diff = getLbMemoryDifference(getSelection(), rankQuery.data.rank);
@@ -140,7 +140,6 @@ export function LeaderboardPage(): JSXElement {
         void updateLbMemory(
           "time",
           getSelection().mode2,
-          "english",
           rankQuery.data.rank,
           true,
         );
@@ -155,17 +154,14 @@ export function LeaderboardPage(): JSXElement {
     if (
       selection.type !== "allTime" ||
       selection.mode !== "time" ||
-      selection.language !== "english" ||
       selection.friendsOnly ||
       currentRank === undefined
     ) {
       return undefined;
     }
-    const oldRank =
-      getSnapshot()?.lbMemory?.time?.[selection.mode2]?.english ?? 0;
-    const diff = oldRank - currentRank;
+    const oldRank = getSnapshot()?.lbMemory?.time?.[selection.mode2] ?? 0;
 
-    return diff;
+    return oldRank - currentRank;
   };
 
   return (
@@ -177,10 +173,6 @@ export function LeaderboardPage(): JSXElement {
               <Sidebar
                 selection={getSelection}
                 onSelect={onSelectionChange}
-                validModeRules={
-                  serverConfigurationQueryData().dailyLeaderboards
-                    .validModeRules ?? []
-                }
                 connectionsEnabled={
                   serverConfigurationQueryData().connections.enabled
                 }
@@ -215,9 +207,12 @@ export function LeaderboardPage(): JSXElement {
                 rankQueryData,
                 serverConfigurationQueryData,
               }) => {
-                const minWpm = () => {
+                /** AC-130: croco calc exposes `minScore`, not monkeytype's `minWpm`. */
+                const minScore = () => {
                   const d = entriesQueryData();
-                  return d && "minWpm" in d ? (d.minWpm as number) : undefined;
+                  return d && "minScore" in d
+                    ? (d.minScore as number)
+                    : undefined;
                 };
 
                 return (
@@ -226,18 +221,18 @@ export function LeaderboardPage(): JSXElement {
                     data={rankQueryData()}
                     friendsOnly={getSelection().friendsOnly}
                     total={entriesQueryData()?.count}
-                    minWpm={minWpm()}
+                    minScore={minScore()}
                     memoryDifference={getLbMemoryDifference(
                       getSelection(),
                       rankQueryData()?.rank,
                     )}
                     isLbOptOut={getSnapshot()?.lbOptOut ?? false}
                     isBanned={getSnapshot()?.banned ?? false}
-                    minTimeTyping={
+                    minTimeSpent={
                       serverConfigurationQueryData()?.leaderboards
-                        .minTimeTyping ?? 0
+                        .minTimeSpent ?? 0
                     }
-                    userTimeTyping={getSnapshot()?.typingStats.timeTyping ?? 0}
+                    userTimeSpent={getSnapshot()?.testStats.timeSpent ?? 0}
                   />
                 );
               }}

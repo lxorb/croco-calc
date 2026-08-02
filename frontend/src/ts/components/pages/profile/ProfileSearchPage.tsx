@@ -98,7 +98,7 @@ export function ProfileSearchPage(): JSXElement {
               <SubmitButton
                 form={form}
                 class="shrink"
-                fa={{ icon: "fa-chevron-right" }}
+                icon={{ icon: "ph:caret-right-bold" }}
                 disabled={!isEditable()}
               />
             </div>

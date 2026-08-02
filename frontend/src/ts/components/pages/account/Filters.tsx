@@ -1,11 +1,9 @@
-import { QuoteLength } from "@croco-calc/schemas/configs";
-import { PresetNameSchema } from "@croco-calc/schemas/presets";
 import {
+  ResultFilterPresetNameSchema,
   ResultFilters,
-  ResultFiltersGroupItem,
   ResultFiltersKeys,
 } from "@croco-calc/schemas/users";
-import { createMemo, createSignal, For, JSXElement, Show } from "solid-js";
+import { createSignal, For, JSXElement, Show } from "solid-js";
 import { SetStoreFunction, unwrap } from "solid-js/store";
 import { z } from "zod";
 
@@ -14,15 +12,11 @@ import {
   insertResultFilterPreset,
   useResultFilterPresetsLiveQuery,
 } from "../../../collections/result-filter-presets";
-import { type TagItem, useTagsLiveQuery } from "../../../collections/tags";
 import { getConfig } from "../../../config/store";
 import defaultResultFilters from "../../../constants/default-result-filters";
 import { showSimpleModal } from "../../../states/simple-modal";
-import { FaSolidIcon } from "../../../types/font-awesome";
-import { cn } from "../../../utils/cn";
 import { createErrorMessage } from "../../../utils/error";
 import {
-  getLanguageDisplayString,
   normalizeName,
   replaceUnderscoresWithSpaces,
 } from "../../../utils/strings";
@@ -31,13 +25,19 @@ import AsyncContent from "../../common/AsyncContent";
 import { Button } from "../../common/Button";
 import { H3 } from "../../common/Headers";
 import { Separator } from "../../common/Separator";
-import SlimSelect from "../../ui/SlimSelect";
-import { verifyResultFiltersStructure } from "./utils";
+import {
+  SETTING_HEADINGS,
+  SETTING_ICONS,
+  SETTING_KEYS,
+  settingLabel,
+  verifyResultFiltersStructure,
+} from "./utils";
 
 export function Filters(props: {
   filters: ResultFilters;
   onChangeFilters: SetStoreFunction<ResultFilters>;
 }): JSXElement {
+  /** AC-075: only rendered once the user has saved at least one preset. */
   const FilterPresets = (props: {
     presets: ResultFilters[];
     onChangeFilters: SetStoreFunction<ResultFilters>;
@@ -45,7 +45,10 @@ export function Filters(props: {
     return (
       <Show when={props.presets.length > 0}>
         <div>
-          <H3 fa={{ icon: "fa-sliders-h" }} text="filter presets" />
+          <H3
+            icon={{ icon: "ph:sliders-horizontal-bold" }}
+            text="filter presets"
+          />
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <For each={props.presets}>
               {(preset) => (
@@ -60,7 +63,7 @@ export function Filters(props: {
                     }
                   />
                   <Button
-                    fa={{ icon: "fa-trash", fixedWidth: true }}
+                    icon={{ icon: "ph:trash-bold", fixedWidth: true }}
                     onClick={() =>
                       showSimpleModal({
                         title: "Delete Filter Preset",
@@ -96,69 +99,11 @@ export function Filters(props: {
     );
   };
 
-  const Dropdown = <
-    T extends ResultFiltersKeys,
-    K extends keyof ResultFilters[T],
-  >(options: {
-    icon: FaSolidIcon;
-    text: string;
-    group: T;
-    format?: (value: K) => string;
-    class?: string;
-  }): JSXElement => {
-    // Isolate this group's data to prevent unnecessary updates
-    const groupData = createMemo(() => props.filters[options.group]);
-
-    const dropdownOptions = createMemo(() =>
-      Object.keys(groupData()).map((k) => ({
-        value: k,
-        text: options.format?.(k as K) ?? k,
-      })),
-    );
-
-    const dropdownSelected = createMemo(() =>
-      Object.entries(groupData())
-        .filter(([, v]) => v)
-        .map(([k]) => k),
-    );
-
-    return (
-      <div class={cn(`w-full`, options.class)}>
-        <H3 fa={{ icon: options.icon, fixedWidth: true }} text={options.text} />
-        <SlimSelect
-          multiple
-          settings={{
-            showSearch: true,
-            placeholderText: `select a ${options.group}`,
-            allowDeselect: true,
-            closeOnSelect: false,
-            maxValuesShown: 4,
-            addAllOption: true,
-            scrollToTop: true,
-          }}
-          onChange={(selectedValues) => {
-            setFilter(
-              options.group,
-              Object.fromEntries(
-                Object.entries(props.filters[options.group]).map(([k]) => [
-                  k,
-                  selectedValues.includes(k),
-                ]),
-              ),
-            );
-          }}
-          options={dropdownOptions()}
-          selected={dropdownSelected()}
-        />
-      </div>
-    );
-  };
-
   const ButtonGroup = <
     T extends ResultFiltersKeys,
     K extends keyof ResultFilters[T],
   >(options: {
-    icon?: FaSolidIcon;
+    icon?: string;
     text?: string;
     group: T;
     format?: (value: K) => string;
@@ -175,7 +120,7 @@ export function Filters(props: {
       <div>
         <Show when={options.icon !== undefined && options.text !== undefined}>
           <H3
-            fa={{ icon: options.icon as FaSolidIcon, fixedWidth: true }}
+            icon={{ icon: options.icon as string, fixedWidth: true }}
             text={options.text as string}
           />
         </Show>
@@ -191,6 +136,7 @@ export function Filters(props: {
                 text={item.text ?? (item.id as string)}
                 active={props.filters[options.group][item.id] === true}
                 onClick={(e) => {
+                  // AC-080: shift-click narrows the group to exactly this option.
                   if (e.shiftKey || options.singleSelect) {
                     const newValue = Object.fromEntries(
                       Object.entries(props.filters[options.group]).map(
@@ -217,7 +163,6 @@ export function Filters(props: {
     );
   };
 
-  const tags = useTagsLiveQuery();
   const [isShowAdvanced, setShowAdvanced] = createSignal(false);
 
   const setFilter = (
@@ -240,15 +185,16 @@ export function Filters(props: {
         )}
       </AsyncContent>
       <div>
-        <H3 fa={{ icon: "fa-filter" }} text="filters" />
+        <H3 icon={{ icon: "ph:funnel-bold" }} text="filters" />
+        {/* AC-074 */}
         <div class="mb-4 grid gap-4 sm:grid-cols-2 lg:flex lg:justify-evenly [&>button]:w-full">
           <Button
             text="all"
-            onClick={() => props.onChangeFilters(fromDefaultSettings(tags()))}
+            onClick={() => props.onChangeFilters(allFilters())}
           />
           <Button
             text="current settings"
-            onClick={() => props.onChangeFilters(fromCurrentSettings(tags()))}
+            onClick={() => props.onChangeFilters(fromCurrentSettings())}
           />
           <Button
             text="advanced"
@@ -261,7 +207,7 @@ export function Filters(props: {
               showSimpleModal({
                 title: "New Filter Preset",
                 buttonText: "add",
-                schema: z.object({ name: PresetNameSchema }),
+                schema: z.object({ name: ResultFilterPresetNameSchema }),
                 inputs: {
                   name: {
                     placeholder: "Preset Name",
@@ -295,6 +241,7 @@ export function Filters(props: {
           />
         </div>
         <Separator class="mb-4 block lg:hidden" />
+        {/* AC-076: single-select, five options, defaults to `all time`. */}
         <ButtonGroup
           singleSelect
           classOverride="grid gap-4 sm:grid-cols-2 lg:flex lg:justify-evenly [&>button]:w-full [&>button]:last:col-span-2"
@@ -306,8 +253,13 @@ export function Filters(props: {
           }}
         />
 
+        {/* AC-077 / AC-078 */}
         <AnimeShow when={isShowAdvanced()} slide>
-          <H3 fa={{ icon: "fa-tools" }} text="advanced filters" class="mt-8" />
+          <H3
+            icon={{ icon: "ph:wrench-bold" }}
+            text="advanced filters"
+            class="mt-8"
+          />
 
           <Button
             text="clear filters"
@@ -315,49 +267,23 @@ export function Filters(props: {
             class="mb-4 w-full"
           />
           <div class="gap-4 md:grid md:grid-cols-2">
-            <ButtonGroup text="difficulty" icon="fa-star" group="difficulty" />
-            <ButtonGroup text="personal best" icon="fa-crown" group="pb" />
-            <ButtonGroup text="mode" icon="fa-bars" group="mode" />
             <ButtonGroup
-              text="quote length"
-              icon="fa-quote-right"
-              group="quoteLength"
+              text="personal best"
+              icon="ph:crown-bold"
+              group="pb"
+              format={(val) => (val === "true" ? "yes" : "no")}
             />
-            <ButtonGroup text="words" icon="fa-font" group="words" />
-            <ButtonGroup text="time" icon="fa-clock" group="time" />
-            <ButtonGroup text="punctuation" icon="fa-at" group="punctuation" />
-            <ButtonGroup text="numbers" icon="fa-hashtag" group="numbers" />
-
-            <Show when={tags().length > 0}>
-              <Dropdown
-                icon="fa-tag"
-                text="tags"
-                group="tags"
-                format={(tag) =>
-                  tag === "none"
-                    ? "no tag"
-                    : (tags().find((it) => it._id === tag)?.name ?? tag)
-                }
-              />
-            </Show>
-            <Dropdown
-              icon="fa-gamepad"
-              text="funbox"
-              group="funbox"
-              class={cn("", {
-                "col-span-2": tags().length === 0,
-              })}
-              format={(val) =>
-                val === "none" ? "no funbox" : replaceUnderscoresWithSpaces(val)
-              }
-            />
-            <Dropdown
-              icon="fa-globe-americas"
-              text="language"
-              group="language"
-              class="col-span-2"
-              format={getLanguageDisplayString}
-            />
+            <ButtonGroup text="time" icon="ph:clock-bold" group="time" />
+            <For each={SETTING_KEYS}>
+              {(key) => (
+                <ButtonGroup
+                  text={SETTING_HEADINGS[key]}
+                  icon={SETTING_ICONS[key]}
+                  group={key}
+                  format={(val) => settingLabel(key, val)}
+                />
+              )}
+            </For>
           </div>
         </AnimeShow>
       </div>
@@ -365,6 +291,12 @@ export function Filters(props: {
   );
 }
 
+/** AC-074: `all` resets every group to "everything selected". */
+function allFilters(): ResultFilters {
+  return structuredClone(defaultResultFilters);
+}
+
+/** AC-077: deselect everything except the date group. */
 function noFilters(): ResultFilters {
   const filters = structuredClone(defaultResultFilters);
   Object.entries(filters)
@@ -377,89 +309,28 @@ function noFilters(): ResultFilters {
   return filters;
 }
 
-function fromCurrentSettings(tags: TagItem[]): ResultFilters {
+/**
+ * AC-074: match the settings bar — each of the seven setting groups narrowed to
+ * the value currently selected, `time` to the current duration, `pb` to both
+ * and `date` to `all`.
+ */
+function fromCurrentSettings(): ResultFilters {
   const filters = noFilters();
 
-  filters.pb.no = true;
-  filters.pb.yes = true;
+  filters.pb.true = true;
+  filters.pb.false = true;
 
-  filters.difficulty[getConfig.difficulty] = true;
-  filters.mode[getConfig.mode] = true;
-  if (getConfig.mode === "time") {
-    if ([15, 30, 60, 120].includes(getConfig.time)) {
-      const configTime = `${getConfig.time}` as keyof typeof filters.time;
-      filters.time[configTime] = true;
-    } else {
-      filters.time.custom = true;
-    }
-  } else if (getConfig.mode === "words") {
-    if ([10, 25, 50, 100, 200].includes(getConfig.words)) {
-      const configWords = `${getConfig.words}` as keyof typeof filters.words;
-      filters.words[configWords] = true;
-    } else {
-      filters.words.custom = true;
-    }
-  } else if (getConfig.mode === "quote") {
-    const filterName: ResultFiltersGroupItem<"quoteLength">[] = [
-      "short",
-      "medium",
-      "long",
-      "thicc",
-    ];
-    filterName.forEach((ql, index) => {
-      if (getConfig.quoteLength.includes(index as QuoteLength)) {
-        filters.quoteLength[ql] = true;
-      } else {
-        filters.quoteLength[ql] = false;
-      }
-    });
-  }
-  if (getConfig.punctuation) {
-    filters.punctuation.on = true;
-  } else {
-    filters.punctuation.off = true;
-  }
-  if (getConfig.numbers) {
-    filters.numbers.on = true;
-  } else {
-    filters.numbers.off = true;
-  }
-  if (getConfig.mode === "quote" && /english.*/.test(getConfig.language)) {
-    filters.language["english"] = true;
-  } else {
-    filters.language[getConfig.language] = true;
-  }
+  filters.time[`${getConfig.time}`] = true;
 
-  if (getConfig.funbox.length === 0) {
-    filters.funbox["none"] = true;
-  } else {
-    for (const f of getConfig.funbox) {
-      filters.funbox[f] = true;
-    }
-  }
-
-  filters.tags["none"] = true;
-
-  tags.forEach((tag) => {
-    if (tag.active) {
-      filters.tags["none"] = false;
-      filters.tags[tag._id] = true;
-    }
-  });
+  filters.addition[getConfig.addition] = true;
+  filters.multiplication[getConfig.multiplication] = true;
+  filters.division[getConfig.division] = true;
+  filters.fractionAddition[getConfig.fractionAddition] = true;
+  filters.fractionMultiplication[`${getConfig.fractionMultiplication}`] = true;
+  filters.decimals[`${getConfig.decimals}`] = true;
+  filters.negatives[`${getConfig.negatives}`] = true;
 
   filters.date.all = true;
 
   return filters;
-}
-
-function fromDefaultSettings(tags: TagItem[]): ResultFilters {
-  const tagFilters: Record<string, boolean> = {};
-  tagFilters["none"] = true;
-  tags.forEach((tag) => {
-    tagFilters[tag._id] = true;
-  });
-  return {
-    ...defaultResultFilters,
-    tags: tagFilters,
-  };
 }

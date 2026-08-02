@@ -5,7 +5,7 @@ import { PageName } from "../../../pages/page";
 import { getUserProfile } from "../../../queries/profile";
 import { getActivePage, getSelectedProfileName } from "../../../states/core";
 import AsyncContent from "../../common/AsyncContent";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 import { Page } from "../../common/Page";
 import { UserProfile } from "./UserProfile";
 
@@ -28,7 +28,7 @@ export function ProfilePage(): JSXElement {
         </AsyncContent>
         <Show when={profileQuery.isError}>
           <div class="flex items-baseline gap-2 text-error">
-            <Fa icon="fa-times" />
+            <Icon icon="ph:x-bold" />
             <span>User {getSelectedProfileName()} not found</span>
           </div>
         </Show>

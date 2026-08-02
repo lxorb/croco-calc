@@ -6,7 +6,7 @@ export const queryClient = new QueryClient();
 
 createEffectOn(isAuthenticated, () => {
   //reset user related queries and collections whenever the state changes.
-  //for legacy access we initialize some user-bound collections without a user being present (e.g. tags, presets).
-  //to avoid empty collections after login, reset the queries on every state change not just logout
+  //some user-bound collections initialize before a user is present, so reset on
+  //every state change and not just on logout, or they stay empty after login.
   void queryClient.resetQueries({ queryKey: ["user"] });
 });

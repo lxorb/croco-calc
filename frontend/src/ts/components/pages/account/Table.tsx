@@ -1,28 +1,38 @@
-import { Difficulty } from "@croco-calc/schemas/configs";
 import { Mode } from "@croco-calc/schemas/shared";
 import { createColumnHelper } from "@tanstack/solid-table";
 import { format as dateFormat } from "date-fns/format";
-import { Accessor, createMemo, createSignal, JSXElement, Show } from "solid-js";
+import {
+  Accessor,
+  createMemo,
+  createSignal,
+  For,
+  JSXElement,
+  Show,
+} from "solid-js";
 
-import { type TagItem, useTagsLiveQuery } from "../../../collections/tags";
 import { SnapshotResult } from "../../../constants/default-snapshot";
 import { getFormatting } from "../../../states/core";
-import { showEditResultTagsModal } from "../../../states/edit-result-tags";
 import { showModal } from "../../../states/modals";
-import { showNoticeNotification } from "../../../states/notifications";
 import { cn } from "../../../utils/cn";
 import { Formatting } from "../../../utils/format";
-import { replaceUnderscoresWithSpaces } from "../../../utils/strings";
 import { Button } from "../../common/Button";
-import { Fa, FaProps } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 import { DataTable, DataTableColumnDef } from "../../ui/table/DataTable";
 import { MiniResultChart } from "./MiniResultChart";
+import { enabledSettings, SETTING_ICONS, settingBalloon } from "./utils";
 
 type Sorting = {
   field: keyof SnapshotResult<Mode>;
   direction: "asc" | "desc";
 };
 
+/**
+ * AC-101 — the results table has exactly eight columns:
+ * `isPb`, `score`, `tpm`, `acc`, `tasks`, `mode2`, `info`, `timestamp`.
+ * monkeytype's `rawWpm`, `consistency`, `charStats`, `mode` and `tags` columns
+ * are gone (AC-007, AC-016, master C5, C15) and `wpm` becomes `score`
+ * (master C40).
+ */
 export function Table<M extends Mode>(props: {
   data: SnapshotResult<M>[];
   onSortingChange: (sorting: Sorting) => void;
@@ -32,12 +42,9 @@ export function Table<M extends Mode>(props: {
     undefined,
   );
 
-  const tags = useTagsLiveQuery();
-
   const columns = createMemo(() =>
     getColumns<M>({
       format: getFormatting(),
-      tags: tags(),
       onMiniResultChartSelected: (id) => {
         setSelectedResult(id);
         if (id !== undefined) showModal("MiniResultChartModal");
@@ -63,8 +70,6 @@ export function Table<M extends Mode>(props: {
           }
         }}
         class={cn("table-auto", "text-xs md:text-sm lg:text-base")}
-        // headerCellClass="p-1"
-        // bodyCellClass="p-1"
         data={props.data}
         columns={columns()}
         fallback=<span>No data found. Check your filters.</span>
@@ -83,11 +88,9 @@ export function Table<M extends Mode>(props: {
 
 function getColumns<M extends Mode>({
   format,
-  tags,
   onMiniResultChartSelected,
 }: {
   format: Formatting;
-  tags: TagItem[];
   onMiniResultChartSelected(val: string): void;
 }): DataTableColumnDef<SnapshotResult<M>>[] {
   const defineColumn = createColumnHelper<SnapshotResult<M>>().accessor;
@@ -96,9 +99,9 @@ function getColumns<M extends Mode>({
       header: "",
       cell: (info) =>
         info.getValue() ? (
-          <Fa icon="fa-crown" />
+          <Icon icon="ph:crown-bold" />
         ) : (
-          <Fa icon="fa-crown" class="opacity-0" />
+          <Icon icon="ph:crown-bold" class="opacity-0" />
         ),
       enableSorting: false,
       meta: {
@@ -107,15 +110,15 @@ function getColumns<M extends Mode>({
         },
       },
     }),
-    defineColumn("wpm", {
-      header: format.typingSpeedUnit,
-      cell: (info) =>
-        format.typingSpeed(info.getValue(), { showDecimalPlaces: true }),
+    /** AC-101 row 2 — the headline metric, a signed integer (master C40). */
+    defineColumn("score", {
+      header: "score",
+      cell: (info) => format.decimals(info.getValue()),
     }),
-    defineColumn("rawWpm", {
-      header: "raw",
+    defineColumn("tpm", {
+      header: "tpm",
       cell: (info) =>
-        format.typingSpeed(info.getValue(), { showDecimalPlaces: true }),
+        format.decimals(info.getValue(), { showDecimalPlaces: true }),
       meta: {
         breakpoint: "xs",
       },
@@ -128,27 +131,23 @@ function getColumns<M extends Mode>({
         breakpoint: "xs",
       },
     }),
-    defineColumn("consistency", {
-      header: "consistency",
-      cell: (info) =>
-        format.percentage(info.getValue(), { showDecimalPlaces: true }),
-      meta: {
-        breakpoint: "xs",
-      },
-    }),
-    defineColumn("charStats", {
-      header: "chars",
-      cell: (info) =>
-        `${info.row.original.charStats[0]}/${info.row.original.charStats[1]}/${info.row.original.charStats[2]}/${info.row.original.charStats[3]}`,
+    /** AC-101 row 5 — `{correct}/{wrong}`, replacing monkeytype's `charStats`. */
+    defineColumn("tasks", {
+      header: "correct/wrong",
+      enableSorting: false,
+      cell: (info) => `${info.row.original.correct}/${info.row.original.wrong}`,
       meta: {
         breakpoint: "lg",
       },
     }),
-    defineColumn("mode", {
-      header: "mode",
+    /**
+     * AC-101 row 6 — croco calc has exactly one mode, so the column prints the
+     * test length instead of monkeytype's `{mode} {mode2}` pair (AC-008).
+     */
+    defineColumn("mode2", {
+      header: "time",
       enableSorting: false,
-      cell: (info) =>
-        `${info.getValue()} ${info.row.original.mode2 === "custom" ? "" : info.row.original.mode2}`,
+      cell: (info) => `${info.getValue()} min`,
       meta: {
         breakpoint: "md",
       },
@@ -157,51 +156,25 @@ function getColumns<M extends Mode>({
       header: "info",
       enableSorting: false,
       cell: (info) => {
-        const hasChart =
-          info.row.original.chartData !== "toolong" &&
-          info.row.original.testDuration <= 122;
+        const hasChart = info.row.original.chartData !== "toolong";
 
         return (
           <div class="flex gap-0.5">
-            <span aria-label={info.row.original.language} data-balloon-pos="up">
-              <Fa icon="fa-globe-americas" fixedWidth={true} />
-            </span>
-            <span
-              aria-label={info.row.original.difficulty}
-              data-balloon-pos="up"
-            >
-              <Fa {...difficultyIcon(info.row.original.difficulty)} />
-            </span>
-            <Show when={info.row.original.punctuation}>
-              <span aria-label="punctuation" data-balloon-pos="up">
-                <Fa icon="fa-at" fixedWidth={true} />
-              </span>
-            </Show>
-            <Show when={info.row.original.numbers}>
-              <span aria-label="numbers" data-balloon-pos="up">
-                <Fa icon="fa-hashtag" fixedWidth={true} />
-              </span>
-            </Show>
-            <Show when={info.row.original.blindMode}>
-              <span aria-label="blind mode" data-balloon-pos="up">
-                <Fa icon="fa-eye-slash" fixedWidth={true} />
-              </span>
-            </Show>
-            <Show when={info.row.original.lazyMode}>
-              <span aria-label="lazy mode" data-balloon-pos="up">
-                <Fa icon="fa-couch" fixedWidth={true} />
-              </span>
-            </Show>
-            <Show when={(info.row.original.funbox ?? []).length > 0}>
-              <span
-                aria-label={info.row.original.funbox
-                  .map(replaceUnderscoresWithSpaces)
-                  .join(", ")}
-                data-balloon-pos="up"
-              >
-                <Fa icon="fa-gamepad" fixedWidth={true} />
-              </span>
-            </Show>
+            {/*
+              AC-102: one fixed-width icon per **enabled** setting, with the
+              balloon built by mapping the stored value through the shared
+              label table — never by string-matching a display literal.
+            */}
+            <For each={enabledSettings(info.row.original.settings)}>
+              {({ key, value }) => (
+                <span
+                  aria-label={settingBalloon(key, value)}
+                  data-balloon-pos="up"
+                >
+                  <Icon icon={SETTING_ICONS[key]} fixedWidth={true} />
+                </span>
+              )}
+            </For>
             <span
               data-balloon-pos="up"
               aria-label={
@@ -214,60 +187,13 @@ function getColumns<M extends Mode>({
                 disabled={!hasChart}
                 class="p-0 text-inherit"
                 variant="text"
-                fa={{ icon: "fa-chart-line", fixedWidth: true }}
+                icon={{ icon: "ph:chart-line-bold", fixedWidth: true }}
                 onClick={() => {
                   onMiniResultChartSelected(info.getValue());
                 }}
               />
             </span>
           </div>
-        );
-      },
-      meta: {
-        breakpoint: "sm",
-      },
-    }),
-    defineColumn("tags", {
-      header: "tags",
-      enableSorting: false,
-      cell: (info) => {
-        const hasTags = () => info.getValue().length > 0;
-        return (
-          <Button
-            variant="text"
-            class={
-              hasTags() ? "[--themable-button-text:var(--text-color)]" : ""
-            }
-            fa={{
-              icon: info.getValue().length > 1 ? "fa-tags" : "fa-tag",
-              fixedWidth: true,
-            }}
-            balloon={{
-              text: hasTags()
-                ? info
-                    .getValue()
-                    .map(
-                      (it) =>
-                        tags.find((tag) => tag._id === it)?.name ??
-                        "unknown tag",
-                    )
-                    .join(", ")
-                : "no tags",
-            }}
-            onClick={() => {
-              if (tags.length === 0) {
-                showNoticeNotification(
-                  "You have no tags. You can create one in the tags section of the settings page.",
-                );
-                return;
-              }
-
-              showEditResultTagsModal({
-                _id: info.row.original._id,
-                tags: info.getValue(),
-              });
-            }}
-          />
         );
       },
       meta: {
@@ -289,14 +215,4 @@ function getColumns<M extends Mode>({
     }),
   ];
   return columns;
-}
-
-function difficultyIcon(difficulty: Difficulty): FaProps {
-  if (difficulty === "expert") {
-    return { variant: "solid", icon: "fa-star-half-alt", fixedWidth: true };
-  } else if (difficulty === "master") {
-    return { variant: "solid", icon: "fa-star", fixedWidth: true };
-  } else {
-    return { variant: "regular", icon: "fa-star", fixedWidth: true };
-  }
 }

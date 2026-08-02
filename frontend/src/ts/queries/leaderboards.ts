@@ -17,7 +17,6 @@ const queryKeys = {
     {
       mode: options.mode,
       mode2: options.mode2,
-      language: options.language,
       friendsOnly: options.friendsOnly,
       previous: options.previous,
     },
@@ -58,7 +57,6 @@ export const getLeaderboardQueryOptions = (
           ...baseQuery,
           mode: options.mode,
           mode2: options.mode2,
-          language: options.language,
         };
 
         if (options.type === "allTime") {
@@ -114,7 +112,6 @@ export const getRankQueryOptions = (options: Selection) =>
         const baseQuery: GetLeaderboardRankQuery = {
           mode: options.mode,
           mode2: options.mode2,
-          language: options.language,
           friendsOnly: options.friendsOnly ? true : undefined,
         };
         if (options.type === "allTime") {

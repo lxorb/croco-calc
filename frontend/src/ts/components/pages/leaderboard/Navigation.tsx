@@ -30,7 +30,7 @@ export function Navigation(props: {
       </Show>
       <Button
         onClick={() => props.onPageChange(0)}
-        fa={{ icon: "fa-crown", fixedWidth: true }}
+        icon={{ icon: "ph:crown-bold", fixedWidth: true }}
         disabled={props.currentPage === 0}
         class={buttonClass}
       />
@@ -40,7 +40,7 @@ export function Navigation(props: {
             props.onPageChange(props.userPage as number);
             props.onScrollToUser(true);
           }}
-          fa={{ icon: "fa-user", fixedWidth: true }}
+          icon={{ icon: "ph:user-bold", fixedWidth: true }}
           disabled={
             props.userPage === undefined || props.currentPage === props.userPage
           }
@@ -52,7 +52,7 @@ export function Navigation(props: {
           const lastPage = props.lastPage;
           props.onPageChange((old) => Math.max(0, Math.min(old, lastPage) - 1));
         }}
-        fa={{ icon: "fa-chevron-left", fixedWidth: true }}
+        icon={{ icon: "ph:caret-left-bold", fixedWidth: true }}
         disabled={props.currentPage === 0}
         class={buttonClass}
       />
@@ -80,7 +80,7 @@ export function Navigation(props: {
             },
           })
         }
-        fa={{ icon: "fa-hashtag", fixedWidth: true }}
+        icon={{ icon: "ph:hash-bold", fixedWidth: true }}
         class={buttonClass}
         disabled={props.lastPage <= 1}
       >
@@ -89,7 +89,7 @@ export function Navigation(props: {
       </Button>
       <Button
         onClick={() => props.onPageChange((old) => old + 1)}
-        fa={{ icon: "fa-chevron-right", fixedWidth: true }}
+        icon={{ icon: "ph:caret-right-bold", fixedWidth: true }}
         disabled={props.currentPage + 1 >= props.lastPage}
         class={buttonClass}
       />

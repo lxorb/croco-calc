@@ -112,8 +112,8 @@ export function Register(): JSXElement {
     <div class="grid w-full grid-cols-1 justify-center gap-2 sm:w-80">
       <H3
         text="register"
-        fa={{
-          icon: "fa-user-plus",
+        icon={{
+          icon: "ph:user-plus-bold",
         }}
         class="p-0"
       />
@@ -243,7 +243,7 @@ export function Register(): JSXElement {
         />
         <SubmitButton
           form={form}
-          fa={{ icon: "fa-user-plus" }}
+          icon={{ icon: "ph:user-plus-bold" }}
           text="sign up"
           disabled={!getLoginPageInputsEnabled()}
         />

@@ -21,8 +21,6 @@ import { createMemo } from "solid-js";
 import { z, ZodString } from "zod";
 
 import Ape from "./ape";
-import { waitForPresetsReady } from "./collections/presets";
-import { waitForTagsReady } from "./collections/tags";
 import { updateFromServer as updateConfigFromServer } from "./config/remote";
 import * as DB from "./db";
 import { authEvent } from "./events/auth";
@@ -37,7 +35,6 @@ import {
 } from "./firebase";
 import { createSignalWithSetters } from "./hooks/createSignalWithSetters";
 import { createEffectOn } from "./hooks/effects";
-import * as Sentry from "./sentry";
 import { getUserId, isAuthenticated, setUserId } from "./states/core";
 import { hideLoaderBar, showLoaderBar } from "./states/loader-bar";
 import {
@@ -45,7 +42,6 @@ import {
   showNoticeNotification,
   showSuccessNotification,
 } from "./states/notifications";
-import { FaObject } from "./types/font-awesome";
 import { isDevEnvironment } from "./utils/env";
 import { createErrorMessage } from "./utils/error";
 import { SnapshotInitError } from "./utils/snapshot-init-error";
@@ -53,31 +49,33 @@ import { OneOf } from "./utils/types";
 
 type AuthMethodInfo = {
   display: string;
-  fa: FaObject;
+  /** iconify id (AC-019, AC-020) */
+  icon: string;
 } & OneOf<{
   provider: AuthProvider;
   providerId: string;
 }>;
 
 /**
- * auth methods, keep order from most to least preferred.
- * This is used for reauthenticate
+ * AC-169: all three authentication methods ship in v1 — none is stubbed or
+ * flagged off. Keep the order from most to least preferred; `reauthenticate`
+ * walks it top-down.
  */
 const authMethods = {
   password: {
     display: "Password",
     providerId: "password",
-    fa: { icon: "fa-lock" },
+    icon: "ph:lock-bold",
   },
   github: {
     display: "GitHub",
     provider: new GithubAuthProvider(),
-    fa: { variant: "brand", icon: "fa-github" },
+    icon: "ph:github-logo-bold",
   },
   google: {
     display: "Google",
     provider: new GoogleAuthProvider(),
-    fa: { variant: "brand", icon: "fa-google" },
+    icon: "ph:google-logo-bold",
   },
 } as const satisfies Record<string, AuthMethodInfo>;
 
@@ -165,17 +163,12 @@ async function getDataAndInit(): Promise<boolean> {
   try {
     console.log("getting account data");
     const snapshot = await DB.initSnapshot();
-    //TODO: preload collections for now, remove when __nonReactive is removed from collections
-    await waitForPresetsReady();
-    await waitForTagsReady();
 
     if (snapshot === false) {
       throw new Error(
         "Snapshot didn't initialize due to lacking authentication even though user is authenticated",
       );
     }
-
-    void Sentry.setUser(snapshot.uid, snapshot.name);
 
     await updateConfigFromServer();
     return true;
@@ -230,10 +223,6 @@ export async function onAuthStateChanged(
       setUserId(null);
       DB.setSnapshot(undefined);
     }
-  }
-
-  if (!authInitialisedAndConnected || !user) {
-    void Sentry.clearUser();
   }
 
   authEvent.dispatch({
@@ -611,8 +600,16 @@ export function getAuthMethodDisplay(authMethod: AuthMethod): string {
   return authMethods[authMethod].display;
 }
 
-export function getAuthMethodIcon(authMethod: AuthMethod): FaObject {
-  return authMethods[authMethod].fa;
+export function getAuthMethodIcon(authMethod: AuthMethod): { icon: string } {
+  return { icon: authMethods[authMethod].icon };
+}
+
+/** AC-172: the last remaining authentication method can never be removed. */
+export function canRemoveAuthMethodReactive(authMethod: AuthMethod): boolean {
+  return (
+    isUsingAuthenticationReactive(authMethod) &&
+    hasAdditionalAuthMethodsReactive(authMethod)
+  );
 }
 
 function getProviderId(authMethod: AuthMethod): string {

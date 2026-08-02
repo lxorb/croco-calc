@@ -120,13 +120,8 @@ export function showResetPersonalBestsModal(): void {
         };
       }
 
-      snapshot.personalBests = {
-        time: {},
-        words: {},
-        quote: {},
-        zen: {},
-        custom: {},
-      };
+      // AC-064: personal bests key on `time` alone — croco calc has one mode.
+      snapshot.personalBests = { time: {} };
 
       return {
         status: "success",

@@ -8,13 +8,24 @@ import {
 import { getFormatting } from "../../../states/core";
 import { secondsToString } from "../../../utils/date-and-time";
 import AsyncContent from "../../common/AsyncContent";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 
+/**
+ * AC-092 … AC-097 — the totals block.
+ *
+ * The headline reads `tasks answered` over the exact task count (monkeytype's
+ * `estimated words typed` was a wpm-derived estimate) and the grid is the
+ * fifteen cells of AC-093: the score / tpm / acc triples replace monkeytype's
+ * wpm / raw / consistency ones, and a `total correct` / `total wrong` /
+ * `total tasks` row is added.
+ */
 export function TestStats(props: {
   queryState: Accessor<ResultsQueryState | undefined>;
 }): JSXElement {
   const format = getFormatting;
-  const formatWpm = (val: number): string => format().typingSpeed(val);
+  const formatScore = (val: number): string => format().decimals(val);
+  const formatTpm = (val: number): string =>
+    format().decimals(val, { showDecimalPlaces: true });
   const formatPercentage = (val: number): string => format().percentage(val);
 
   const statsQuery = useResultStatsLiveQuery(() => props.queryState());
@@ -41,9 +52,9 @@ export function TestStats(props: {
             return (
               <>
                 <div class="flex items-center justify-center text-sub">
-                  estimated words typed{" "}
+                  tasks answered{" "}
                   <span class="p-5 text-5xl text-text lg:text-5xl">
-                    {stats.words}
+                    {stats.tasks}
                   </span>
                 </div>
                 <div class="grid grid-cols-3 gap-4">
@@ -57,10 +68,10 @@ export function TestStats(props: {
                       <span
                         data-balloon-length="xlarge"
                         data-balloon-pos="up"
-                        aria-label="Due to the increasing number of results in the database, you can now only see your last 1000 results in detail. Total time spent typing, started and completed tests stats will still be up to date at the top of the page, above the filters."
+                        aria-label="Due to the increasing number of results in the database, you can now only see your last 1000 results in detail. Total time spent, started and completed tests stats will still be up to date at the top of the page, above the filters."
                         role="alertdialog"
                       >
-                        <Fa icon="fa-question-circle" />
+                        <Icon icon="ph:question-bold" />
                       </span>
                     </div>
                     <div class="text-2xl leading-[1.1] md:text-3xl lg:text-5xl">
@@ -83,76 +94,64 @@ export function TestStats(props: {
                   </div>
 
                   <Stat
-                    header="time typing"
-                    value={stats.timeTyping}
+                    header="time spent"
+                    value={stats.timeSpent}
                     formatter={(val) =>
                       secondsToString(Math.round(val), true, true)
                     }
                   />
 
                   <Stat
-                    header={`highest ${format().typingSpeedUnit}`}
-                    value={stats.maxWpm}
-                    formatter={formatWpm}
+                    header="highest score"
+                    value={stats.maxScore}
+                    formatter={formatScore}
                   />
                   <Stat
-                    header={`average ${format().typingSpeedUnit}`}
-                    value={stats.avgWpm}
-                    formatter={formatWpm}
+                    header="average score"
+                    value={stats.avgScore}
+                    formatter={formatScore}
                   />
                   <Stat
-                    header={`average ${format().typingSpeedUnit} (last 10 tests)`}
-                    value={last10.avgWpm}
-                    formatter={formatWpm}
-                  />
-
-                  <Stat
-                    header={`highest raw ${format().typingSpeedUnit}`}
-                    value={stats.maxRaw}
-                    formatter={formatWpm}
-                  />
-                  <Stat
-                    header={`average raw ${format().typingSpeedUnit}`}
-                    value={stats.avgRaw}
-                    formatter={formatWpm}
-                  />
-                  <Stat
-                    header={`average raw ${format().typingSpeedUnit} (last 10 tests)`}
-                    value={last10.avgRaw}
-                    formatter={formatWpm}
+                    header="average score (last 10 tests)"
+                    value={last10.avgScore}
+                    formatter={formatScore}
                   />
 
                   <Stat
-                    header={`highest acc`}
+                    header="highest tpm"
+                    value={stats.maxTpm}
+                    formatter={formatTpm}
+                  />
+                  <Stat
+                    header="average tpm"
+                    value={stats.avgTpm}
+                    formatter={formatTpm}
+                  />
+                  <Stat
+                    header="average tpm (last 10 tests)"
+                    value={last10.avgTpm}
+                    formatter={formatTpm}
+                  />
+
+                  <Stat
+                    header="highest acc"
                     value={stats.maxAcc}
                     formatter={formatPercentage}
                   />
                   <Stat
-                    header={`average acc`}
+                    header="average acc"
                     value={stats.avgAcc}
                     formatter={formatPercentage}
                   />
                   <Stat
-                    header={`average acc (last 10 tests)`}
+                    header="average acc (last 10 tests)"
                     value={last10.avgAcc}
                     formatter={formatPercentage}
                   />
 
-                  <Stat
-                    header={`highest consistency`}
-                    value={stats.maxConsistency}
-                    formatter={formatPercentage}
-                  />
-                  <Stat
-                    header={`average consistency`}
-                    value={stats.avgConsistency}
-                    formatter={formatPercentage}
-                  />
-                  <Stat
-                    header={`average consistency (last 10 tests)`}
-                    value={last10.avgConsistency}
-                    formatter={formatPercentage}
-                  />
+                  <Stat header="total correct" value={stats.correct} />
+                  <Stat header="total wrong" value={stats.wrong} />
+                  <Stat header="total tasks" value={stats.tasks} />
                 </div>
               </>
             );

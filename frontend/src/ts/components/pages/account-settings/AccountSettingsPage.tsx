@@ -9,16 +9,15 @@ import {
 import { Button } from "../../common/Button";
 import { Page } from "../../common/Page";
 import { AccountTab } from "./AccountTab";
-import { ApeKeysTab } from "./ApeKeysTab";
 import { AuthenticationTab } from "./AuthenticationTab";
 import { BlockedUsersTab } from "./BlockedUsersTab";
 import { DangerZoneTab } from "./DangerZoneTab";
 
+/** AC-162 / AC-163: exactly four tabs — the `apeKeys` entry is gone entirely. */
 const tabContent: Record<AccountSettingsTab, () => JSXElement> = {
   account: () => <AccountTab />,
   authentication: () => <AuthenticationTab />,
   blockedUsers: () => <BlockedUsersTab />,
-  apeKeys: () => <ApeKeysTab />,
   dangerZone: () => <DangerZoneTab />,
 };
 
@@ -45,7 +44,7 @@ function Sidebar() {
           <Button
             text={tab.text}
             variant="text"
-            fa={{ icon: tab.icon }}
+            icon={{ icon: tab.icon }}
             active={getCurrentTab() === key}
             class="[--themable-button-active:var(--themable-button-text)]"
             onClick={() => setCurrentTab(key as AccountSettingsTab)}

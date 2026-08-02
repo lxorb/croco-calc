@@ -11,27 +11,45 @@ import { getTheme } from "../../../states/theme";
 import { blendTwoHexColors } from "../../../utils/colors";
 import { Formatting } from "../../../utils/format";
 import { findLineByLeastSquares } from "../../../utils/numbers";
-import { TypingSpeedUnitSettings } from "../../../utils/typing-speed-units";
 import { Button } from "../../common/Button";
 import { ChartJs } from "../../common/ChartJs";
+import { enabledSettings, settingBalloon } from "./utils";
 
 export type HistoryChartClickEvent = {
   index: number;
   _id: string;
 };
+
+/**
+ * AC-085: five toggles, persisted in `config.accountChart`. Index 4 is the
+ * croco-calc-only `Per minute` switch (AC-086) — `score` scales with test
+ * length, so a chart mixing 1- and 8-minute runs is unreadable without it.
+ */
+const TOGGLE = {
+  score: 0,
+  accuracy: 1,
+  avg10: 2,
+  avg100: 3,
+  perMinute: 4,
+} as const;
+
 export function HistoryChart(props: {
   results: SnapshotResult<Mode>[];
   beginAtZero: boolean;
-  typingSpeedUnit: TypingSpeedUnitSettings;
   format: Formatting;
   onClick?: (event: HistoryChartClickEvent) => void;
 }): JSXElement {
   const formatAccuracy = (accuracy: number): string =>
     props.format.accuracy(accuracy, { showDecimalPlaces: true });
-  const formatSpeed = (wpm: number): string =>
-    props.format.typingSpeed(wpm, { showDecimalPlaces: true });
-  const wpm = createMemo(() =>
-    props.results.map((it) => props.typingSpeedUnit.fromWpm(it.wpm)),
+  const formatNumber = (value: number): string =>
+    props.format.decimals(value, { showDecimalPlaces: true });
+
+  const isPerMinute = (): boolean =>
+    getConfig.accountChart[TOGGLE.perMinute] === "on";
+
+  //AC-086: the score series switches between the absolute and per-minute value.
+  const score = createMemo(() =>
+    props.results.map((it) => (isPerMinute() ? it.spm : it.score)),
   );
   const acc = createMemo(() => props.results.map((it) => it.acc));
 
@@ -47,7 +65,7 @@ export function HistoryChart(props: {
     val.filter((it) => it).length;
 
   const datasetOptions = createMemo(() => {
-    const wpmColors = [
+    const scoreColors = [
       getTheme().main,
       blendTwoHexColors(getTheme().bg, getTheme().main, 0.4),
       blendTwoHexColors(getTheme().bg, getTheme().main, 0.2),
@@ -58,36 +76,36 @@ export function HistoryChart(props: {
       blendTwoHexColors(getTheme().bg, getTheme().sub, 0.2),
     ];
 
-    const isSpeed = getConfig.accountChart[0] === "on";
-    const isAcc = getConfig.accountChart[1] === "on";
-    const isAvg10 = getConfig.accountChart[2] === "on";
-    const isAvg100 = getConfig.accountChart[3] === "on";
+    const isScore = getConfig.accountChart[TOGGLE.score] === "on";
+    const isAcc = getConfig.accountChart[TOGGLE.accuracy] === "on";
+    const isAvg10 = getConfig.accountChart[TOGGLE.avg10] === "on";
+    const isAvg100 = getConfig.accountChart[TOGGLE.avg100] === "on";
 
     return {
-      wpm: {
-        yAxisID: "wpm",
+      score: {
+        yAxisID: "score",
         fill: false,
         borderWidth: 0,
-        hidden: !isSpeed,
-        pointBackgroundColor: wpmColors[colorIndex(isAvg10, isAvg100)],
+        hidden: !isScore,
+        pointBackgroundColor: scoreColors[colorIndex(isAvg10, isAvg100)],
         order: 3,
       },
-      wpmAvg10: {
-        yAxisID: "wpm",
+      scoreAvg10: {
+        yAxisID: "score",
         fill: false,
         pointRadius: 0,
         pointHoverRadius: 0,
-        hidden: !isSpeed || !isAvg10,
-        borderColor: wpmColors[colorIndex(isAvg10, isAvg100) - 1],
+        hidden: !isScore || !isAvg10,
+        borderColor: scoreColors[colorIndex(isAvg10, isAvg100) - 1],
         order: 2,
       },
-      wpmAvg100: {
-        yAxisID: "wpm",
+      scoreAvg100: {
+        yAxisID: "score",
         fill: false,
         pointRadius: 0,
         pointHoverRadius: 0,
-        hidden: !isSpeed || !isAvg100,
-        borderColor: wpmColors[0],
+        hidden: !isScore || !isAvg100,
+        borderColor: scoreColors[0],
         order: 1,
       },
       acc: {
@@ -119,13 +137,13 @@ export function HistoryChart(props: {
         order: 1,
       },
       pb: {
-        yAxisID: "wpm",
+        yAxisID: "score",
         fill: false,
         stepped: true,
         pointRadius: 0,
         pointHoverRadius: 0,
         order: 4,
-        hidden: !isSpeed,
+        hidden: !isScore,
         borderColor: blendTwoHexColors(getTheme().bg, getTheme().text, 0.2),
       },
     };
@@ -141,11 +159,11 @@ export function HistoryChart(props: {
             labels: props.results.map((_, i) => i),
             datasets: [
               {
-                data: wpm(),
-                ...datasetOptions().wpm,
+                data: score(),
+                ...datasetOptions().score,
               },
               {
-                data: pb(wpm()),
+                data: pb(score()),
                 ...datasetOptions().pb,
               },
               {
@@ -153,16 +171,16 @@ export function HistoryChart(props: {
                 ...datasetOptions().acc,
               },
               {
-                data: movingAverage(wpm(), 10),
-                ...datasetOptions().wpmAvg10,
+                data: movingAverage(score(), 10),
+                ...datasetOptions().scoreAvg10,
               },
               {
                 data: movingAverage(acc(), 10),
                 ...datasetOptions().accAvg10,
               },
               {
-                data: movingAverage(wpm(), 100),
-                ...datasetOptions().wpmAvg100,
+                data: movingAverage(score(), 100),
+                ...datasetOptions().scoreAvg100,
               },
               {
                 data: movingAverage(acc(), 100),
@@ -171,12 +189,12 @@ export function HistoryChart(props: {
             ],
           }}
           options={{
-            // responsive: true,
             maintainAspectRatio: false,
             hover: {
               mode: "nearest",
               intersect: false,
             },
+            //AC-088: raise the clicked result so the table can scroll to it.
             onClick: (_, elements) => {
               const nearest = elements.find((it) => it.datasetIndex === 0);
               if (nearest === undefined) return;
@@ -191,31 +209,30 @@ export function HistoryChart(props: {
                 type: "linear",
                 reverse: true,
                 min: -1,
-                max: wpm().length,
+                max: score().length,
                 display: false,
                 grid: {
                   display: false,
                 },
               },
-              wpm: {
+              score: {
                 axis: "y",
                 type: "linear",
                 beginAtZero: props.beginAtZero,
-                ticks: {
-                  stepSize: props.typingSpeedUnit.historyStepSize,
-                },
                 display: true,
                 title: {
                   display: true,
-                  text: props.typingSpeedUnit.fullUnitString,
+                  //AC-086
+                  text: isPerMinute() ? "Score / min" : "Score",
                 },
-                position: "right",
+                position: "left",
               },
               acc: {
                 axis: "y",
                 beginAtZero: props.beginAtZero,
                 min:
-                  getConfig.accountChart[0] === "on" || acc().length === 0
+                  getConfig.accountChart[TOGGLE.score] === "on" ||
+                  acc().length === 0
                     ? 0
                     : Math.floor(Math.min(...acc()) / 5) * 5,
                 max: 100,
@@ -231,7 +248,7 @@ export function HistoryChart(props: {
                 grid: {
                   display: false,
                 },
-                position: "left",
+                position: "right",
               },
             },
 
@@ -263,6 +280,7 @@ export function HistoryChart(props: {
                     return "";
                   },
 
+                  //AC-087
                   beforeLabel: function (tooltipItem): string {
                     const result = props.results[tooltipItem.dataIndex];
                     if (result === undefined) return "unknown";
@@ -271,44 +289,31 @@ export function HistoryChart(props: {
                       return `error rate: ${formatAccuracy(100 - result.acc)}\nacc: ${formatAccuracy(result.acc)}`;
                     }
 
-                    let label =
-                      `${getConfig.typingSpeedUnit}: ${formatSpeed(result.wpm)}` +
-                      "\n" +
-                      `raw: ${formatSpeed(result.rawWpm)}` +
-                      "\n" +
-                      `acc: ${formatAccuracy(result.acc)}` +
-                      "\n\n" +
-                      `mode: ${result.mode} `;
+                    const settings = enabledSettings(result.settings)
+                      .map(({ key, value }) => settingBalloon(key, value))
+                      .join("\n");
 
-                    if (result.mode === "time") {
-                      label += result.mode2;
-                    } else if (result.mode === "words") {
-                      label += result.mode2;
-                    }
-
-                    let diff = result.difficulty ?? "normal";
-                    label += `\ndifficulty: ${diff}`;
-
-                    label +=
-                      "\n" +
-                      `punctuation: ${result.punctuation}` +
-                      "\n" +
-                      `language: ${result.language}` +
-                      `${result.isPb ? "\n\nnew personal best" : ""}` +
-                      "\n\n" +
+                    //AC-087: the duration is present whether or not `Per minute` is on.
+                    return [
+                      `score: ${formatNumber(result.score)}`,
+                      `tpm: ${formatNumber(result.tpm)}`,
+                      `acc: ${formatAccuracy(result.acc)}`,
+                      `correct/wrong: ${result.correct}/${result.wrong}`,
+                      "",
+                      `time: ${result.mode2} min`,
+                      settings,
+                      `${result.isPb ? "\nnew personal best\n" : ""}`,
                       `date: ${dateFormat(
                         new Date(result.timestamp),
                         "dd MMM yyyy HH:mm",
-                      )}`;
-
-                    return label;
+                      )}`,
+                    ].join("\n");
                   },
 
                   label: function (): string {
                     return "";
                   },
-                  afterLabel: function (_tooltip): string {
-                    //accountHistoryActiveIndex = tooltip.dataIndex;
+                  afterLabel: function (): string {
                     return "";
                   },
                 },
@@ -317,32 +322,39 @@ export function HistoryChart(props: {
           }}
         />
       </div>
+      {/* AC-085 / AC-089 */}
       <div class="grid grid-cols-1 items-center lg:grid-cols-[1fr_30rem]">
         <Trend results={props.results} />
-        <div class="grid grid-cols-4 gap-2 text-em-xs max-[475px]:grid-cols-2">
+        <div class="grid grid-cols-5 gap-2 text-em-xs max-[475px]:grid-cols-2">
           <Button
-            fa={{ icon: "fa-tachometer-alt", fixedWidth: true }}
-            text="Speed"
-            onClick={toggleAccountChart(0)}
-            active={getConfig.accountChart[0] === "on"}
+            icon={{ icon: "ph:gauge-bold", fixedWidth: true }}
+            text="Score"
+            onClick={toggleAccountChart(TOGGLE.score)}
+            active={getConfig.accountChart[TOGGLE.score] === "on"}
           />
           <Button
-            fa={{ icon: "fa-bullseye", fixedWidth: true }}
+            icon={{ icon: "ph:target-bold", fixedWidth: true }}
             text="Accuracy"
-            onClick={toggleAccountChart(1)}
-            active={getConfig.accountChart[1] === "on"}
+            onClick={toggleAccountChart(TOGGLE.accuracy)}
+            active={getConfig.accountChart[TOGGLE.accuracy] === "on"}
           />
           <Button
-            fa={{ icon: "fa-chart-line", fixedWidth: true }}
+            icon={{ icon: "ph:chart-line-bold", fixedWidth: true }}
             text="Avg of 10"
-            onClick={toggleAccountChart(2)}
-            active={getConfig.accountChart[2] === "on"}
+            onClick={toggleAccountChart(TOGGLE.avg10)}
+            active={getConfig.accountChart[TOGGLE.avg10] === "on"}
           />
           <Button
-            fa={{ icon: "fa-chart-line", fixedWidth: true }}
+            icon={{ icon: "ph:chart-line-bold", fixedWidth: true }}
             text="Avg of 100"
-            onClick={toggleAccountChart(3)}
-            active={getConfig.accountChart[3] === "on"}
+            onClick={toggleAccountChart(TOGGLE.avg100)}
+            active={getConfig.accountChart[TOGGLE.avg100] === "on"}
+          />
+          <Button
+            icon={{ icon: "ph:clock-bold", fixedWidth: true }}
+            text="Per minute"
+            onClick={toggleAccountChart(TOGGLE.perMinute)}
+            active={getConfig.accountChart[TOGGLE.perMinute] === "on"}
           />
         </div>
       </div>
@@ -350,24 +362,28 @@ export function HistoryChart(props: {
   );
 }
 
+/** AC-089: least-squares trend, hidden when it cannot be computed. */
 function Trend(props: { results: SnapshotResult<Mode>[] }): JSXElement {
   const format = getFormatting;
 
   const trend = createMemo(() => {
     const line = findLineByLeastSquares(
-      props.results.map((it) => it.wpm).reverse(),
+      props.results.map((it) => it.score).reverse(),
     );
     if (line === null) return undefined;
 
     const totalSecondsFiltered = props.results
-      .map((it) => it.timeTyping)
+      .map((it) => it.timeSpent)
       .reduce((acc, it) => acc + it, 0);
 
-    const wpmChange = line[1][1] - line[0][1];
-    const wpmChangePerHour = wpmChange * (3600 / totalSecondsFiltered);
-    const plus = wpmChangePerHour > 0 ? "+" : "";
+    if (totalSecondsFiltered === 0) return undefined;
 
-    return `Speed change per hour spent typing: ${plus}${format().typingSpeed(wpmChangePerHour, { showDecimalPlaces: true })} ${format().typingSpeedUnit}`;
+    const scoreChange = line[1][1] - line[0][1];
+    const scoreChangePerHour = scoreChange * (3600 / totalSecondsFiltered);
+    if (!Number.isFinite(scoreChangePerHour)) return undefined;
+    const plus = scoreChangePerHour > 0 ? "+" : "";
+
+    return `Score change per hour spent: ${plus}${format().decimals(scoreChangePerHour, { showDecimalPlaces: true })}`;
   });
 
   return (

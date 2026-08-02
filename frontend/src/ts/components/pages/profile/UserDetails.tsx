@@ -1,26 +1,17 @@
 import {
-  TypingStats as TypingStatsType,
+  SolveStats as SolveStatsType,
   UserProfile,
   UserProfileDetails,
 } from "@croco-calc/schemas/users";
-import {
-  isToday as dateIsToday,
-  isYesterday as dateIsYesterday,
-  getCurrentDayTimestamp,
-} from "@croco-calc/util/date-and-time";
-import { isSafeNumber } from "@croco-calc/util/numbers";
 import { differenceInDays } from "date-fns/differenceInDays";
 import { formatDate } from "date-fns/format";
-import { formatDistanceToNowStrict } from "date-fns/formatDistanceToNowStrict";
-import { For, JSXElement, Show } from "solid-js";
+import { JSXElement, Show } from "solid-js";
 
 import { addConnection, hasConnection } from "../../../collections/connections";
-import { Snapshot } from "../../../constants/default-snapshot";
 import { bp } from "../../../states/breakpoints";
 import { getUserId, isAuthenticated } from "../../../states/core";
 import { showModal } from "../../../states/modals";
 import { showNoticeNotification } from "../../../states/notifications";
-import { getLastResult } from "../../../states/snapshot";
 import { setUserToReport } from "../../../states/user-report";
 import { cn } from "../../../utils/cn";
 import { secondsToString } from "../../../utils/date-and-time";
@@ -30,29 +21,38 @@ import { AutoShrink } from "../../common/AutoShrink";
 import { Balloon, BalloonProps } from "../../common/Balloon";
 import { Bar } from "../../common/Bar";
 import { Button } from "../../common/Button";
-import { DiscordAvatar } from "../../common/DiscordAvatar";
-import { UserBadge } from "../../common/UserBadge";
 import { UserFlags } from "../../common/UserFlags";
 import { EditProfile } from "../../modals/EditProfileModal";
+import { Avatar } from "./Avatar";
 
-type Variant = "basic" | "hasSocials" | "hasBioOrKeyboard" | "full";
+/**
+ * AC-052: the `keyboard` profile field is cut, so monkeytype's
+ * `hasBioOrKeyboard` variant is renamed `hasBio` and keeps its layout classes
+ * byte-for-byte.
+ */
+type Variant = "basic" | "hasSocials" | "hasBio" | "full";
 
+/**
+ * AC-045 … AC-054 — the profile header card.
+ *
+ * Streaks (master C17, AC-015) and badges (master C16) are removed; user flags
+ * stay. The Discord avatar becomes the crocodile mark (AC-047) and
+ * `typingStats` becomes `testStats` carrying `timeSpent` (AC-013, AC-014).
+ */
 export function UserDetails(props: {
   profile: UserProfile;
   isAccountPage?: true;
 }): JSXElement {
-  const variant = () => {
+  const variant = (): Variant => {
     if (props.profile.banned) return "basic";
 
     const hasSocials = props.profile.details?.socialProfiles !== undefined;
-    const hasBioOrKeyboard =
-      (props.profile.details?.bio !== undefined &&
-        props.profile.details?.bio !== "") ||
-      (props.profile.details?.keyboard !== undefined &&
-        props.profile.details?.keyboard !== "");
-    if (!hasSocials && !hasBioOrKeyboard) return "basic";
-    if (hasSocials && !hasBioOrKeyboard) return "hasSocials";
-    if (!hasSocials && hasBioOrKeyboard) return "hasBioOrKeyboard";
+    const hasBio =
+      props.profile.details?.bio !== undefined &&
+      props.profile.details.bio !== "";
+    if (!hasSocials && !hasBio) return "basic";
+    if (hasSocials && !hasBio) return "hasSocials";
+    if (!hasSocials && hasBio) return "hasBio";
     return "full";
   };
 
@@ -62,7 +62,7 @@ export function UserDetails(props: {
         class={cn(
           "grid items-center gap-4 p-4",
           variant() === "basic" && "md:grid-cols-[17.5rem_auto_1fr]",
-          variant() === "hasBioOrKeyboard" &&
+          variant() === "hasBio" &&
             "sm:grid-cols-2 md:grid-cols-[17.5rem_auto_auto_auto_1fr] lg:grid-cols-[17.5rem_auto_1fr_auto_2fr]",
           variant() === "hasSocials" &&
             "sm:grid-cols-2 md:grid-cols-[17.5rem_auto_1fr_auto_auto]",
@@ -70,18 +70,11 @@ export function UserDetails(props: {
             "sm:grid-cols-2 md:grid-cols-[1fr_auto_1fr_auto] lg:grid-cols-[17.5rem_auto_auto_auto_1fr_auto_auto] xl:lg:grid-cols-[17.5rem_auto_1fr_auto_2fr_auto_auto]",
         )}
       >
-        <AvatarAndName
-          profile={props.profile}
-          variant={variant()}
-          isAccountPage={props.isAccountPage}
-        />
-        <Show when={variant() === "full" || variant() === "hasBioOrKeyboard"}>
-          <BioAndKeyboard details={props.profile.details} variant={variant()} />
+        <AvatarAndName profile={props.profile} variant={variant()} />
+        <Show when={variant() === "full" || variant() === "hasBio"}>
+          <Bio details={props.profile.details} variant={variant()} />
         </Show>
-        <TypingStats
-          typingStats={props.profile.typingStats}
-          variant={variant()}
-        />
+        <SolveStats stats={props.profile.testStats} variant={variant()} />
         <Show when={variant() === "full" || variant() === "hasSocials"}>
           <Socials
             socials={props.profile.details?.socialProfiles}
@@ -103,6 +96,7 @@ export function UserDetails(props: {
   );
 }
 
+/** AC-053 on `/account`, AC-154 on a public profile. */
 function ActionButtons(props: {
   profile: UserProfile;
   isAccountPage?: true;
@@ -135,7 +129,7 @@ function ActionButtons(props: {
                   "rounded-br": !showFriendsButton(),
                 },
               )}
-              fa={{ icon: "fa-flag", fixedWidth: true }}
+              icon={{ icon: "ph:flag-bold", fixedWidth: true }}
               onClick={() => {
                 if (!isAuthenticated()) {
                   showNoticeNotification(
@@ -152,7 +146,7 @@ function ActionButtons(props: {
             <Button
               balloon={{ text: "Send friend request", position: "left" }}
               class="h-full rounded-none rounded-br text-sub hover:text-bg"
-              fa={{ icon: "fa-user-plus", fixedWidth: true }}
+              icon={{ icon: "ph:user-plus-bold", fixedWidth: true }}
               onClick={() => handleAddFriend()}
             />
           </Show>
@@ -162,7 +156,7 @@ function ActionButtons(props: {
       <Button
         balloon={{ text: "Edit profile", position: "left" }}
         class="h-full rounded-none rounded-tr text-sub hover:text-bg"
-        fa={{ icon: "fa-pen", fixedWidth: true }}
+        icon={{ icon: "ph:pencil-simple-bold", fixedWidth: true }}
         onClick={() => {
           if (props.profile.banned === true) {
             showNoticeNotification("Banned users cannot edit their profile");
@@ -174,7 +168,7 @@ function ActionButtons(props: {
       <Button
         balloon={{ text: "Copy public link", position: "left" }}
         class="h-full rounded-none rounded-br text-sub hover:text-bg"
-        fa={{ icon: "fa-link", fixedWidth: true }}
+        icon={{ icon: "ph:link-bold", fixedWidth: true }}
         onClick={() => {
           const url = `${location.origin}/profile/${props.profile.name}`;
 
@@ -199,59 +193,12 @@ function ActionButtons(props: {
 function AvatarAndName(props: {
   profile: UserProfile;
   variant: Variant;
-  isAccountPage?: true;
 }): JSXElement {
+  /** AC-049: `{N} day(s) ago`, on the `Joined` balloon. */
   const accountAgeHint = () => {
     const creationDate = new Date(props.profile.addedAt);
     const diffDays = differenceInDays(new Date(), creationDate);
     return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
-  };
-
-  const formatStreak = (length: number) =>
-    `${length} ${length === 1 ? "day" : "days"}`;
-
-  const extraStreakText = () => {
-    if (!props.isAccountPage) return "";
-    let hoverText = "";
-
-    const lastResult = getLastResult();
-    if (lastResult === undefined) return "";
-
-    const streakOffset = (props.profile as Snapshot).streakHourOffset;
-
-    const dayInMilis = 1000 * 60 * 60 * 24;
-
-    let target = getCurrentDayTimestamp(streakOffset) + dayInMilis;
-    if (target < Date.now()) {
-      target += dayInMilis;
-    }
-    const timeDif = formatDistanceToNowStrict(target);
-
-    if (lastResult !== undefined) {
-      //check if the last result is from today
-      const isToday = dateIsToday(lastResult.timestamp, streakOffset);
-      const isYesterday = dateIsYesterday(lastResult.timestamp, streakOffset);
-
-      const offsetString = isSafeNumber(streakOffset)
-        ? `(${streakOffset > 0 ? "+" : ""}${streakOffset} offset)`
-        : "";
-
-      if (isToday) {
-        hoverText += `\nClaimed today: yes`;
-        hoverText += `\nCome back in: ${timeDif} ${offsetString}`;
-      } else if (isYesterday) {
-        hoverText += `\nClaimed today: no`;
-        hoverText += `\nStreak lost in: ${timeDif} ${offsetString}`;
-      } else {
-        hoverText += `\nStreak lost ${timeDif} ${offsetString} ago`;
-        hoverText += `\nIt will be removed from your profile on the next result save`;
-      }
-
-      if (streakOffset === undefined) {
-        hoverText += `\n\nIf the streak reset time doesn't line up with your timezone, you can change it in Account Settings > Account > Set streak hour offset.`;
-      }
-    }
-    return hoverText;
   };
 
   const balloonPosition = (): BalloonProps["position"] =>
@@ -264,12 +211,7 @@ function AvatarAndName(props: {
         props.variant === "hasSocials" && "sm:col-span-2 md:col-span-1",
       )}
     >
-      <DiscordAvatar
-        class="h-auto w-full place-self-center"
-        size={256}
-        discordAvatar={props.profile.discordAvatar}
-        discordId={props.profile.discordId}
-      />
+      <Avatar class="h-auto w-full place-self-center" />
 
       <div class="flex h-min flex-col gap-1 text-xs [&>div]:w-fit">
         <AutoShrink upperLimitRem={2} class="flex text-text">
@@ -282,54 +224,10 @@ function AvatarAndName(props: {
             />
           </div>
         </AutoShrink>
-        <div class="flex flex-col gap-1 text-base">
-          <UserBadge
-            id={props.profile.inventory?.badges.find((it) => it.selected)?.id}
-            balloon={{
-              position: balloonPosition(),
-              length: balloonPosition() === "up" ? "medium" : undefined,
-            }}
-            class="w-max"
-            hideTextOnWidth={false}
-          />
-          <Show
-            when={props.profile.inventory?.badges.some((it) => !it.selected)}
-          >
-            <div class="flex flex-row gap-1">
-              <For
-                each={props.profile.inventory?.badges
-                  .filter((it) => !it.selected)
-                  .map((it) => it.id)}
-              >
-                {(badgeId) => (
-                  <UserBadge
-                    id={badgeId}
-                    iconOnly
-                    balloon={{
-                      position: balloonPosition(),
-                      length: balloonPosition() === "up" ? "medium" : undefined,
-                    }}
-                  />
-                )}
-              </For>
-            </div>
-          </Show>
-        </div>
         <div class="grid">
           <Balloon inline text={accountAgeHint()} position={balloonPosition()}>
             Joined {formatDate(props.profile.addedAt ?? 0, "dd MMM yyyy")}
           </Balloon>
-          <Show when={(props.profile.streak ?? 0) > 1}>
-            <Balloon
-              inline
-              text={`Longest streak: ${formatStreak(props.profile.maxStreak)}${extraStreakText()}`}
-              position={balloonPosition()}
-              break
-              length="large"
-            >
-              Current streak {formatStreak(props.profile.streak)}
-            </Balloon>
-          </Show>
         </div>
       </div>
 
@@ -338,6 +236,7 @@ function AvatarAndName(props: {
   );
 }
 
+/** AC-050: level number, progress bar, `{current}/{max}` — all three ballooned. */
 function LevelAndBar(props: { xp?: number }): JSXElement {
   const xpDetails = () => getXpDetails(props.xp ?? 0);
   const bar = () => xpDetails().levelProgressPercent;
@@ -364,7 +263,8 @@ function LevelAndBar(props: { xp?: number }): JSXElement {
   );
 }
 
-function BioAndKeyboard(props: {
+/** AC-052: bio only — the `keyboard` block is removed with the schema field. */
+function Bio(props: {
   details?: UserProfileDetails;
   variant: Variant;
 }): JSXElement {
@@ -373,14 +273,14 @@ function BioAndKeyboard(props: {
       <div
         class={cn(
           "hidden h-full w-2 rounded bg-bg",
-          props.variant === "hasBioOrKeyboard" && "md:order-3 md:block",
+          props.variant === "hasBio" && "md:order-3 md:block",
           props.variant === "full" && "md:block lg:order-3",
         )}
       ></div>
       <div
         class={cn(
           "flex h-full flex-col content-center justify-around gap-2 overflow-hidden text-sm whitespace-pre-line",
-          props.variant === "hasBioOrKeyboard" && "md:order-4",
+          props.variant === "hasBio" && "md:order-4",
           props.variant === "full" && "md:col-span-2 lg:order-4 lg:col-span-1",
         )}
       >
@@ -394,27 +294,17 @@ function BioAndKeyboard(props: {
             <div>{props.details?.bio}</div>
           </div>
         </Show>
-        <Show
-          when={
-            props.details?.keyboard !== undefined &&
-            props.details.keyboard.length > 0
-          }
-        >
-          <div>
-            <div class="text-sub">keyboard</div>
-            <div>{props.details?.keyboard}</div>
-          </div>
-        </Show>
       </div>
     </>
   );
 }
 
-function TypingStats(props: {
-  typingStats: TypingStatsType;
+/** AC-051: `tests started`, `tests completed`, `time spent`. */
+function SolveStats(props: {
+  stats: SolveStatsType;
   variant: Variant;
 }): JSXElement {
-  const stats = () => formatTypingStatsRatio(props.typingStats);
+  const ratios = () => formatTypingStatsRatio(props.stats);
 
   return (
     <>
@@ -422,18 +312,17 @@ function TypingStats(props: {
         class={cn(
           "hidden h-full w-2 rounded bg-bg",
           props.variant === "basic" && "md:block",
-          props.variant === "hasBioOrKeyboard" && "md:order-1 md:block",
+          props.variant === "hasBio" && "md:order-1 md:block",
           props.variant === "hasSocials" && "md:block",
           props.variant === "full" && "lg:order-1 lg:block",
         )}
       ></div>
-      {/* <div class="grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-4 sm:grid-cols-3 lg:flex lg:flex-col"> */}
       <div
         class={cn(
           "grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-2",
           props.variant === "basic" &&
             "sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3 lg:text-[1.25rem]",
-          props.variant === "hasBioOrKeyboard" &&
+          props.variant === "hasBio" &&
             "sm:col-span-2 md:order-2 md:col-span-1 md:grid-cols-1",
           props.variant === "hasSocials" &&
             "sm:col-span-2 sm:grid-cols-3 md:col-span-1 md:grid-cols-1 lg:grid-cols-3 xl:text-[1.25rem]",
@@ -443,28 +332,24 @@ function TypingStats(props: {
       >
         <div class="flex flex-col">
           <div class="text-em-sm text-sub">tests started</div>
-          <div class="text-em-2xl leading-8">
-            {props.typingStats.startedTests}
-          </div>
+          <div class="text-em-2xl leading-8">{props.stats.startedTests}</div>
         </div>
         <Balloon
           class="flex w-max flex-col"
           text={
-            stats().completedPercentage !== ""
-              ? `${stats().completedPercentage}% (${stats().restartRatio} restarts per completed test)`
+            ratios().completedPercentage !== ""
+              ? `${ratios().completedPercentage}% (${ratios().restartRatio} restarts per completed test)`
               : undefined
           }
         >
           <div class="text-em-sm text-sub">tests completed</div>
-          <div class="text-em-2xl leading-8">
-            {props.typingStats.completedTests}
-          </div>
+          <div class="text-em-2xl leading-8">{props.stats.completedTests}</div>
         </Balloon>
         <div class="flex flex-col">
-          <div class="text-em-sm text-sub">time typing</div>
+          <div class="text-em-sm text-sub">time spent</div>
           <div class="text-em-2xl leading-8">
             {secondsToString(
-              Math.round(props.typingStats.timeTyping ?? 0),
+              Math.round(props.stats.timeSpent ?? 0),
               true,
               true,
             )}
@@ -517,7 +402,7 @@ function Socials(props: {
           <Show when={props.socials?.github}>
             <Button
               variant="text"
-              fa={{ icon: "fa-github", variant: "brand", fixedWidth: true }}
+              icon={{ icon: "ph:github-logo-bold", fixedWidth: true }}
               href={`https://github.com/${props.socials?.github}`}
               balloon={{ text: props.socials?.github ?? "" }}
             />
@@ -525,7 +410,7 @@ function Socials(props: {
           <Show when={props.socials?.twitter}>
             <Button
               variant="text"
-              fa={{ icon: "fa-twitter", variant: "brand", fixedWidth: true }}
+              icon={{ icon: "ph:twitter-logo-bold", fixedWidth: true }}
               href={`https://x.com/${props.socials?.twitter}`}
               balloon={{ text: props.socials?.twitter ?? "" }}
             />
@@ -533,7 +418,7 @@ function Socials(props: {
           <Show when={props.socials?.website}>
             <Button
               variant="text"
-              fa={{ icon: "fa-globe", fixedWidth: true }}
+              icon={{ icon: "ph:globe-bold", fixedWidth: true }}
               href={props.socials?.website ?? ""}
               balloon={{ text: props.socials?.website ?? "" }}
             />

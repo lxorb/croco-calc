@@ -20,6 +20,7 @@ export function Title(props: {
   selection: Selection;
   onPreviousSelect: () => void;
 }): JSXElement {
+  /** AC-116: monkeytype's title minus the language segment. */
   const title = createMemo(() => {
     const type =
       props.selection.type === "allTime"
@@ -30,13 +31,12 @@ export function Title(props: {
 
     const friend = props.selection.friendsOnly ? "Friends " : "";
 
-    const language = capitalizeFirstLetter(props.selection.language ?? "");
-
     const mode =
       props.selection.type !== "weekly"
-        ? ` ${capitalizeFirstLetter(props.selection.mode ?? "")} ${props.selection.mode2}`
+        ? `${capitalizeFirstLetter(props.selection.mode ?? "")} ${props.selection.mode2} `
         : "";
-    return `${type} ${language} ${mode} ${friend}Leaderboard`;
+
+    return `${type} ${mode}${friend}Leaderboard`;
   });
 
   const subTitle = createMemo(() => {
@@ -98,9 +98,10 @@ export function Title(props: {
             text={subTitle()?.buttonText}
             variant="text"
             onClick={props.onPreviousSelect}
-            fa={{
-              icon: props.selection.previous ? "fa-forward" : "fa-backward",
-              variant: "solid",
+            icon={{
+              icon: props.selection.previous
+                ? "ph:fast-forward-bold"
+                : "ph:rewind-bold",
             }}
           />
         </div>

@@ -4,7 +4,7 @@ import { sendVerificationEmail } from "../../../auth";
 import { isUserVerified } from "../../../states/core";
 import { cn } from "../../../utils/cn";
 import { Button } from "../../common/Button";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 
 export function VerifyNotice(props: { class?: string }): JSXElement {
   const [isProcessing, setProcessing] = createSignal(false);
@@ -21,7 +21,7 @@ export function VerifyNotice(props: { class?: string }): JSXElement {
         )}
       >
         <div class="grid grid-cols-[auto_1fr] items-center gap-4">
-          <Fa icon="fa-exclamation-triangle" class="text-4xl text-sub" />
+          <Icon icon="ph:warning-bold" class="text-4xl text-sub" />
           <div>Your email address is still not verified</div>
         </div>
         <Button

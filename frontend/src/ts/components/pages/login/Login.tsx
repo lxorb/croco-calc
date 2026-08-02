@@ -65,14 +65,14 @@ export function Login(): JSXElement {
     <div class="grid w-full grid-cols-1 justify-center gap-2 sm:w-80">
       <H3
         text="login"
-        fa={{
-          icon: "fa-sign-in-alt",
+        icon={{
+          icon: "ph:sign-in-bold",
         }}
         class="p-0"
       />
       <div class="grid grid-cols-2 gap-4">
         <Button
-          fa={{ icon: "fa-google", variant: "brand" }}
+          icon={{ icon: "ph:google-logo-bold" }}
           onClick={() =>
             void trySignIn(
               async () =>
@@ -85,7 +85,7 @@ export function Login(): JSXElement {
           disabled={!getLoginPageInputsEnabled()}
         />
         <Button
-          fa={{ icon: "fa-github", variant: "brand" }}
+          icon={{ icon: "ph:github-logo-bold" }}
           onClick={() =>
             void trySignIn(
               async () =>
@@ -143,7 +143,7 @@ export function Login(): JSXElement {
 
         <SubmitButton
           form={form}
-          fa={{ icon: "fa-sign-in-alt" }}
+          icon={{ icon: "ph:sign-in-bold" }}
           text="sign in"
           disabled={!getLoginPageInputsEnabled()}
         />

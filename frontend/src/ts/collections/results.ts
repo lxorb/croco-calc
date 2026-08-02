@@ -1,5 +1,9 @@
 import { ResultMinified } from "@croco-calc/schemas/results";
-import { Difficulty, Mode, Mode2 } from "@croco-calc/schemas/shared";
+import {
+  buildSettingsId,
+  MathGeneratorSettings,
+} from "@croco-calc/schemas/math";
+import { Mode, Mode2 } from "@croco-calc/schemas/shared";
 import { ResultFilters } from "@croco-calc/schemas/users";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import {
@@ -11,10 +15,7 @@ import {
   eq,
   gte,
   inArray,
-  length,
   max,
-  not,
-  or,
   Query,
   queryOnce,
   sum,
@@ -29,32 +30,24 @@ import { queryClient } from "../queries";
 import { baseKey } from "../queries/utils/keys";
 import { isAuthenticated } from "../states/core";
 import { getLastResult, setLastResult } from "../states/snapshot";
-import {
-  getActiveTagsOnce,
-  getTagsOnce,
-  reconcileLocalTagPB,
-  saveLocalTagPB,
-  useActiveTagsLiveQuery,
-} from "./tags";
 import { applyIdWorkaround } from "./utils/misc";
 import { getConfig } from "../config/store";
-import { getMode2 } from "../utils/misc";
-import { getCurrentQuote } from "../states/test";
-import { removeLanguageSize } from "../utils/strings";
 
+/**
+ * The filter selection, flattened into the value lists the query engine
+ * compares against. One entry per AC-078 group plus the `date` cut-off.
+ */
 export type ResultsQueryState = {
-  difficulty: SnapshotResult<Mode>["difficulty"][];
-  pb: SnapshotResult<Mode>["isPb"][];
-  mode: SnapshotResult<Mode>["mode"][];
-  words: ("10" | "25" | "50" | "100" | "custom")[];
-  time: ("15" | "30" | "60" | "120" | "custom")[];
-  punctuation: SnapshotResult<Mode>["punctuation"][];
-  numbers: SnapshotResult<Mode>["numbers"][];
-  timestamp: SnapshotResult<Mode>["timestamp"];
-  quoteLength: SnapshotResult<Mode>["quoteLength"][];
-  tags: SnapshotResult<Mode>["tags"];
-  funbox: SnapshotResult<Mode>["funbox"];
-  language: SnapshotResult<Mode>["language"][];
+  pb: boolean[];
+  time: Mode2<"time">[];
+  addition: MathGeneratorSettings["addition"][];
+  multiplication: MathGeneratorSettings["multiplication"][];
+  division: MathGeneratorSettings["division"][];
+  fractionAddition: MathGeneratorSettings["fractionAddition"][];
+  fractionMultiplication: boolean[];
+  decimals: boolean[];
+  negatives: boolean[];
+  timestamp: number;
 };
 
 const queryKeys = {
@@ -62,19 +55,20 @@ const queryKeys = {
   fullResult: (_id: string) => [...queryKeys.root(), _id],
 };
 
+/** AC-093: the numbers behind the fifteen totals cells. */
 export type ResultStats = {
-  words: number;
+  tasks: number;
+  correct: number;
+  wrong: number;
   restarted: number;
   completed: number;
-  maxWpm: number;
-  avgWpm: number;
-  maxRaw: number;
-  avgRaw: number;
+  maxScore: number;
+  avgScore: number;
+  maxTpm: number;
+  avgTpm: number;
   maxAcc: number;
   avgAcc: number;
-  maxConsistency: number;
-  avgConsistency: number;
-  timeTyping: number;
+  timeSpent: number;
   dayTimestamp?: number;
 };
 
@@ -115,18 +109,18 @@ export function useResultStatsLiveQuery(
 
     return query.select(({ r }) => ({
       dayTimestamp: isGroupByDay ? r.dayTimestamp : undefined,
-      words: sum(r.words),
+      tasks: sum(r.tasks),
+      correct: sum(r.correct),
+      wrong: sum(r.wrong),
       completed: count(r._id),
       restarted: sum(r.restartCount),
-      timeTyping: sum(r.timeTyping),
-      maxWpm: max(r.wpm),
-      avgWpm: avg(r.wpm),
-      maxRaw: max(r.rawWpm),
-      avgRaw: avg(r.rawWpm),
+      timeSpent: sum(r.timeSpent),
+      maxScore: max(r.score),
+      avgScore: avg(r.score),
+      maxTpm: max(r.tpm),
+      avgTpm: avg(r.tpm),
       maxAcc: max(r.acc),
       avgAcc: avg(r.acc),
-      maxConsistency: max(r.consistency),
-      avgConsistency: avg(r.consistency),
     }));
   });
 }
@@ -181,7 +175,6 @@ export function useResultsLiveQuery(options: {
 
 function normalizeResult(
   result: ResultMinified | SnapshotResult<Mode>,
-  knownTagIds?: Set<string>,
 ): SnapshotResult<Mode> {
   const resultDate = new Date(result.timestamp);
   resultDate.setSeconds(0);
@@ -190,28 +183,15 @@ function normalizeResult(
   resultDate.setMilliseconds(0);
 
   //results strip default values, add them back
-  result.bailedOut ??= false;
-  result.blindMode ??= false;
-  result.lazyMode ??= false;
-  result.difficulty ??= "normal";
-  result.funbox ??= [];
-  result.language ??= "english";
-  result.numbers ??= false;
-  result.punctuation ??= false;
-  result.quoteLength ??= -1;
   result.restartCount ??= 0;
   result.incompleteTestSeconds ??= 0;
   result.afkDuration ??= 0;
-
-  result.tags ??= [];
-  if (knownTagIds !== undefined) {
-    result.tags = result.tags.filter((tagId) => knownTagIds.has(tagId));
-  }
   result.isPb ??= false;
+
   return {
     ...result,
-    timeTyping: calcTimeTyping(result),
-    words: Math.round((result.wpm / 60) * result.testDuration),
+    timeSpent: calcTimeSpent(result),
+    tasks: result.correct + result.wrong,
     dayTimestamp: resultDate.getTime(),
   } as SnapshotResult<Mode>;
 }
@@ -223,20 +203,14 @@ const resultsCollection = createCollection(
     queryKey: queryKeys.root(),
     enabled: isAuthenticated,
     queryFn: async () => {
-      const tagIds = await getTagsOnce();
-      const knownTagIds = new Set([...tagIds.map((it) => it._id)]);
-      //const options = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-
-      const response = await Ape.results.get({
-        //query: { limit: options.limit },
-      });
+      const response = await Ape.results.get({});
 
       if (response.status !== 200) {
         throw new Error(`Error fetching results:${response.body.message}`);
       }
 
       const results = response.body.data
-        .map((result) => normalizeResult(result, knownTagIds))
+        .map((result) => normalizeResult(result))
         .map(applyIdWorkaround);
 
       if (getLastResult() === undefined && results.length > 0) {
@@ -257,70 +231,12 @@ resultsCollection.createIndex((row) => row.timestamp, {
 });
 
 type ActionType = {
-  updateTags: {
-    resultId: string;
-    currentTagIds: string[];
-    newTagIds: string[];
-    //TODO: remove when result page  is migrated to solidjs
-    afterUpdate?: (params: { tagPbs: string[] }) => void;
-  };
   insertLocalResult: {
     result: SnapshotResult<Mode>;
-  };
-  deleteLocalTag: {
-    tagId: string;
   };
 };
 
 const actions = {
-  updateTags: createOptimisticAction<ActionType["updateTags"]>({
-    onMutate: ({ resultId, newTagIds }) => {
-      resultsCollection.update(resultId, (result) => {
-        result.tags = newTagIds;
-      });
-    },
-    mutationFn: async ({ resultId, currentTagIds, newTagIds, afterUpdate }) => {
-      const response = await Ape.results.updateTags({
-        body: { resultId, tagIds: newTagIds },
-      });
-      if (response.status !== 200) {
-        throw new Error(
-          `Failed to update result tag: ${response.body.message}`,
-        );
-      }
-      const results = getResults();
-      const result = results.find((it) => it._id === resultId);
-
-      if (result === undefined) {
-        throw new Error(`Cannot find result with id ${resultId}`);
-      }
-
-      const tagsToUpdate = [
-        ...currentTagIds.filter((tag) => !newTagIds.includes(tag)),
-        ...newTagIds.filter((tag) => !currentTagIds.includes(tag)),
-      ];
-      tagsToUpdate.forEach((tag) => {
-        reconcileLocalTagPB(
-          tag,
-          result.mode,
-          result.mode2,
-          result.punctuation,
-          result.numbers,
-          result.language,
-          result.difficulty,
-          result.lazyMode,
-          results,
-        );
-      });
-
-      resultsCollection.utils.writeUpdate({
-        _id: resultId,
-        tags: newTagIds,
-      });
-
-      afterUpdate?.({ tagPbs: response.body.data.tagPbs });
-    },
-  }),
   insertLocalResult: createOptimisticAction<ActionType["insertLocalResult"]>({
     onMutate: ({ result }) => {
       resultsCollection.utils.writeInsert(normalizeResult(result));
@@ -330,74 +246,9 @@ const actions = {
       return;
     },
   }),
-  deleteLocalTag: createOptimisticAction<ActionType["deleteLocalTag"]>({
-    onMutate: ({ tagId }) => {
-      for (const result of [...resultsCollection.values()].filter((it) =>
-        it.tags.includes(tagId),
-      )) {
-        resultsCollection.utils.writeUpdate({
-          ...result,
-          tags: result.tags.filter((it) => it !== tagId),
-        });
-      }
-    },
-    mutationFn: async () => {
-      //we do not sync the changes back to the backend
-      return;
-    },
-  }),
 };
+
 // --- Public API ---
-export async function updateTags(
-  params: ActionType["updateTags"],
-): Promise<void> {
-  if (!resultsCollection.isReady()) {
-    // if its not ready yet, send the api request to update the tags
-    const response = await Ape.results.updateTags({
-      body: { resultId: params.resultId, tagIds: params.newTagIds },
-    });
-
-    if (response.status !== 200) {
-      throw new Error(`Failed to update result tag: ${response.body.message}`);
-    }
-
-    const result = getLastResult();
-
-    if (result === undefined) {
-      throw new Error(`Cannot find result with id ${params.resultId}`);
-    }
-
-    if (result._id !== params.resultId) {
-      throw new Error(
-        `Last result id ${result._id} does not match updated result id ${params.resultId}. Call the devs and tell them to fix their ugly code`,
-      );
-    }
-
-    response.body.data.tagPbs.forEach((tag) => {
-      saveLocalTagPB(
-        tag,
-        result.mode,
-        result.mode2,
-        result.punctuation,
-        result.numbers,
-        result.language,
-        result.difficulty,
-        result.lazyMode,
-        result.wpm,
-        result.acc,
-        result.rawWpm,
-        result.consistency,
-      );
-    });
-
-    params.afterUpdate?.({ tagPbs: response.body.data.tagPbs });
-    return;
-  }
-
-  const transaction = actions.updateTags(params);
-  await transaction.isPersisted.promise;
-}
-
 export async function insertLocalResult(
   params: ActionType["insertLocalResult"],
 ): Promise<void> {
@@ -409,100 +260,44 @@ export async function insertLocalResult(
   await transaction.isPersisted.promise;
 }
 
-export async function deleteLocalTag(
-  params: ActionType["deleteLocalTag"],
-): Promise<void> {
-  if (!resultsCollection.isReady()) {
-    //not loaded yet, don't need to update
-    return;
-  }
-  const transaction = actions.deleteLocalTag(params);
-  await transaction.isPersisted.promise;
-}
-
+/**
+ * AC-078: nine multi-select groups plus the date cut-off. A group whose value
+ * list is empty selects nothing, which is what `clear filters` (AC-077) does.
+ */
 // oxlint-disable-next-line typescript/explicit-function-return-type
 export function buildResultsQuery(state: ResultsQueryState) {
-  const applyMode2Filter = <T extends "time" | "words">(
-    key: T,
-    filter: ResultsQueryState[T],
-    nonCustomValues: string[],
-  ): void => {
-    if (filter.length === 5) return;
-    const isCustom = filter.includes("custom");
-    const selected = filter.filter((it) => it !== "custom");
-    query = query.where(({ r }) =>
-      or(
-        //results not matching the mode pass
-        not(eq(r.mode, key)),
-
-        //mode2 is matching one of the  selected mode2
-        inArray(r.mode2, selected),
-        //or if custom selected are not matching any non-custom value
-        isCustom ? not(inArray(r.mode2, nonCustomValues)) : false,
-      ),
-    );
-  };
-
-  let query = new Query()
+  return new Query()
     .from({ r: resultsCollection })
     .where(({ r }) => gte(r.timestamp, state.timestamp))
-    .where(({ r }) => inArray(r.difficulty, state.difficulty))
     .where(({ r }) => inArray(r.isPb, state.pb))
-    .where(({ r }) => inArray(r.mode, state.mode))
-    .where(({ r }) => inArray(r.punctuation, state.punctuation))
-    .where(({ r }) => inArray(r.numbers, state.numbers))
-    .where(({ r }) => inArray(r.quoteLength, state.quoteLength))
-    .where(({ r }) => inArray(r.language, state.language))
+    .where(({ r }) => inArray(r.mode2, state.time))
+    .where(({ r }) => inArray(r.settings.addition, state.addition))
+    .where(({ r }) => inArray(r.settings.multiplication, state.multiplication))
+    .where(({ r }) => inArray(r.settings.division, state.division))
     .where(({ r }) =>
-      or(
-        false,
-        false,
-        ...state.tags.map((tag) =>
-          tag === "none" ? eq(length(r.tags), 0) : inArray(tag, r.tags),
-        ),
-      ),
+      inArray(r.settings.fractionAddition, state.fractionAddition),
     )
     .where(({ r }) =>
-      or(
-        false,
-        false,
-        ...state.funbox.map((fb) =>
-          (fb as string) === "none"
-            ? eq(length(r.funbox), 0)
-            : inArray(fb, r.funbox),
-        ),
-      ),
-    );
-  applyMode2Filter("time", state.time, ["15", "30", "60", "120"]);
-  applyMode2Filter("words", state.words, ["10", "25", "50", "100"]);
-
-  return query;
+      inArray(r.settings.fractionMultiplication, state.fractionMultiplication),
+    )
+    .where(({ r }) => inArray(r.settings.decimals, state.decimals))
+    .where(({ r }) => inArray(r.settings.negatives, state.negatives));
 }
 
 export function createResultsQueryState(
   filters: ResultFilters,
 ): ResultsQueryState {
   return {
-    difficulty: valueFilter(filters.difficulty),
     pb: boolFilter(filters.pb),
-    mode: valueFilter(filters.mode),
-    words: valueFilter(filters.words),
     time: valueFilter(filters.time),
-    punctuation: boolFilter(filters.punctuation),
-    numbers: boolFilter(filters.numbers),
+    addition: valueFilter(filters.addition),
+    multiplication: valueFilter(filters.multiplication),
+    division: valueFilter(filters.division),
+    fractionAddition: valueFilter(filters.fractionAddition),
+    fractionMultiplication: boolFilter(filters.fractionMultiplication),
+    decimals: boolFilter(filters.decimals),
+    negatives: boolFilter(filters.negatives),
     timestamp: timestampFilter(filters.date),
-    quoteLength: [
-      ...valueFilter(filters.quoteLength, {
-        short: 0,
-        medium: 1,
-        long: 2,
-        thicc: 3,
-      }),
-      -1, // fallback value for results without quoteLength, set in the collection
-    ],
-    tags: valueFilter(filters.tags),
-    funbox: valueFilter(filters.funbox),
-    language: valueFilter(filters.language),
   };
 }
 
@@ -516,12 +311,14 @@ function valueFilter<T extends string, U = T>(
     .map((it) => (mapping ? mapping[it] : (it as unknown as U)));
 }
 
-function boolFilter(
-  val: Record<"on" | "off", boolean> | Record<"yes" | "no", boolean>,
-): boolean[] {
+/**
+ * AC-081: a boolean group is keyed by `String(storedValue)`, so the two keys are
+ * literally `"true"` and `"false"` and the mapping back is a string compare.
+ */
+function boolFilter(val: Record<"true" | "false", boolean>): boolean[] {
   return Object.entries(val)
     .filter(([_, v]) => v)
-    .map(([k]) => k === "on" || k === "yes");
+    .map(([k]) => k === "true");
 }
 
 function timestampFilter(val: ResultFilters["date"]): number {
@@ -538,28 +335,19 @@ function timestampFilter(val: ResultFilters["date"]): number {
   return Math.floor(Date.now() - seconds * 1000);
 }
 
-function calcTimeTyping(result: ResultMinified): number {
-  let tt = 0;
-  if (
-    result.testDuration === undefined &&
-    result.mode2 !== "custom" &&
-    result.mode2 !== "zen"
-  ) {
-    //test finished before testDuration field was introduced - estimate
-    if (result.mode === "time") {
-      tt = parseInt(result.mode2);
-    } else if (result.mode === "words") {
-      tt = (parseInt(result.mode2) / result.wpm) * 60;
-    }
-  } else {
-    tt = parseFloat(result.testDuration as unknown as string); //legacy results could have a string here
-  }
+/**
+ * AC-013: "time spent" is the test itself plus whatever was burned on restarts,
+ * minus idle time. Every croco calc test is a fixed-duration timer, so unlike
+ * monkeytype there is no word-mode estimate to fall back on.
+ */
+function calcTimeSpent(result: ResultMinified | SnapshotResult<Mode>): number {
+  let tt = result.testDuration;
   if (result.incompleteTestSeconds !== undefined) {
     tt += result.incompleteTestSeconds;
   } else if (result.restartCount !== undefined && result.restartCount > 0) {
     tt += (tt / 4) * result.restartCount;
   }
-  return tt;
+  return tt - (result.afkDuration ?? 0);
 }
 
 // oxlint-disable-next-line typescript/explicit-function-return-type
@@ -577,34 +365,22 @@ export const getSingleResultQueryOptions = (_id: string) =>
     staleTime: Infinity,
   });
 
+/**
+ * The `(mode2, settingsId)` pair a personal best is keyed on (master C31).
+ */
 export type CurrentSettingsFilter = {
-  mode: Mode;
-  mode2: Mode2<Mode>;
-  punctuation: boolean;
-  numbers: boolean;
-  language: string;
-  difficulty: Difficulty;
-  lazyMode: boolean;
+  mode2: Mode2<"time">;
+  settingsId: string;
 };
 
 // oxlint-disable-next-line typescript/explicit-function-return-type
 export function useUserAverage10LiveQuery(options: {
   isEnabled: Accessor<boolean>;
 }) {
-  const settingsFilter = createMemo(() => {
-    const language =
-      getConfig.mode === "quote"
-        ? removeLanguageSize(getConfig.language)
-        : getConfig.language;
-
-    return {
-      ...getConfig,
-      mode2: getMode2(getConfig, getCurrentQuote()),
-      language,
-    };
-  });
-
-  const activeTagsQuery = useActiveTagsLiveQuery();
+  const settingsFilter = createMemo<CurrentSettingsFilter>(() => ({
+    mode2: `${getConfig.time}`,
+    settingsId: buildSettingsIdFromConfig(),
+  }));
 
   return useLiveQuery((q) => {
     //disable query
@@ -614,85 +390,78 @@ export function useUserAverage10LiveQuery(options: {
     return q
       .from({
         //we use sub-query to filter first and then aggregate
-        last10: buildSettingsResultsQuery(settingsFilter(), {
-          tagIds: activeTagsQuery().map((it) => it._id),
-        })
+        last10: buildSettingsResultsQuery(settingsFilter())
           .orderBy(({ r }) => r.timestamp, "desc")
           .limit(10),
       })
-      .select(({ last10 }) => ({ wpm: avg(last10.wpm), acc: avg(last10.acc) }))
+      .select(({ last10 }) => ({
+        score: avg(last10.score),
+        acc: avg(last10.acc),
+      }))
       .findOne();
   });
 }
 
 export async function getUserAverage10Once(
   options: CurrentSettingsFilter,
-): Promise<{ wpm: number; acc: number }> {
+): Promise<{ score: number; acc: number }> {
   //exit early if there is no user. Don't init the result collection
-  if (!isAuthenticated()) return { wpm: 0, acc: 0 };
-  const tagIds = (await getActiveTagsOnce()).map((it) => it._id);
+  if (!isAuthenticated()) return { score: 0, acc: 0 };
 
   const result = await queryOnce((q) =>
     q
       .from({
         //we use sub-query to filter first and then aggregate
-        last10: buildSettingsResultsQuery(options, { tagIds })
+        last10: buildSettingsResultsQuery(options)
           .orderBy(({ r }) => r.timestamp, "desc")
           .limit(10),
       })
-      .select(({ last10 }) => ({ wpm: avg(last10.wpm), acc: avg(last10.acc) }))
+      .select(({ last10 }) => ({
+        score: avg(last10.score),
+        acc: avg(last10.acc),
+      }))
       .findOne(),
   );
 
-  return result ?? { wpm: 0, acc: 0 };
+  return result ?? { score: 0, acc: 0 };
 }
 
 export async function getUserDailyBestOnce(
   options: CurrentSettingsFilter,
-): Promise<{ wpm: number; acc: number }> {
+): Promise<{ score: number; acc: number }> {
   //exit early if there is no user. Don't init the result collection
-  if (!isAuthenticated()) return { wpm: 0, acc: 0 };
-  const tagIds = (await getActiveTagsOnce()).map((it) => it._id);
+  if (!isAuthenticated()) return { score: 0, acc: 0 };
 
   const result = await queryOnce(() =>
-    buildSettingsResultsQuery(options, { tagIds })
+    buildSettingsResultsQuery(options)
       .where(({ r }) => gte(r.timestamp, Date.now() - 24 * 60 * 60 * 1000))
-      .orderBy(({ r }) => r.wpm, "desc")
+      .orderBy(({ r }) => r.score, "desc")
       .limit(1)
       .findOne(),
   );
 
-  return result ?? { wpm: 0, acc: 0 };
+  return result ?? { score: 0, acc: 0 };
 }
 
 // oxlint-disable-next-line typescript/explicit-function-return-type
-function buildSettingsResultsQuery(
-  filter: CurrentSettingsFilter,
-  options?: { tagIds?: string[] },
-) {
-  const tagIds = options?.tagIds;
-
-  let query = new Query()
+function buildSettingsResultsQuery(filter: CurrentSettingsFilter) {
+  return new Query()
     .from({ r: resultsCollection })
-    .where(({ r }) => eq(r.mode, filter.mode))
     .where(({ r }) => eq(r.mode2, filter.mode2))
-    .where(({ r }) => eq(r.punctuation, filter.punctuation))
-    .where(({ r }) => eq(r.numbers, filter.numbers))
-    .where(({ r }) => eq(r.language, filter.language))
-    .where(({ r }) => eq(r.difficulty, filter.difficulty))
-    .where(({ r }) => eq(r.lazyMode, filter.lazyMode));
+    .where(({ r }) => eq(r.settingsId, filter.settingsId));
+}
 
-  if (tagIds !== undefined) {
-    query = query.where(({ r }) =>
-      or(
-        false,
-        tagIds.length === 0,
-        ...tagIds.map((it) => inArray(it, r.tags)),
-      ),
-    );
-  }
-
-  return query;
+/** SB-170: one shared join, never a per-call-site re-derivation (AC-121). */
+function buildSettingsIdFromConfig(): string {
+  return buildSettingsId({
+    addition: getConfig.addition,
+    multiplication: getConfig.multiplication,
+    division: getConfig.division,
+    fractionAddition: getConfig.fractionAddition,
+    fractionMultiplication: getConfig.fractionMultiplication,
+    decimals: getConfig.decimals,
+    negatives: getConfig.negatives,
+  });
 }
 
 export function isResultsReady(): boolean {
@@ -703,9 +472,6 @@ export async function waitForResultsReady(): Promise<void> {
   await resultsCollection.stateWhenReady();
 }
 
-/**
- *
- */
 createEffectOn(isAuthenticated, (hasUser) => {
   if (hasUser) {
     void resultsCollection.utils.refetch();

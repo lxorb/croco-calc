@@ -1,68 +1,46 @@
 import { ResultFilters } from "@croco-calc/schemas/users";
-import { LanguageList } from "./languages";
-import { getFunboxNames } from "@monkeytype/funbox";
+import {
+  AdditionSchema,
+  DivisionSchema,
+  FractionAdditionSchema,
+  MultiplicationSchema,
+} from "@croco-calc/schemas/math";
+import { Mode2Schema } from "@croco-calc/schemas/shared";
+
+/**
+ * AC-078 / AC-081: every filter group starts fully selected, except `date`,
+ * which is a single-select defaulting to `all time` (AC-076).
+ *
+ * Keys are the C2 canonical **stored** literals, never the display labels — a
+ * filter keyed on `100x100` could never match a result storing `"100"`
+ * (master §2.31, gap 4). `difficulty`, `mode`, `words`, `quoteLength`,
+ * `punctuation`, `numbers`, `tags`, `language` and `funbox` are gone (AC-079).
+ */
+function allTrue<T extends string>(values: readonly T[]): Record<T, boolean> {
+  return Object.fromEntries(values.map((it) => [it, true])) as Record<
+    T,
+    boolean
+  >;
+}
 
 const object: ResultFilters = {
   _id: "default",
   name: "defaults",
-  pb: {
-    no: true,
-    yes: true,
-  },
-  difficulty: {
-    normal: true,
-    expert: true,
-    master: true,
-  },
-  mode: {
-    words: true,
-    time: true,
-    quote: true,
-    zen: true,
-    custom: true,
-  },
-  words: {
-    "10": true,
-    "25": true,
-    "50": true,
-    "100": true,
-    custom: true,
-  },
-  time: {
-    "15": true,
-    "30": true,
-    "60": true,
-    "120": true,
-    custom: true,
-  },
-  quoteLength: {
-    short: true,
-    medium: true,
-    long: true,
-    thicc: true,
-  },
-  punctuation: {
-    on: true,
-    off: true,
-  },
-  numbers: {
-    on: true,
-    off: true,
-  },
+  pb: { true: true, false: true },
+  time: allTrue(Mode2Schema.options),
+  addition: allTrue(AdditionSchema.options),
+  multiplication: allTrue(MultiplicationSchema.options),
+  division: allTrue(DivisionSchema.options),
+  fractionAddition: allTrue(FractionAdditionSchema.options),
+  fractionMultiplication: { true: true, false: true },
+  decimals: { true: true, false: true },
+  negatives: { true: true, false: true },
   date: {
     last_day: false,
     last_week: false,
     last_month: false,
     last_3months: false,
     all: true,
-  },
-  tags: {
-    none: true,
-  },
-  language: Object.fromEntries(LanguageList.map((lang) => [lang, true])),
-  funbox: {
-    none: true,
-    ...Object.fromEntries(getFunboxNames().map((funbox) => [funbox, true])),
   },
 };
 

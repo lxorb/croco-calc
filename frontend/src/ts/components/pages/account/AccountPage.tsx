@@ -12,7 +12,6 @@ import { hideLoaderBar, showLoaderBar } from "../../../states/loader-bar";
 import { filters, setFilters } from "../../../states/result-filters";
 import { qs } from "../../../utils/dom";
 import { downloadResultsCSV } from "../../../utils/misc";
-import { Advertisement } from "../../common/Advertisement";
 import AsyncContent from "../../common/AsyncContent";
 import { Button } from "../../common/Button";
 import { Page } from "../../common/Page";
@@ -57,8 +56,6 @@ export function AccountPage(): JSXElement {
         <VerifyNotice />
         <MyProfile />
 
-        <Advertisement id="ad-account-1" visible="sellout" />
-
         <Filters filters={filters} onChangeFilters={setFilters} />
 
         <Show
@@ -94,7 +91,7 @@ export function AccountPage(): JSXElement {
             <div class="grid grid-cols-3">
               <Button
                 text="Export CSV"
-                fa={{ icon: "fa-file-csv" }}
+                icon={{ icon: "ph:file-csv-bold" }}
                 class="col-start-3 w-full"
                 disabled={isExporting()}
                 onClick={() => {
@@ -113,8 +110,6 @@ export function AccountPage(): JSXElement {
                 }}
               />
             </div>
-
-            <Advertisement id="ad-account-2" visible="sellout" />
 
             <AsyncContent collections={{ resultsQuery }}>
               {({ resultsQueryData }) => (

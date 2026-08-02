@@ -1,4 +1,4 @@
-import { Mode2, Mode, PersonalBest } from "@croco-calc/schemas/shared";
+import { Mode, Mode2, PersonalBest } from "@croco-calc/schemas/shared";
 import { createColumnHelper } from "@tanstack/solid-table";
 import { format as formatDate } from "date-fns/format";
 import { createMemo, createSignal, JSXElement } from "solid-js";
@@ -8,9 +8,8 @@ import * as DB from "../../db";
 import { pbTablesMode } from "../../states/pb-tables-modal";
 import { cn } from "../../utils/cn";
 import { Formatting } from "../../utils/format";
-import { getLanguageDisplayString } from "../../utils/strings";
 import { AnimatedModal } from "../common/AnimatedModal";
-import { Fa } from "../common/Fa";
+import { enabledSettings, settingLabel } from "../pages/account/utils";
 import { DataTable, DataTableColumnDef } from "../ui/table/DataTable";
 
 type PBWithMode2 = PersonalBest & {
@@ -21,6 +20,14 @@ type PBRow = PBWithMode2 & {
   isGroupStart: boolean;
 };
 
+/**
+ * AC-063 — every stored personal best, keyed by `(mode2, settingsId)`
+ * (master C4, C31). Rows are grouped by duration and ordered by `score` inside
+ * each group; monkeytype's `raw` / `consistency` / `difficulty` / `language` /
+ * `punctuation` / `numbers` / `lazyMode` columns are gone with the fields
+ * (AC-007, AC-064) and are replaced by `tpm` and the settings column, which is
+ * the axis the two PB cards split on.
+ */
 function buildRows(mode: Mode): PBRow[] {
   const allmode2 = DB.getSnapshot()?.personalBests?.[mode] as
     | Record<Mode2<Mode>, PBWithMode2[]>
@@ -28,9 +35,8 @@ function buildRows(mode: Mode): PBRow[] {
   if (allmode2 === undefined) return [];
 
   const list: PBWithMode2[] = [];
-  Object.keys(allmode2).forEach((key) => {
-    let pbs = allmode2[key] ?? [];
-    pbs = [...pbs].sort((a, b) => b.wpm - a.wpm);
+  (Object.keys(allmode2) as Mode2<Mode>[]).forEach((key) => {
+    const pbs = [...(allmode2[key] ?? [])].sort((a, b) => b.score - a.score);
     pbs.forEach((pb) => {
       list.push({ ...pb, mode2: key });
     });
@@ -46,6 +52,18 @@ function buildRows(mode: Mode): PBRow[] {
   });
 
   return rows;
+}
+
+/**
+ * AC-102's rule, reused: the label comes from mapping the stored value through
+ * the shared table, never from string-matching a display literal.
+ */
+function describeSettings(pb: PersonalBest): string {
+  const enabled = enabledSettings(pb.settings);
+  if (enabled.length === 0) return "-";
+  return enabled
+    .map(({ key, value }) => `${key} ${settingLabel(key, value)}`)
+    .join(", ");
 }
 
 function getColumns(options: {
@@ -69,69 +87,50 @@ function getColumns(options: {
         }),
       },
     }),
-    defineColumn("wpm", {
+    defineColumn("score", {
       header: () => (
         <>
-          {f.typingSpeedUnit}
+          score
           <br />
           <span class="text-sub">accuracy</span>
         </>
       ),
       cell: (info) => (
         <>
-          {f.typingSpeed(info.getValue())}
+          {f.decimals(info.getValue())}
           <br />
           <span class="text-sub">{f.accuracy(info.row.original.acc)}</span>
         </>
       ),
       meta: { align: "right" },
     }),
-    defineColumn("raw", {
+    defineColumn("tpm", {
       header: () => (
         <>
-          raw
+          tpm
           <br />
-          <span class="text-sub">consistency</span>
+          <span class="text-sub">correct/wrong</span>
         </>
       ),
       cell: (info) => (
         <>
-          {f.typingSpeed(info.getValue())}
+          {f.decimals(info.getValue(), { showDecimalPlaces: true })}
           <br />
           <span class="text-sub">
-            {f.percentage(info.row.original.consistency)}
+            {info.row.original.correct}/{info.row.original.wrong}
           </span>
         </>
       ),
       meta: { align: "right" },
     }),
-    defineColumn("difficulty", {
-      header: "difficulty",
-      cell: (info) => info.getValue(),
+    defineColumn("settingsId", {
+      header: "settings",
+      cell: (info) => (
+        <span aria-label={info.getValue()} data-balloon-pos="up">
+          {describeSettings(info.row.original)}
+        </span>
+      ),
       meta: { align: "right" },
-    }),
-    defineColumn("language", {
-      header: "language",
-      cell: (info) => {
-        const lang = info.getValue();
-        return lang ? getLanguageDisplayString(lang) : "-";
-      },
-      meta: { align: "right" },
-    }),
-    defineColumn("punctuation", {
-      header: "punctuation",
-      cell: (info) => (info.getValue() ? <Fa icon="fa-check" /> : null),
-      meta: { align: "center" },
-    }),
-    defineColumn("numbers", {
-      header: "numbers",
-      cell: (info) => (info.getValue() ? <Fa icon="fa-check" /> : null),
-      meta: { align: "center" },
-    }),
-    defineColumn("lazyMode", {
-      header: "lazy mode",
-      cell: (info) => (info.getValue() ? <Fa icon="fa-check" /> : null),
-      meta: { align: "center" },
     }),
     defineColumn("timestamp", {
       header: "date",

@@ -7,21 +7,14 @@ import {
   ModifiableTestActivityCalendar,
 } from "./elements/test-activity-calendar";
 import { showLoaderBar, hideLoaderBar } from "./states/loader-bar";
-import { Badge } from "@croco-calc/schemas/users";
-import { Difficulty } from "@croco-calc/schemas/configs";
-import {
-  Mode,
-  Mode2,
-  PersonalBest,
-  PersonalBests,
-} from "@croco-calc/schemas/shared";
+import { Mode, Mode2, PersonalBest } from "@croco-calc/schemas/shared";
+import { MathGeneratorSettings } from "@croco-calc/schemas/math";
 import {
   getDefaultSnapshot,
   Snapshot,
   SnapshotResult,
 } from "./constants/default-snapshot";
 import { getFirstDayOfTheWeek } from "./utils/date-and-time";
-import { Language } from "@croco-calc/schemas/languages";
 import { authEvent } from "./events/auth";
 import { configurationPromise } from "./ape/server-configuration";
 import { insertLocalResult } from "./collections/results";
@@ -31,11 +24,8 @@ import {
 } from "./states/snapshot";
 import { XpBreakdown } from "@croco-calc/schemas/results";
 import { setXpBarData } from "./states/header";
-import { FunboxMetadata } from "@monkeytype/funbox";
-import { __nonReactive } from "./collections/tags";
 import { fetchUserFromApi } from "./ape/user";
 import { SnapshotInitError } from "./utils/snapshot-init-error";
-import { updateTagsInFilterStorage } from "./states/result-filters";
 
 let dbSnapshot: Snapshot | undefined;
 const firstDayOfTheWeek = getFirstDayOfTheWeek();
@@ -77,7 +67,7 @@ export function setSnapshot(
 }
 
 export async function initSnapshot(): Promise<Snapshot | false> {
-  //send api request with token that returns tags, presets, and data needed for snap
+  //send api request with token that returns the data needed for the snapshot
   const snap = getDefaultSnapshot();
   await configurationPromise;
 
@@ -95,40 +85,23 @@ export async function initSnapshot(): Promise<Snapshot | false> {
 
     snap.name = userData.name;
     snap.personalBests = userData.personalBests;
-    snap.personalBests ??= {
-      time: {},
-      words: {},
-      quote: {},
-      zen: {},
-      custom: {},
-    };
-
-    for (const mode of ["time", "words", "quote", "zen", "custom"]) {
-      snap.personalBests[mode as keyof PersonalBests] ??= {};
-    }
+    snap.personalBests ??= { time: {} };
+    snap.personalBests.time ??= {};
 
     snap.banned = userData.banned;
     snap.lbOptOut = userData.lbOptOut;
     snap.verified = userData.verified;
-    snap.discordId = userData.discordId;
-    snap.discordAvatar = userData.discordAvatar;
     snap.needsToChangeName = userData.needsToChangeName;
-    snap.typingStats = {
-      timeTyping: userData.timeTyping ?? 0,
+    //AC-013 / AC-014: "time typing" is "time spent" everywhere.
+    snap.testStats = {
+      timeSpent: userData.timeSpent ?? 0,
       startedTests: userData.startedTests ?? 0,
       completedTests: userData.completedTests ?? 0,
     };
-    snap.quoteMod = userData.quoteMod;
-    snap.favoriteQuotes = userData.favoriteQuotes ?? {};
-    snap.quoteRatings = userData.quoteRatings;
     snap.details = userData.profileDetails;
     snap.addedAt = userData.addedAt;
-    snap.inventory = userData.inventory;
     snap.xp = userData.xp ?? 0;
     snap.inboxUnreadSize = userData.inboxUnreadSize ?? 0;
-    snap.streak = userData?.streak?.length ?? 0;
-    snap.maxStreak = userData?.streak?.maxLength ?? 0;
-    snap.isPremium = userData?.isPremium ?? false;
     snap.allTimeLbs = userData.allTimeLbs;
 
     if (userData.testActivity !== undefined) {
@@ -139,14 +112,9 @@ export async function initSnapshot(): Promise<Snapshot | false> {
       );
     }
 
-    const hourOffset = userData?.streak?.hourOffset;
-    snap.streakHourOffset = hourOffset ?? undefined;
-
     if (userData.lbMemory !== undefined) {
       snap.lbMemory = userData.lbMemory;
     }
-
-    updateTagsInFilterStorage(userData.tags?.map((it) => it._id) ?? []);
 
     dbSnapshot = snap;
 
@@ -158,151 +126,99 @@ export async function initSnapshot(): Promise<Snapshot | false> {
     setSolidSnapshot(dbSnapshot);
   }
 }
-export function getLocalPB<M extends Mode>(
-  mode: M,
-  mode2: Mode2<M>,
-  punctuation: boolean,
-  numbers: boolean,
-  language: string,
-  difficulty: Difficulty,
-  lazyMode: boolean,
-  funboxes: FunboxMetadata[],
+
+/**
+ * AC-065 / master C31: personal bests are keyed on `(mode2, settingsId)` and
+ * nothing else — there is no language, difficulty, punctuation or lazy-mode
+ * dimension left to disambiguate them.
+ */
+export function getLocalPB(
+  mode2: Mode2<"time">,
+  settingsId: string,
 ): PersonalBest | undefined {
-  if (!funboxes.every((f) => f.canGetPb)) {
-    return undefined;
-  }
-
-  const pbs = dbSnapshot?.personalBests?.[mode]?.[mode2] as
-    | PersonalBest[]
-    | undefined;
-
-  return pbs?.find(
-    (pb) =>
-      (pb.punctuation ?? false) === punctuation &&
-      (pb.numbers ?? false) === numbers &&
-      pb.difficulty === difficulty &&
-      pb.language === language &&
-      (pb.lazyMode ?? false) === lazyMode,
+  return dbSnapshot?.personalBests?.time?.[mode2]?.find(
+    (pb) => pb.settingsId === settingsId,
   );
 }
 
-function saveLocalPB<M extends Mode>(
-  mode: M,
-  mode2: Mode2<M>,
-  punctuation: boolean,
-  numbers: boolean,
-  language: Language,
-  difficulty: Difficulty,
-  lazyMode: boolean,
-  wpm: number,
+function saveLocalPB(
+  mode2: Mode2<"time">,
+  settingsId: string,
+  settings: MathGeneratorSettings,
+  score: number,
   acc: number,
-  raw: number,
-  consistency: number,
+  tpm: number,
+  spm: number,
+  correct: number,
+  wrong: number,
 ): void {
-  if (mode === "quote") return;
   if (!dbSnapshot) return;
-  function cont(): void {
-    if (!dbSnapshot) return;
-    let found = false;
 
-    dbSnapshot.personalBests ??= {
-      time: {},
-      words: {},
-      quote: {},
-      zen: {},
-      custom: {},
-    };
+  dbSnapshot.personalBests ??= { time: {} };
+  dbSnapshot.personalBests.time ??= {};
+  dbSnapshot.personalBests.time[mode2] ??= [];
 
-    dbSnapshot.personalBests[mode] ??= {
-      [mode2]: [],
-    };
+  const bests = dbSnapshot.personalBests.time[mode2];
+  const existing = bests.find((pb) => pb.settingsId === settingsId);
 
-    dbSnapshot.personalBests[mode][mode2] ??=
-      [] as unknown as PersonalBests[M][Mode2<M>];
-
-    (
-      dbSnapshot.personalBests[mode][mode2] as unknown as PersonalBest[]
-    ).forEach((pb) => {
-      if (
-        (pb.punctuation ?? false) === punctuation &&
-        (pb.numbers ?? false) === numbers &&
-        pb.difficulty === difficulty &&
-        pb.language === language &&
-        (pb.lazyMode ?? false) === lazyMode
-      ) {
-        found = true;
-        pb.wpm = wpm;
-        pb.acc = acc;
-        pb.raw = raw;
-        pb.timestamp = Date.now();
-        pb.consistency = consistency;
-        pb.lazyMode = lazyMode;
-      }
+  if (existing !== undefined) {
+    existing.score = score;
+    existing.acc = acc;
+    existing.tpm = tpm;
+    existing.spm = spm;
+    existing.correct = correct;
+    existing.wrong = wrong;
+    existing.settings = settings;
+    existing.timestamp = Date.now();
+  } else {
+    bests.push({
+      score,
+      acc,
+      tpm,
+      spm,
+      correct,
+      wrong,
+      settings,
+      settingsId,
+      timestamp: Date.now(),
     });
-    if (!found) {
-      //nothing found
-      (dbSnapshot.personalBests[mode][mode2] as unknown as PersonalBest[]).push(
-        {
-          language,
-          difficulty,
-          lazyMode,
-          punctuation,
-          numbers,
-          wpm,
-          acc,
-          raw,
-          timestamp: Date.now(),
-          consistency,
-        },
-      );
-    }
-  }
-
-  if (dbSnapshot !== null) {
-    cont();
   }
 }
 
+/**
+ * AC-128: the "since you last checked" memory is keyed by `(mode, mode2)` only.
+ * The language key monkeytype threaded through here is gone (AC-113).
+ */
 export async function updateLbMemory<M extends Mode>(
   mode: M,
   mode2: Mode2<M> | undefined,
-  language: Language,
   rank: number,
   api = false,
 ): Promise<void> {
   if (mode2 === undefined) return;
-  if (mode === "time") {
-    const timeMode = mode;
-    const timeMode2 = mode2 as "15" | "60";
+  if (mode !== "time") return;
 
-    const snapshot = getSnapshot();
-    if (!snapshot) return;
-    snapshot.lbMemory ??= {
-      time: { "15": { english: 0 }, "60": { english: 0 } },
-    };
-    snapshot.lbMemory[timeMode] ??= {
-      "15": { english: 0 },
-      "60": { english: 0 },
-    };
-    snapshot.lbMemory[timeMode][timeMode2] ??= {};
-    const current = snapshot.lbMemory?.[timeMode]?.[timeMode2]?.[language];
+  const snapshot = getSnapshot();
+  if (!snapshot) return;
 
-    //this is protected above so not sure why it would be undefined
-    const mem = snapshot.lbMemory[timeMode][timeMode2];
-    mem[language] = rank;
-    if (api && current !== rank) {
-      await Ape.users.updateLeaderboardMemory({
-        body: { mode, mode2, language, rank },
-      });
-    }
-    setSnapshot(snapshot);
+  snapshot.lbMemory ??= { time: {} };
+  snapshot.lbMemory.time ??= {};
+
+  const timeMode2 = mode2;
+  const current = snapshot.lbMemory.time[timeMode2];
+  snapshot.lbMemory.time[timeMode2] = rank;
+
+  if (api && current !== rank) {
+    await Ape.users.updateLeaderboardMemory({
+      body: { mode: "time", mode2: timeMode2, rank },
+    });
   }
+  setSnapshot(snapshot);
 }
 
 export type SaveLocalResultData = {
   xp?: number;
   xpBreakdown?: XpBreakdown;
-  streak?: number;
   result?: SnapshotResult<Mode>;
   isPb?: boolean;
 };
@@ -317,8 +233,8 @@ export function saveLocalResult(data: SaveLocalResultData): void {
     if (snapshot.testActivity !== undefined) {
       snapshot.testActivity.increment(new Date(data.result.timestamp));
     }
-    snapshot.typingStats ??= {
-      timeTyping: 0,
+    snapshot.testStats ??= {
+      timeSpent: 0,
       startedTests: 0,
       completedTests: 0,
     };
@@ -328,23 +244,21 @@ export function saveLocalResult(data: SaveLocalResultData): void {
       data.result.incompleteTestSeconds -
       data.result.afkDuration;
 
-    snapshot.typingStats.timeTyping += time;
-    snapshot.typingStats.startedTests += data.result.restartCount + 1;
-    snapshot.typingStats.completedTests += 1;
+    snapshot.testStats.timeSpent += time;
+    snapshot.testStats.startedTests += data.result.restartCount + 1;
+    snapshot.testStats.completedTests += 1;
 
     if (data.isPb) {
       saveLocalPB(
-        data.result.mode,
         data.result.mode2,
-        data.result.punctuation,
-        data.result.numbers,
-        data.result.language,
-        data.result.difficulty,
-        data.result.lazyMode,
-        data.result.wpm,
+        data.result.settingsId,
+        data.result.settings,
+        data.result.score,
         data.result.acc,
-        data.result.rawWpm,
-        data.result.consistency,
+        data.result.tpm,
+        data.result.spm,
+        data.result.correct,
+        data.result.wrong,
       );
     }
   }
@@ -352,14 +266,6 @@ export function saveLocalResult(data: SaveLocalResultData): void {
   if (data.xp !== undefined) {
     snapshot.xp ??= 0;
     snapshot.xp += data.xp;
-  }
-
-  if (data.streak !== undefined) {
-    snapshot.streak = data.streak;
-
-    if (snapshot.streak > snapshot.maxStreak) {
-      snapshot.maxStreak = snapshot.streak;
-    }
   }
 
   setSnapshot(snapshot, {
@@ -398,17 +304,10 @@ export function updateInboxUnreadSize(newSize: number): void {
   setSnapshot(snapshot);
 }
 
-export function addBadge(badge: Badge): void {
-  const snapshot = getSnapshot();
-  if (!snapshot) return;
-
-  snapshot.inventory ??= {
-    badges: [],
-  };
-  snapshot.inventory.badges.push(badge);
-  setSnapshot(snapshot);
-}
-
+/**
+ * AC-069 / AC-017: every year since the account was created is fetchable — the
+ * monkeytype premium gate is gone.
+ */
 export async function getTestActivityCalendar(
   yearString: string,
 ): Promise<TestActivityCalendar | undefined> {

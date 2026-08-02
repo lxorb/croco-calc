@@ -27,8 +27,8 @@ export function AccountMenu(props: Props): JSXElement {
         <Button
           text="User stats"
           class={buttonClass}
-          fa={{
-            icon: "fa-chart-line",
+          icon={{
+            icon: "ph:chart-line-bold",
             fixedWidth: true,
           }}
           href="/account"
@@ -38,8 +38,8 @@ export function AccountMenu(props: Props): JSXElement {
           <Button
             text="Friends"
             class={`${buttonClass} relative`}
-            fa={{
-              icon: "fa-user-friends",
+            icon={{
+              icon: "ph:users-bold",
               fixedWidth: true,
             }}
             href="/friends"
@@ -55,8 +55,8 @@ export function AccountMenu(props: Props): JSXElement {
         <Button
           text="Public profile"
           class={buttonClass}
-          fa={{
-            icon: "fa-globe-americas",
+          icon={{
+            icon: "ph:globe-hemisphere-west-bold",
             fixedWidth: true,
           }}
           href={`/profile/${getSnapshot()?.name ?? ""}`}
@@ -65,8 +65,8 @@ export function AccountMenu(props: Props): JSXElement {
         <Button
           text="Account settings"
           class={buttonClass}
-          fa={{
-            icon: "fa-cog",
+          icon={{
+            icon: "ph:gear-bold",
             fixedWidth: true,
           }}
           href="/account-settings"
@@ -75,8 +75,8 @@ export function AccountMenu(props: Props): JSXElement {
         <Button
           text="Sign out"
           class={buttonClass}
-          fa={{
-            icon: "fa-sign-out-alt",
+          icon={{
+            icon: "ph:sign-out-bold",
             fixedWidth: true,
           }}
           onClick={() => {

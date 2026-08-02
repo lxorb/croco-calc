@@ -5,25 +5,27 @@ import {
 import { formatDuration, intervalToDuration } from "date-fns";
 import { JSXElement, Match, Show, Switch } from "solid-js";
 
-import { getFormatting } from "../../../states/core";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 import { LoadingCircle } from "../../common/LoadingCircle";
 import { Table, TableEntry } from "./Table";
 
+/**
+ * AC-124 … AC-129 — the "You" row. AC-127 formats the percentile to two decimal
+ * places and swaps in `GOAT` at rank 1; AC-129 fixes the priority of the
+ * not-ranked messages; AC-130 keys the last of them on `minScore`.
+ */
 export function UserRank(props: {
   type: "speed" | "xp";
   data?: LeaderboardEntry | XpLeaderboardEntry | null;
-  minWpm?: number;
+  minScore?: number;
   friendsOnly: boolean;
   total: number | undefined;
   memoryDifference: number | undefined;
   isLbOptOut: boolean;
   isBanned: boolean;
-  minTimeTyping: number;
-  userTimeTyping: number;
+  minTimeSpent: number;
+  userTimeSpent: number;
 }): JSXElement {
-  const format = getFormatting;
-
   const userOverride = () => {
     if (props.data === undefined || props.data === null) {
       return "";
@@ -49,13 +51,13 @@ export function UserRank(props: {
               <Match when={props.memoryDifference === 0}>=</Match>
               <Match when={(props.memoryDifference as number) > 0}>
                 <>
-                  <Fa icon="fa-angle-up" fixedWidth />
+                  <Icon icon="ph:caret-up-bold" fixedWidth />
                   {Math.abs(props.memoryDifference as number)}
                 </>
               </Match>
               <Match when={(props.memoryDifference as number) < 0}>
                 <>
-                  <Fa icon="fa-angle-down" fixedWidth />
+                  <Icon icon="ph:caret-down-bold" fixedWidth />
                   {Math.abs(props.memoryDifference as number)}
                 </>
               </Match>
@@ -84,26 +86,21 @@ export function UserRank(props: {
                 <Match when={props.isBanned}>
                   <div>Your account is banned.</div>
                 </Match>
-                <Match when={props.userTimeTyping < props.minTimeTyping}>
+                <Match when={props.userTimeSpent < props.minTimeSpent}>
                   <div>
                     Your account must have{" "}
                     {formatDuration(
                       intervalToDuration({
                         start: 0,
-                        end: props.minTimeTyping * 1000,
+                        end: props.minTimeSpent * 1000,
                       }),
                     )}{" "}
-                    typed to be placed on the leaderboard.
+                    spent to be placed on the leaderboard.
                   </div>
                 </Match>
-                <Match when={props.minWpm !== undefined}>
+                <Match when={props.minScore !== undefined}>
                   <div>
-                    Not qualified (min speed required:{" "}
-                    {format().typingSpeed(props.minWpm, {
-                      showDecimalPlaces: true,
-                      suffix: ` ${format().typingSpeedUnit}`,
-                    })}
-                    )
+                    Not qualified (min score required: {props.minScore})
                   </div>
                 </Match>
               </Switch>

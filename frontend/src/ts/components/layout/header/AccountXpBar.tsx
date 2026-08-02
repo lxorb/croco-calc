@@ -142,7 +142,7 @@ export function AccountXpBar(): JSXElement {
     let total = breakdown.base ?? 0;
     setTotal(total);
 
-    addItem("time typing", breakdown.base ?? 0);
+    addItem("time solving", breakdown.base ?? 0);
 
     if (isSafeNumber(breakdown.fullAccuracy)) {
       await sleep(delay);
@@ -150,51 +150,14 @@ export function AccountXpBar(): JSXElement {
       total += breakdown.fullAccuracy;
       setTotal(total);
       addItem("perfect", breakdown.fullAccuracy);
-    } else if (isSafeNumber(breakdown.corrected)) {
-      await sleep(delay);
-      if (isStale() || skipped) return;
-      total += breakdown.corrected;
-      setTotal(total);
-      addItem("clean", breakdown.corrected);
     }
 
-    if (isSafeNumber(breakdown.quote)) {
+    if (isSafeNumber(breakdown.modes)) {
       await sleep(delay);
       if (isStale() || skipped) return;
-      total += breakdown.quote;
+      total += breakdown.modes;
       setTotal(total);
-      addItem("quote", breakdown.quote);
-    } else {
-      if (isSafeNumber(breakdown.punctuation)) {
-        await sleep(delay);
-        if (isStale() || skipped) return;
-        total += breakdown.punctuation;
-        setTotal(total);
-        addItem("punctuation", breakdown.punctuation);
-      }
-      if (isSafeNumber(breakdown.numbers)) {
-        await sleep(delay);
-        if (isStale() || skipped) return;
-        total += breakdown.numbers;
-        setTotal(total);
-        addItem("numbers", breakdown.numbers);
-      }
-    }
-
-    if (isSafeNumber(breakdown.funbox)) {
-      await sleep(delay);
-      if (isStale() || skipped) return;
-      total += breakdown.funbox;
-      setTotal(total);
-      addItem("funbox", breakdown.funbox);
-    }
-
-    if (isSafeNumber(breakdown.streak)) {
-      await sleep(delay);
-      if (isStale() || skipped) return;
-      total += breakdown.streak;
-      setTotal(total);
-      addItem("streak", breakdown.streak);
+      addItem("modes", breakdown.modes);
     }
 
     if (isSafeNumber(breakdown.accPenalty) && breakdown.accPenalty > 0) {
@@ -203,14 +166,6 @@ export function AccountXpBar(): JSXElement {
       total -= breakdown.accPenalty;
       setTotal(total);
       addItem("accuracy penalty", -breakdown.accPenalty);
-    }
-
-    if (isSafeNumber(breakdown.incomplete) && breakdown.incomplete > 0) {
-      await sleep(delay);
-      if (isStale() || skipped) return;
-      total += breakdown.incomplete;
-      setTotal(total);
-      addItem("incomplete tests", breakdown.incomplete);
     }
 
     if (isSafeNumber(breakdown.configMultiplier)) {

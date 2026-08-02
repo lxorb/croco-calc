@@ -31,7 +31,7 @@ function PasswordAuthentication() {
   return (
     <Section
       title="password authentication settings"
-      fa={getAuthMethodIcon("password")}
+      icon={getAuthMethodIcon("password")}
       description=<>
         Add password authentication, update your password or email.
       </>
@@ -74,7 +74,7 @@ function ProviderAuthentication(props: { authMethod: ProviderAuthMethod }) {
   return (
     <Section
       title={`${getAuthMethodDisplay(props.authMethod)}`}
-      fa={getAuthMethodIcon(props.authMethod)}
+      icon={getAuthMethodIcon(props.authMethod)}
       description=<>
         Add or remove {getAuthMethodDisplay(props.authMethod)} authentication.
       </>
@@ -100,7 +100,7 @@ function RevokeAllTokens() {
   return (
     <Section
       title="revoke all tokens"
-      fa={{ icon: "fa-user-slash" }}
+      icon={{ icon: "ph:user-minus-bold" }}
       description=<>
         Revokes all tokens connected to your account. Do this if you think
         someone else has access to your account.

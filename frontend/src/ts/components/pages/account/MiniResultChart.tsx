@@ -6,11 +6,18 @@ import { getSingleResultQueryOptions } from "../../../collections/results";
 import { getConfig } from "../../../config/store";
 import { isModalOpen } from "../../../states/modals";
 import { getTheme } from "../../../states/theme";
-import { get as getTypingSpeedUnit } from "../../../utils/typing-speed-units";
 import { AnimatedModal } from "../../common/AnimatedModal";
 import AsyncContent from "../../common/AsyncContent";
 import { ChartJs } from "../../common/ChartJs";
 
+/**
+ * AC-102: the per-result graph behind the table's chart-line button.
+ *
+ * `ChartDataSchema` is now `{ score, tpm, wrong }` (CP-114 … CP-116), so
+ * monkeytype's `wpm` / `burst` / `err` series become the cumulative score line,
+ * the running-average tpm line and the per-second wrong-answer scatter. The
+ * speed-unit conversion is gone with the unit system (AC-007).
+ */
 export function MiniResultChart(props: { resultId: string }): JSXElement {
   const query = useQuery(() => ({
     ...getSingleResultQueryOptions(props.resultId),
@@ -18,9 +25,6 @@ export function MiniResultChart(props: { resultId: string }): JSXElement {
   }));
 
   const beginAtZero = createMemo(() => getConfig.startGraphsAtZero);
-  const typingSpeedUnit = createMemo(() =>
-    getTypingSpeedUnit(getConfig.typingSpeedUnit),
-  );
 
   return (
     <AnimatedModal id="MiniResultChartModal" modalClass="max-w-300">
@@ -34,13 +38,13 @@ export function MiniResultChart(props: { resultId: string }): JSXElement {
                 name="MiniResult"
                 type="line"
                 data={{
-                  labels: data.wpm.map((_, index) => (index + 1).toString()),
+                  labels: data.score.map((_, index) => (index + 1).toString()),
                   datasets: [
                     {
-                      label: "wpm",
-                      data: data.wpm.map((it) => typingSpeedUnit().fromWpm(it)),
+                      label: "score",
+                      data: data.score,
                       borderWidth: 3,
-                      yAxisID: "wpm",
+                      yAxisID: "score",
                       order: 2,
                       pointRadius: 1,
                       fill: false,
@@ -48,12 +52,10 @@ export function MiniResultChart(props: { resultId: string }): JSXElement {
                       backgroundColor: getTheme().main,
                     },
                     {
-                      label: "burst",
-                      data: data.burst.map((it) =>
-                        typingSpeedUnit().fromWpm(it),
-                      ),
+                      label: "tpm",
+                      data: data.tpm,
                       borderWidth: 3,
-                      yAxisID: "wpm",
+                      yAxisID: "score",
                       order: 3,
                       pointRadius: 1,
                       fill: false,
@@ -61,13 +63,13 @@ export function MiniResultChart(props: { resultId: string }): JSXElement {
                       backgroundColor: getTheme().sub,
                     },
                     {
-                      label: "errors",
-                      data: data.err,
+                      label: "wrong",
+                      data: data.wrong,
                       pointBorderColor: getTheme().error,
                       backgroundColor: getTheme().error,
                       borderWidth: 2,
                       order: 1,
-                      yAxisID: "error",
+                      yAxisID: "wrong",
                       type: "scatter",
                       pointStyle: "crossRot",
                       pointRadius: function (context): number {
@@ -99,12 +101,12 @@ export function MiniResultChart(props: { resultId: string }): JSXElement {
                         text: "Seconds",
                       },
                     },
-                    wpm: {
+                    score: {
                       axis: "y",
                       display: true,
                       title: {
                         display: true,
-                        text: typingSpeedUnit().fullUnitString,
+                        text: "score / tpm",
                       },
                       beginAtZero: beginAtZero(),
                       ticks: {
@@ -116,12 +118,12 @@ export function MiniResultChart(props: { resultId: string }): JSXElement {
                       },
                     },
 
-                    error: {
+                    wrong: {
                       display: true,
                       position: "right",
                       title: {
                         display: true,
-                        text: "Errors",
+                        text: "Wrong",
                       },
                       beginAtZero: beginAtZero(),
                       ticks: {

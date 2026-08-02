@@ -3,17 +3,21 @@ import { createMemo, JSXElement } from "solid-js";
 
 import { SnapshotResult } from "../../../constants/default-snapshot";
 import { getTheme } from "../../../states/theme";
-import { TypingSpeedUnitSettings } from "../../../utils/typing-speed-units";
 import { ChartJs } from "../../common/ChartJs";
+
+/**
+ * AC-090: the bucket width is a fixed constant rather than monkeytype's
+ * `typingSpeedUnit.histogramDataBucketSize`, which no longer exists.
+ */
+export const HISTOGRAM_BUCKET_SIZE = 10;
 
 export function HistogramChart(props: {
   results: SnapshotResult<Mode>[];
-  typingSpeedUnit: TypingSpeedUnitSettings;
 }): JSXElement {
   const buckets = createMemo(() =>
     groupIntoBuckets(
-      props.results.map((it) => props.typingSpeedUnit.fromWpm(it.wpm)),
-      props.typingSpeedUnit.histogramDataBucketSize,
+      props.results.map((it) => it.score),
+      HISTOGRAM_BUCKET_SIZE,
     ),
   );
 

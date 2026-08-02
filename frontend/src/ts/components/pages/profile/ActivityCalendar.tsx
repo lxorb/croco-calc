@@ -1,7 +1,6 @@
 import { TestActivity } from "@croco-calc/schemas/users";
 import { createEffect, createSignal, JSXElement, Show } from "solid-js";
 
-import { get as getSeverConfiguration } from "../../../ape/server-configuration";
 import { getSnapshot, getTestActivityCalendar } from "../../../db";
 import {
   clear as clearTestActivity,
@@ -74,17 +73,15 @@ export function ActivityCalendar(props: {
         value: "current",
       },
     ];
+    // AC-069 / AC-017: every year back to the account-creation year is
+    // selectable. monkeytype gated all but the first behind `users.premium`;
+    // croco calc has no premium tier, so the gate is gone rather than
+    // defaulted-open.
     for (let year = currentYear; year >= startYear; year--) {
-      if (
-        years.length < 2 ||
-        (getSeverConfiguration()?.users.premium.enabled &&
-          getSnapshot()?.isPremium)
-      ) {
-        years.push({
-          text: year.toString(),
-          value: year.toString(),
-        });
-      }
+      years.push({
+        text: year.toString(),
+        value: year.toString(),
+      });
     }
     return years;
   };

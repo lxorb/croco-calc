@@ -1,73 +1,65 @@
 import { User, UserProfileDetails } from "@croco-calc/schemas/users";
-import { getDefaultConfig } from "./default-config";
 import { Mode } from "@croco-calc/schemas/shared";
 import { Result } from "@croco-calc/schemas/results";
-import { Difficulty, FunboxName } from "@croco-calc/schemas/configs";
 import {
   ModifiableTestActivityCalendar,
   TestActivityCalendar,
 } from "../elements/test-activity-calendar";
-import { Language } from "@croco-calc/schemas/languages";
 
+/**
+ * A result as the account page consumes it: every field the API strips when it
+ * equals its default has been filled back in, plus three values derived once at
+ * normalisation time so the table, the charts and the aggregations can sort and
+ * group on them directly.
+ *
+ * monkeytype's `words` (an estimate derived from wpm) becomes `tasks`
+ * (`correct + wrong`, exact — AC-092/AC-093), and `timeTyping` becomes
+ * `timeSpent` (AC-013, AC-014). `bailedOut`, `blindMode`, `lazyMode`,
+ * `difficulty`, `funbox`, `language`, `numbers`, `punctuation`, `quoteLength`
+ * and `tags` are all gone (master C15, C38, C41; AC-016, AC-079, AC-187).
+ */
 export type SnapshotResult<M extends Mode> = Omit<
   Result<M>,
-  | "bailedOut"
-  | "blindMode"
-  | "lazyMode"
-  | "difficulty"
-  | "funbox"
-  | "language"
-  | "numbers"
-  | "punctuation"
-  | "quoteLength"
-  | "restartCount"
-  | "incompleteTestSeconds"
-  | "afkDuration"
-  | "tags"
+  "restartCount" | "incompleteTestSeconds" | "afkDuration" | "isPb"
 > & {
-  bailedOut: boolean;
-  blindMode: boolean;
-  lazyMode: boolean;
-  difficulty: Difficulty;
-  funbox: FunboxName[];
-  language: Language;
-  numbers: boolean;
-  punctuation: boolean;
-  quoteLength: number;
   restartCount: number;
   incompleteTestSeconds: number;
+  /** persisted as `afkDuration`, displayed as `idle` (master C37) */
   afkDuration: number;
-  tags: string[];
+  isPb: boolean;
   //calculated values
-  words: number;
-  timeTyping: number;
+  /** `correct + wrong` — the number the totals block calls "tasks answered". */
+  tasks: number;
+  /** seconds of the test plus its restarts, minus idle time (AC-013). */
+  timeSpent: number;
   dayTimestamp: number;
 };
 
+/**
+ * The local mirror of the user document.
+ *
+ * Streaks (master C17), badges/`inventory` (master C16), premium (AC-017),
+ * tags (master C15), config presets (master C18) and every Discord field
+ * (AC-047, AC-167) are removed. `typingStats` becomes `testStats` with
+ * `timeSpent` (AC-013, AC-014).
+ */
 export type Snapshot = Omit<
   User,
-  | "timeTyping"
+  | "timeSpent"
   | "startedTests"
   | "completedTests"
   | "profileDetails"
-  | "streak"
-  | "resultFilterPresets"
-  | "tags"
   | "customThemes"
   | "xp"
   | "testActivity"
 > & {
-  typingStats: {
-    timeTyping: number;
+  testStats: {
+    timeSpent: number;
     startedTests: number;
     completedTests: number;
   };
   details?: UserProfileDetails;
   inboxUnreadSize: number;
-  streak: number;
-  maxStreak: number;
-  isPremium: boolean;
-  streakHourOffset?: number;
   xp: number;
   testActivity?: ModifiableTestActivityCalendar;
   testActivityByYear?: { [key: string]: TestActivityCalendar };
@@ -77,37 +69,25 @@ export type Snapshot = Omit<
 const defaultSnap = {
   personalBests: {
     time: {},
-    words: {},
-    quote: {},
-    zen: {},
-    custom: {},
   },
   name: "",
   email: "",
   uid: "",
-  isPremium: false,
-  config: getDefaultConfig(),
   banned: undefined,
   verified: undefined,
-  lbMemory: { time: { 15: { english: 0 }, 60: { english: 0 } } },
-  typingStats: {
-    timeTyping: 0,
+  lbMemory: { time: { "4": 0, "8": 0 } },
+  testStats: {
+    timeSpent: 0,
     startedTests: 0,
     completedTests: 0,
   },
-  quoteRatings: undefined,
-  quoteMod: false,
-  favoriteQuotes: {},
   addedAt: 0,
   xp: 0,
   inboxUnreadSize: 0,
-  streak: 0,
-  maxStreak: 0,
-  streakHourOffset: undefined,
   allTimeLbs: {
     time: {
-      15: { english: { count: 0, rank: 0 } },
-      60: { english: { count: 0, rank: 0 } },
+      "4": { count: 0, rank: 0 },
+      "8": { count: 0, rank: 0 },
     },
   },
 } as Snapshot;

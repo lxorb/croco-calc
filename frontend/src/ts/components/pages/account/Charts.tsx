@@ -1,37 +1,37 @@
 import { ResultFilters, ResultFiltersKeys } from "@croco-calc/schemas/users";
 import { useLiveQuery } from "@tanstack/solid-db";
-import { Accessor, createMemo, JSXElement } from "solid-js";
+import { Accessor, createMemo, For, JSXElement } from "solid-js";
 
 import {
   buildResultsQuery,
   ResultsQueryState,
 } from "../../../collections/results";
-import { type TagItem, useTagsLiveQuery } from "../../../collections/tags";
 import { getConfig } from "../../../config/store";
 import { getFormatting, isAuthenticated } from "../../../states/core";
-import { FaSolidIcon } from "../../../types/font-awesome";
 import {
   capitalizeFirstLetter,
   replaceUnderscoresWithSpaces,
 } from "../../../utils/strings";
-import { get as getTypingSpeedUnit } from "../../../utils/typing-speed-units";
 import AsyncContent from "../../common/AsyncContent";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 import { DailyActivityChart } from "./DailyActivityChart";
 import { HistogramChart } from "./HistogramChart";
 import { HistoryChart, HistoryChartClickEvent } from "./HistoryChart";
+import {
+  SETTING_HEADINGS,
+  SETTING_ICONS,
+  SETTING_KEYS,
+  settingLabel,
+} from "./utils";
 
+/** AC-083: icon filter row, history chart, histogram, time-spent chart. */
 export function Charts(props: {
   filters: ResultFilters;
   queryState: Accessor<ResultsQueryState | undefined>;
   onHistoryChartClick?: (event: HistoryChartClickEvent) => void;
 }): JSXElement {
   const beginAtZero = createMemo(() => getConfig.startGraphsAtZero);
-  const typingSpeedUnit = createMemo(() =>
-    getTypingSpeedUnit(getConfig.typingSpeedUnit),
-  );
   const format = getFormatting;
-  const tags = useTagsLiveQuery();
 
   const resultsQuery = useLiveQuery((q) => {
     if (!isAuthenticated()) return undefined;
@@ -47,25 +47,20 @@ export function Charts(props: {
       {({ resultsQueryData }) => (
         <div class="flex flex-col gap-8">
           <div>
-            <FilterSummary filters={props.filters} tags={tags()} />
+            <FilterSummary filters={props.filters} />
             <HistoryChart
               results={resultsQueryData()}
               beginAtZero={beginAtZero()}
-              typingSpeedUnit={typingSpeedUnit()}
               format={format()}
               onClick={(index) => props.onHistoryChartClick?.(index)}
             />
           </div>
 
-          <HistogramChart
-            results={resultsQueryData()}
-            typingSpeedUnit={typingSpeedUnit()}
-          />
+          <HistogramChart results={resultsQueryData()} />
 
           <DailyActivityChart
             queryState={props.queryState}
             beginAtZero={beginAtZero()}
-            typingSpeedUnit={typingSpeedUnit()}
             format={format()}
           />
         </div>
@@ -74,16 +69,19 @@ export function Charts(props: {
   );
 }
 
-function FilterSummary(props: {
-  filters: ResultFilters;
-  tags: TagItem[];
-}): JSXElement {
+/**
+ * AC-082 — the icon filter row. One icon+value pair per filter group; a fully
+ * selected group prints the literal `all`, anything else prints the selected
+ * values comma-joined. The groups are date, time and the seven settings.
+ */
+function FilterSummary(props: { filters: ResultFilters }): JSXElement {
   const Item = <
     T extends ResultFiltersKeys,
     K extends keyof ResultFilters[T],
   >(options: {
     group: T;
-    icon: FaSolidIcon;
+    label?: string;
+    icon: string;
     format?: (val: K) => string;
   }): JSXElement => {
     const values = createMemo(() =>
@@ -97,39 +95,33 @@ function FilterSummary(props: {
 
     return (
       <span
-        aria-label={capitalizeFirstLetter(options.group)}
+        aria-label={options.label ?? capitalizeFirstLetter(options.group)}
         data-balloon-pos="up"
       >
-        <Fa icon={options.icon} fixedWidth />
+        <Icon icon={options.icon} fixedWidth />
         {values()}
       </span>
     );
   };
 
   return (
-    <div class="mt-4 mb-4 flex flex-wrap justify-center gap-4 text-sub [&>span>i]:mr-1">
+    <div class="mt-4 mb-4 flex flex-wrap justify-center gap-4 text-sub [&>span>svg]:mr-1">
       <Item
         group="date"
-        icon="fa-calendar"
+        icon="ph:calendar-blank-bold"
         format={replaceUnderscoresWithSpaces}
       />
-      <Item group="mode" icon="fa-bars" />
-      <Item group="time" icon="fa-clock" />
-      <Item group="words" icon="fa-font" />
-      <Item group="difficulty" icon="fa-star" />
-      <Item group="punctuation" icon="fa-at" />
-      <Item group="numbers" icon="fa-hashtag" />
-      <Item group="language" icon="fa-globe-americas" />
-      <Item
-        group="funbox"
-        icon="fa-gamepad"
-        format={replaceUnderscoresWithSpaces}
-      />
-      <Item
-        group="tags"
-        icon="fa-tags"
-        format={(tag) => props.tags.find((it) => it._id === tag)?.name ?? tag}
-      />
+      <Item group="time" icon="ph:clock-bold" />
+      <For each={SETTING_KEYS}>
+        {(key) => (
+          <Item
+            group={key}
+            label={capitalizeFirstLetter(SETTING_HEADINGS[key])}
+            icon={SETTING_ICONS[key]}
+            format={(val) => settingLabel(key, val)}
+          />
+        )}
+      </For>
     </div>
   );
 }

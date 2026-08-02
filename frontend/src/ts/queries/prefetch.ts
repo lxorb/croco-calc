@@ -1,17 +1,17 @@
 import { queryClient } from ".";
 import {
   getContributorsQueryOptions,
-  getSpeedHistogramQueryOptions,
+  getScoreHistogramQueryOptions,
   getSupportersQueryOptions,
-  getTypingStatsQueryOptions,
+  getTrainingStatsQueryOptions,
 } from "./public";
 import { getLeaderboardQueryOptions } from "./leaderboards";
 
 export function prefetchAboutPage(): void {
   void queryClient.prefetchQuery(getContributorsQueryOptions());
   void queryClient.prefetchQuery(getSupportersQueryOptions());
-  void queryClient.prefetchQuery(getTypingStatsQueryOptions());
-  void queryClient.prefetchQuery(getSpeedHistogramQueryOptions());
+  void queryClient.prefetchQuery(getTrainingStatsQueryOptions());
+  void queryClient.prefetchQuery(getScoreHistogramQueryOptions());
 }
 
 export function prefetchLeaderboardPage(): void {
@@ -19,8 +19,7 @@ export function prefetchLeaderboardPage(): void {
     getLeaderboardQueryOptions({
       type: "allTime",
       mode: "time",
-      mode2: "15",
-      language: "english",
+      mode2: "4",
       friendsOnly: false,
       page: 0,
       previous: false,

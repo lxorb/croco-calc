@@ -1,81 +1,80 @@
-import { ValidModeRule } from "@croco-calc/schemas/configuration";
-import { Language } from "@croco-calc/schemas/languages";
-import { Mode } from "@croco-calc/schemas/shared";
+import { VALID_LEADERBOARD_MATRIX } from "@croco-calc/schemas/leaderboards";
 import { Accessor, For, JSXElement, Show } from "solid-js";
 
 import { isAuthenticated } from "../../../states/core";
 import { Selection } from "../../../states/leaderboard-selection";
-import { FaSolidIcon } from "../../../types/font-awesome";
 import { Button } from "../../common/Button";
 
-type GroupItem<T> = { id: T; text: string; icon: FaSolidIcon };
-
-type LanguagesByModeByMode2 = Partial<Record<Mode, Record<string, Language[]>>>;
-
-type ValidLeaderboards = {
-  allTime: LanguagesByModeByMode2;
-  weekly: LanguagesByModeByMode2;
-  daily: LanguagesByModeByMode2;
-};
+type GroupItem<T> = { id: T; text: string; icon: string };
 
 export type ModeSelect = Pick<Selection, "mode" | "mode2">;
+
+/**
+ * AC-112 / AC-113 — the duration group is `time 4` and `time 8` and nothing
+ * else, taken straight from the AC-114 matrix in `@croco-calc/schemas` so the
+ * sidebar, the URL parser and the server all read one source. There is no
+ * language axis anywhere on this page.
+ */
+const MODE_BUTTONS: GroupItem<ModeSelect>[] =
+  VALID_LEADERBOARD_MATRIX.allTime.time.map((mode2) => ({
+    id: { mode: "time", mode2 },
+    text: `time ${mode2}`,
+    icon: "ph:clock-bold",
+  }));
 
 export function Sidebar(props: {
   selection: Accessor<Selection>;
   onSelect: (selection: Selection) => void;
-  validModeRules: ValidModeRule[];
   connectionsEnabled: boolean;
 }): JSXElement {
-  const updateSelection = (patch: Partial<Selection>) => {
+  const updateSelection = (patch: Partial<Selection>): void => {
     props.onSelect(
-      normalizeSelection(
-        { ...props.selection(), ...patch } as Selection,
-        getValidLeaderboards(props.validModeRules),
-      ),
+      normalizeSelection({ ...props.selection(), ...patch } as Selection),
     );
   };
 
-  const selectType = (type: Selection["type"]) => {
+  const selectType = (type: Selection["type"]): void => {
     updateSelection({ type });
   };
 
-  const selectMode = (value: ModeSelect) => {
+  const selectMode = (value: ModeSelect): void => {
     updateSelection({ mode: value.mode, mode2: value.mode2 });
   };
 
-  const selectLanguage = (language: Language) => {
-    updateSelection({ language });
-  };
-  const selectFriendsOnly = (friendsOnly: boolean) => {
+  const selectFriendsOnly = (friendsOnly: boolean): void => {
     updateSelection({ friendsOnly });
   };
 
   return (
     <>
+      {/* AC-110 — `all-time` drops monkeytype's language word. */}
       <Group
         selected={props.selection().type}
         onSelect={selectType}
         items={[
           {
             id: "allTime",
-            text: "all-time english",
-            icon: "fa-globe-americas",
+            text: "all-time",
+            icon: "ph:globe-hemisphere-west-bold",
           },
-          { id: "weekly", text: "weekly xp", icon: "fa-calendar-day" },
-          { id: "daily", text: "daily", icon: "fa-sun" },
+          { id: "weekly", text: "weekly xp", icon: "ph:calendar-dot-bold" },
+          { id: "daily", text: "daily", icon: "ph:sun-bold" },
         ]}
       />
+
+      {/* AC-111 — audience group, signed-in visitors with connections only. */}
       <Show when={isAuthenticated() && props.connectionsEnabled}>
         <Group
           selected={props.selection().friendsOnly}
           onSelect={selectFriendsOnly}
           items={[
-            { id: false, text: "everyone", icon: "fa-users" },
-            { id: true, text: "friends only", icon: "fa-user-friends" },
+            { id: false, text: "everyone", icon: "ph:users-three-bold" },
+            { id: true, text: "friends only", icon: "ph:users-bold" },
           ]}
         />
       </Show>
 
+      {/* AC-112 — hidden entirely on the weekly XP board. */}
       <Show when={props.selection().type !== "weekly"}>
         <Group
           selected={{
@@ -83,27 +82,14 @@ export function Sidebar(props: {
             mode2: props.selection().mode2,
           }}
           onSelect={selectMode}
-          items={getModeButtons(
-            getValidLeaderboards(props.validModeRules)[props.selection().type],
-            props.selection().language,
-          )}
-        />
-      </Show>
-      <Show when={props.selection().type === "daily"}>
-        <Group
-          selected={props.selection().language}
-          onSelect={selectLanguage}
-          items={getLanguageButtons(
-            getValidLeaderboards(props.validModeRules).daily,
-            props.selection().mode,
-            props.selection().mode2,
-          )}
+          items={MODE_BUTTONS}
         />
       </Show>
     </>
   );
 }
 
+/** AC-109: one `bg-sub-alt` pill group, left-aligned buttons with a leading icon. */
 function Group<T>(props: {
   items: GroupItem<T>[];
   selected: T | undefined;
@@ -118,7 +104,7 @@ function Group<T>(props: {
         {(item) => (
           <Button
             onClick={() => props.onSelect(item.id)}
-            fa={{ icon: item.icon }}
+            icon={{ icon: item.icon }}
             text={item.text}
             class="justify-start px-[0.75em]"
             active={isEqual(item.id, props.selected)}
@@ -129,134 +115,26 @@ function Group<T>(props: {
   );
 }
 
-function normalizeSelection(
-  draft: Selection,
-  valid: ValidLeaderboards,
-): Selection {
+/**
+ * Coerces a selection back onto the AC-114 matrix. The weekly board carries no
+ * mode axis; the speed boards always land on a bundled `time 4` / `time 8`.
+ */
+export function normalizeSelection(draft: Selection): Selection {
   if (draft.type === "weekly") {
     return {
-      ...draft,
-      mode: undefined,
-      mode2: undefined,
-      language: undefined,
+      type: "weekly",
+      friendsOnly: draft.friendsOnly,
       previous: false,
     };
   }
 
-  let { mode, mode2, language } = draft;
-  const validModes = valid[draft.type];
+  const validMode2 = VALID_LEADERBOARD_MATRIX[draft.type].time;
+  const first = validMode2[0];
 
-  if (validModes === undefined) throw new Error("no valid leaderboards");
+  const mode2 =
+    draft.mode2 !== undefined && validMode2.includes(draft.mode2)
+      ? draft.mode2
+      : first;
 
-  if (mode === null || validModes[mode] === undefined) {
-    const firstMode = Object.keys(validModes).sort()[0] as Mode | undefined;
-    if (!firstMode) {
-      throw new Error(`No valid mode for type ${draft.type}`);
-    }
-    mode = firstMode;
-  }
-
-  const validMode2 = validModes[mode] as Record<string, Language[]>;
-
-  if (mode2 === null || validMode2[mode2] === undefined) {
-    const firstMode2 = Object.keys(validMode2).sort(
-      (a, b) => parseInt(a) - parseInt(b),
-    )[0];
-    if (firstMode2 === undefined) {
-      throw new Error(`No valid mode2 for ${draft.type}:${mode}`);
-    }
-    mode2 = firstMode2;
-  }
-
-  const supportedLanguages = validMode2[mode2];
-  if (!supportedLanguages || supportedLanguages.length === 0) {
-    throw new Error(`Invalid leaderboard config for ${mode}:${mode2}`);
-  }
-
-  if (!language || !supportedLanguages.includes(language)) {
-    language = supportedLanguages.sort()[0] as Language;
-  }
-
-  return { ...draft, mode, mode2, language };
-}
-
-function getModeButtons(
-  valid: LanguagesByModeByMode2,
-  language?: Language,
-): GroupItem<ModeSelect>[] {
-  const modes = Object.entries(valid).flatMap(([mode, mode2List]) =>
-    Object.entries(mode2List)
-      .filter(
-        ([_, languages]) =>
-          language === undefined || languages.includes(language),
-      )
-      .flatMap(([mode2]) => ({
-        id: { mode, mode2 },
-        text: `${mode} ${mode2}`,
-        icon: mode === "time" ? "fa-clock" : "fa-align-left",
-      })),
-  );
-
-  return modes as GroupItem<ModeSelect>[];
-}
-
-function getLanguageButtons(
-  valid: LanguagesByModeByMode2,
-  mode: Mode | undefined,
-  mode2: string | undefined,
-): GroupItem<Language>[] {
-  if (mode === undefined || mode2 === undefined) return [];
-
-  return (valid[mode]?.[mode2] ?? []).map((language) => ({
-    id: language,
-    text: language,
-    icon: "fa-globe",
-  }));
-}
-function getValidLeaderboards(
-  validModeRules: ValidModeRule[],
-): ValidLeaderboards {
-  //a rule can contain multiple values. create a flat list out of them
-  const dailyRules = validModeRules.flatMap((rule) => {
-    const languages = convertRuleOption(rule.language) as Language[];
-    const mode2List = convertRuleOption(rule.mode2);
-
-    return mode2List.map((mode2) => ({
-      mode: rule.mode as Mode,
-      mode2,
-      languages,
-    }));
-  });
-
-  return {
-    allTime: {
-      time: {
-        "15": ["english"],
-        "60": ["english"],
-      },
-    },
-    weekly: {},
-    daily: dailyRules.reduce<
-      Partial<Record<Mode, Record<string /*mode2*/, Language[]>>>
-    >((acc, { mode, mode2, languages }) => {
-      let modes = acc[mode];
-      if (modes === undefined) {
-        modes = {};
-        acc[mode] = modes;
-      }
-
-      let modes2 = modes[mode2];
-      if (modes2 === undefined) {
-        modes2 = [];
-        modes[mode2] = modes2;
-      }
-
-      modes2.push(...languages);
-      return acc;
-    }, {}),
-  };
-}
-
-function convertRuleOption(rule: string): string[] {
-  return rule.startsWith("(") ? rule.slice(1, -1).split("|") : [rule];
+  return { ...draft, mode: "time", mode2 };
 }

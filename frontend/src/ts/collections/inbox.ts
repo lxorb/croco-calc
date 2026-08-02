@@ -1,4 +1,4 @@
-import { AllRewards, MonkeyMail } from "@croco-calc/schemas/users";
+import { AllRewards, CrocoMail } from "@croco-calc/schemas/users";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import {
   createCollection,
@@ -14,12 +14,8 @@ import { queryClient } from "../queries";
 import { baseKey } from "../queries/utils/keys";
 import { isAuthenticated } from "../states/core";
 import { flushDebounceStrategy } from "./utils/flushDebounceStrategy";
-import {
-  showErrorNotification,
-  showSuccessNotification,
-} from "../states/notifications";
-import * as BadgeController from "../controllers/badge-controller";
-import { addBadge, addXp } from "../db";
+import { showErrorNotification } from "../states/notifications";
+import { addXp } from "../db";
 
 const flushStrategy = flushDebounceStrategy({ maxWait: 1000 * 60 * 5 });
 export function applyPendingInboxActions(): void {
@@ -33,7 +29,7 @@ const queryKeys = {
 const [maxMailboxSize, setMaxMailboxSize] = createSignal(0);
 
 export { maxMailboxSize };
-export type InboxItem = Omit<MonkeyMail, "read"> & {
+export type InboxItem = Omit<CrocoMail, "read"> & {
   status: "unclaimed" | "unread" | "read" | "deleted";
 };
 const inboxCollection = createCollection(
@@ -42,7 +38,7 @@ const inboxCollection = createCollection(
     queryKey: queryKeys.root(),
     enabled: isAuthenticated,
     queryFn: async () => {
-      const addStatus = (item: MonkeyMail): InboxItem => ({
+      const addStatus = (item: CrocoMail): InboxItem => ({
         ...item,
         status:
           item.rewards.length > 0 && !item.read
@@ -97,31 +93,18 @@ export const mutateInboxItem = createPacedMutations<
   strategy: flushStrategy.strategy,
 });
 
+/** Master C16: badges are cut, so XP is the only reward kind left to claim. */
 function claimRewards(pendingRewards: AllRewards[]): void {
   if (pendingRewards.length === 0) return;
 
   let totalXp = 0;
-  const badgeNames: string[] = [];
   for (const reward of pendingRewards) {
     if (reward.type === "xp") {
       totalXp += reward.item;
-    } else if (reward.type === "badge") {
-      const badge = BadgeController.getById(reward.item.id);
-      if (badge) {
-        badgeNames.push(badge.name);
-        addBadge(reward.item);
-      }
     }
   }
   if (totalXp > 0) {
     addXp(totalXp);
-  }
-
-  if (badgeNames.length > 0) {
-    showSuccessNotification(
-      `New badge${badgeNames.length > 1 ? "s" : ""} unlocked: ${badgeNames.join(", ")}`,
-      { durationMs: 5000, customTitle: "Reward", customIcon: "gift" },
-    );
   }
 }
 

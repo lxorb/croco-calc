@@ -26,7 +26,7 @@ export function PendingRequests() {
           <Show when={pendingQueryData().length > 0}>
             <H2
               text="Incoming Requests"
-              fa={{ icon: "fa-user-plus", fixedWidth: true }}
+              icon={{ icon: "ph:user-plus-bold", fixedWidth: true }}
             />
             <DataTable
               id="pendingConnections"
@@ -75,17 +75,17 @@ function getColumns(): DataTableColumnDef<Connection>[] {
           <Button
             onClick={() => void acceptConnection({ id: info.getValue() })}
             balloon={{ text: "accept" }}
-            fa={{ icon: "fa-check", fixedWidth: true }}
+            icon={{ icon: "ph:check-bold", fixedWidth: true }}
           />
           <Button
             onClick={() => void rejectConnection({ id: info.getValue() })}
             balloon={{ text: "reject" }}
-            fa={{ icon: "fa-times", fixedWidth: true }}
+            icon={{ icon: "ph:x-bold", fixedWidth: true }}
           />
           <Button
             onClick={() => void blockConnection({ id: info.getValue() })}
             balloon={{ text: "block user" }}
-            fa={{ icon: "fa-ban", fixedWidth: true }}
+            icon={{ icon: "ph:prohibit-bold", fixedWidth: true }}
           />
         </div>
       ),
