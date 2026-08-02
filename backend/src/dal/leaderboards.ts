@@ -1,8 +1,7 @@
 import * as db from "../init/db";
 import Logger from "../utils/logger";
 import { performance } from "perf_hooks";
-import { setLeaderboard } from "../utils/prometheus";
-import { isDevEnvironment, omit } from "../utils/misc";
+import { isDevEnvironment } from "../utils/misc";
 import {
   getCachedConfiguration,
   getLiveConfiguration,
@@ -39,7 +38,6 @@ export async function get(
   language: string,
   page: number,
   pageSize: number,
-  premiumFeaturesEnabled: boolean = false,
   uid?: string,
 ): Promise<DBLeaderboardEntry[] | false> {
   if (page < 0 || pageSize < 0) {
@@ -79,10 +77,6 @@ export async function get(
         .aggregate<DBLeaderboardEntry>(pipeline)
         .toArray();
     }
-    if (!premiumFeaturesEnabled) {
-      leaderboard = leaderboard.map((it) => omit(it, ["isPremium"]));
-    }
-
     return leaderboard;
   } catch (e) {
     // oxlint-disable-next-line no-unsafe-member-access
@@ -182,8 +176,8 @@ export async function update(
 }> {
   const key = `lbPersonalBests.${mode}.${mode2}.${language}`;
   const lbCollectionName = getCollectionName({ language, mode, mode2 });
-  const minTimeTyping = (await getCachedConfiguration(true)).leaderboards
-    .minTimeTyping;
+  const minTimeSpent = (await getCachedConfiguration(true)).leaderboards
+    .minTimeSpent;
   const lb = db.collection<DBUser>("users").aggregate<LeaderboardEntry>(
     [
       {
@@ -206,8 +200,8 @@ export async function update(
           needsToChangeName: {
             $ne: true,
           },
-          timeTyping: {
-            $gt: isDevEnvironment() ? 0 : minTimeTyping,
+          timeSpent: {
+            $gt: isDevEnvironment() ? 0 : minTimeSpent,
           },
         },
       },
@@ -338,13 +332,6 @@ export async function update(
     `Aggregate ${timeToRunAggregate}s, loop 0s, insert 0s, index ${timeToRunIndex}s, histogram ${timeToSaveHistogram}`,
   );
 
-  setLeaderboard(language, mode, mode2, [
-    timeToRunAggregate,
-    0,
-    0,
-    timeToRunIndex,
-  ]);
-
   return {
     message: "Successfully updated leaderboard",
   };
@@ -352,7 +339,7 @@ export async function update(
 
 async function createIndex(
   key: string,
-  minTimeTyping: number,
+  minTimeSpent: number,
   dropIfMismatch = true,
 ): Promise<void> {
   const index = {
@@ -364,7 +351,7 @@ async function createIndex(
     banned: 1,
     lbOptOut: 1,
     needsToChangeName: 1,
-    timeTyping: 1,
+    timeSpent: 1,
     uid: 1,
     name: 1,
     discordId: 1,
@@ -377,8 +364,8 @@ async function createIndex(
       [`${key}.wpm`]: {
         $gt: 0,
       },
-      timeTyping: {
-        $gt: minTimeTyping,
+      timeSpent: {
+        $gt: minTimeSpent,
       },
     },
   };
@@ -400,7 +387,7 @@ async function createIndex(
 
       if (existingIndex !== undefined && existingIndex !== null) {
         await getUsersCollection().dropIndex(existingIndex);
-        return createIndex(key, minTimeTyping, false);
+        return createIndex(key, minTimeSpent, false);
       } else {
         throw e;
       }
@@ -409,10 +396,9 @@ async function createIndex(
 }
 
 export async function createIndicies(): Promise<void> {
-  const minTimeTyping = (await getLiveConfiguration()).leaderboards
-    .minTimeTyping;
-  await createIndex("lbPersonalBests.time.15.english", minTimeTyping);
-  await createIndex("lbPersonalBests.time.60.english", minTimeTyping);
+  const minTimeSpent = (await getLiveConfiguration()).leaderboards.minTimeSpent;
+  await createIndex("lbPersonalBests.time.15.english", minTimeSpent);
+  await createIndex("lbPersonalBests.time.60.english", minTimeSpent);
 
   if (isDevEnvironment()) {
     Logger.info("Updating leaderboards in dev mode...");
