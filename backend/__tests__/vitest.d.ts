@@ -8,6 +8,15 @@ type ExpectedRateLimit = {
   max: number;
   /** window in milliseconds. Needs to be within 2500ms */
   windowMs: number;
+  /**
+   * The rate-limit bucket key — the `uid` the request authenticates as.
+   *
+   * Every test in a spec file shares one bucket, so by the time this assertion
+   * runs an earlier request has usually already opened the window. Passing the
+   * key lets the matcher clear the bucket first, so the measured request opens
+   * a fresh window and `x-ratelimit-reset` reports a full one.
+   */
+  key: string;
 };
 interface RestRequestMatcher<R = Supertest> {
   toBeRateLimited: (

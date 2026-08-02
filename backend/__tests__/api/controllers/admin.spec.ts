@@ -56,7 +56,7 @@ describe("AdminController", () => {
     it("should be rate limited", async () => {
       await expect(
         mockApp.get("/admin").set("Authorization", `Bearer ${uid}`),
-      ).toBeRateLimited({ max: 1, windowMs: 5000 });
+      ).toBeRateLimited({ max: 1, windowMs: 5000, key: uid });
     });
   });
 
@@ -182,7 +182,7 @@ describe("AdminController", () => {
           .post("/admin/toggleBan")
           .send({ uid: victimUid })
           .set("Authorization", `Bearer ${uid}`),
-      ).toBeRateLimited({ max: 1, windowMs: 5000 });
+      ).toBeRateLimited({ max: 1, windowMs: 5000, key: uid });
     });
   });
 
@@ -298,7 +298,7 @@ describe("AdminController", () => {
           .post("/admin/report/accept")
           .send({ reports: [{ reportId: "1" }] })
           .set("Authorization", `Bearer ${uid}`),
-      ).toBeRateLimited({ max: 1, windowMs: 5000 });
+      ).toBeRateLimited({ max: 1, windowMs: 5000, key: uid });
     });
   });
   describe("reject reports", () => {
@@ -416,7 +416,7 @@ describe("AdminController", () => {
           .post("/admin/report/reject")
           .send({ reports: [{ reportId: "1" }] })
           .set("Authorization", `Bearer ${uid}`),
-      ).toBeRateLimited({ max: 1, windowMs: 5000 });
+      ).toBeRateLimited({ max: 1, windowMs: 5000, key: uid });
     });
   });
 

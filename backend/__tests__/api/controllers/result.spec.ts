@@ -178,7 +178,7 @@ describe("result controller test", () => {
     it("should be rate limited", async () => {
       await expect(
         mockApp.get("/results").set("Authorization", `Bearer ${uid}`),
-      ).toBeRateLimited({ max: 60, windowMs: 60 * 60 * 1000 });
+      ).toBeRateLimited({ max: 60, windowMs: 60 * 60 * 1000, key: uid });
     });
   });
   describe("getResultById", () => {
