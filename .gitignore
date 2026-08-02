@@ -133,3 +133,15 @@ frontend/static/webfonts-preview
 frontend/.env.sentry-build-plugin
 .claude/worktrees
 1024MiB
+
+# INF-027 — Cloudflare Wrangler local state and secrets, repo-wide.
+# `frontend/.gitignore` scopes the same set to the worker directory; these
+# entries catch a `.wrangler/` or `.dev.vars` created anywhere else.
+.wrangler/
+frontend/.wrangler/
+.dev.vars
+**/.dev.vars
+**/.dev.vars.*
+
+# Scratch output of `vite-plugins/icons.ts`; regenerate, never commit.
+icons-extracted.json
