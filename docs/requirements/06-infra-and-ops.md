@@ -243,8 +243,14 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
   | Cloudflare Workers + DNS + Email Routing | Free plan | — | **0** | Cloudflare free plan |
   | Firebase Auth | Spark plan, well under 50k MAU | — | **0** | Firebase Spark |
   | Subscription budget + alerts | `azurerm_consumption_budget_subscription` | — | **0** | — |
-  | **TOTAL — deployed default (M10, `westeurope`)** | expected → ceiling (logs at the daily cap, alerts billed) | | **≈ 36.6 – 40.2** | |
-  | **TOTAL — free-tier lever (Free, `northeurope`)** | subtract $18.18 compute + $4.38 storage | | **≈ 14 – 17.6** | INF-062 |
+  | **TOTAL — deployed default (M10, `westeurope`)** | expected → ceiling (logs at the daily cap, alerts billed) | | **≈ 39.42** | master §2.31 |
+  | **TOTAL — free-tier lever (Free, `northeurope`)** | subtract $18.18 compute + $4.38 storage | | **≈ 16.86** | INF-062 |
+
+  > The two totals were a range (`≈ 36.6 – 40.2` / `≈ 14 – 17.6`) until the master document's revision-3
+  > re-verification against the Azure Retail Prices API replaced every row with a dated citation and a single
+  > figure. §2 overrides the source documents, so the range is restated here as the figure it resolved to —
+  > the range's own low bound was ~$0.6 above the sum of the cited rows, which is how the two came to
+  > disagree. Both figures remain under the hard $50 ceiling of INF-004.
 
   Two honest caveats on this table, neither of which is hidden by the totals:
   1. **The ACA rows assume the *idle* rate for the whole month.** A replica is billed idle only while it is

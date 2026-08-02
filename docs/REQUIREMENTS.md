@@ -731,8 +731,80 @@ rule that cannot be satisfied is not a rule; a grep that does not implement the 
 | **B6** (ACA rates from memory) | **RESOLVED** | rates now cited; residual risk is the idle-vs-active assumption, policed by INF-144 |
 | C24 (transactional email) | **discharged + fixed** | audit found the deletion already complete; receiving = Cloudflare Email Routing, sending = Firebase only; ACS rejected (no inbound capability) |
 | **BL-7** | **new** | Cloudflare Email Routing not yet enabled — user is doing it themselves in the dashboard |
+| **Rows below added in revision 4 — remediation of the stage-3 validation** | | |
+| INF-024 (workers.dev production URL) | **overruled** | D1 → `https://crococalc.com` |
+| INF-025 (no custom domain / zone / DNS) | **overruled** | D1 → apex + `www` provisioned as Workers Custom Domains |
+| INF-047 second sentence ("No custom domain … for v1") | **scoped** | D1 applies to the **frontend only**; the API keeps its `*.azurecontainerapps.io` FQDN, so INF-030's preconnect is generated from `BACKEND_URL` rather than written literally |
+| INF-050 / INF-052 (`FRONTEND_URL` = workers.dev) | **amended** | D1 → `https://crococalc.com`; the backend CORS allowlist carries the `www` sibling too |
+| DoD-39 (smoke-test the workers.dev URL) | **amended** | D1 → smoke-test `https://crococalc.com/`; `workers_dev` stays enabled only as a pre-DNS deploy check |
+| §5.2 row "Custom domain, Cloudflare zone, DNS" | **struck** | D1 → no longer deferred |
+| ME-088 ("one config-change event") vs SB-090 (`overrideConfig` loop) | **reconciled** | C43 |
+| DoD-04a, DoD-07, DoD-12, DoD-13a, DoD-14 (grep wording) | **corrected** | C44 |
+| INF-043 (`:latest`) | **restated as testable** | `container_image` has no default and two `validation` blocks; `infra.yml` supplies the SHA |
+| §1 index total (**1111**) | **corrected** | revision 3 added `INF-053a` and `INF-062a`; the true total is **1113**, INF 158 → 160. Evidence: `docs/coverage/requirement-coverage.md` |
+| INF-037 total vs doc 06 range | **corrected** | doc 06 §12's range restated as the single verified figure, ≈ $39.42/mo (recoverable ≈ $16.86) |
 
 Everything not in this table is binding as written.
+
+### 2.32 Standing user decisions cited by code
+
+Source files cite these by id in comments. They are user decisions, not contradictions in the source
+documents, and they are recorded here so the citation resolves.
+
+- **D1 — the production frontend runs on `crococalc.com`.** The apex and `www.crococalc.com` are both
+  provisioned as Cloudflare **Workers Custom Domains** on zone `crococalc.com`, so Cloudflare owns the DNS
+  records and the certificate. `workers_dev` stays enabled purely so a deploy can be smoke-tested before DNS
+  is looked at. Consequences, all implemented: `frontend/wrangler.jsonc` `routes`;
+  `infra/terraform/prod/terraform.tfvars` `frontend_url`; `backend/src/app.ts`'s CORS allowlist (apex + `www`);
+  `deploy-frontend.yml`'s smoke test; `frontend/src/ts/constants/links.ts` `SITE_DOMAIN`. This overrules
+  INF-024, INF-025, INF-050 and INF-052, and removes the §5.2 deferral — see the §2.31 rows above.
+  D1 covers the **frontend only**: no custom domain is provisioned for the API (INF-047 stands).
+- **D2 — two mailboxes on that domain.** `contact@crococalc.com` (CP-156) and `support@crococalc.com`,
+  received through Cloudflare Email Routing (C24). Sending stays Firebase-only. BL-7 tracks the dashboard
+  side, which the user is enabling themselves.
+
+### C43 — ME-088's "one config-change event" vs SB-090's mandated mechanism
+
+**The conflict.** ME-088 says ME-082/ME-084 "MUST be implemented as a **single transactional config update
+that emits one config-change event**, so ME-007 (restart on change) fires exactly once". SB-090's preamble
+says the coupling "MUST be implemented with monkeytype's own mechanism, `overrideConfig` …, executed by the
+loop in `frontend/src/ts/config/setters.ts`". That loop recurses into `setConfig` per coupled key, and every
+`setConfig` dispatches its own `configEvent`. The two cannot both be satisfied literally.
+
+**Ruling.** SB-090 wins on mechanism; ME-088 wins on its stated *purpose*. `configEvent` is a per-key
+notification whose subscribers (themes, the SB-096 pulse, the chart, the caret, the result screen) need the
+key, the old value and the new value, so collapsing it would lose information and buy nothing — none of the
+eight subscribers restarts the test. What MUST be transactional is the observable consequence:
+
+1. **Exactly one `restartTestEvent` per user action**, however many keys the cascade moved. `applyConfig`
+   dispatches once, after the whole batch, comparing only the keys whose metadata declares
+   `changeRequiresRestart` (SB-055). The bar, the mobile modal and the palette each dispatch once per click.
+2. **One persisted write.** `saveToDatabase` is debounced at 1000 ms (SB-121/SB-123), so the second
+   `saveToLocalStorage` in a cascade coalesces into the same request.
+
+ME-088 is therefore **amended** to read "…MUST be implemented as a single transactional config update that
+causes exactly one restart", and the per-key `configEvent` count is explicitly not normative.
+
+### C44 — five DoD greps assert more than their requirement means
+
+DoD-04a, DoD-07, DoD-12, DoD-13a and DoD-14 are written as mechanical greps over the tree. Each is a proxy
+for a substantive requirement, and each proxy over-fires on *prose that records the removal* — a comment
+naming the thing that is gone is evidence the removal happened, not evidence it did not. DoD-14 is worse than
+imprecise: it is unsatisfiable, because it greps the whole history and every match is inside monkeytype's
+inherited commits, which INF-136 preserves and `NOTICE` clause 3 forbids rewriting.
+
+**Ruling.**
+
+- **DoD-04a** — scope to the runtime surface: the assertion is that no `BYPASS_*` variable is *set* or *read*.
+  A Dockerfile comment explaining that upstream hardcoded one does not fail it.
+- **DoD-07** — as already amended by C42, the subject is **user-visible strings**. Code comments and legacy
+  **migration** comparisons against stored monkeytype values are out of scope.
+- **DoD-12** — kept literal and now **passes literally**: zero matches in `frontend/src`. The one place that
+  has to talk about the old markup (`utils/icon-html.ts`) is worded so it does not reproduce a class string.
+- **DoD-13a** — scope to live identifiers: `grep -rnw` over `bailOut|bailedOut|blindMode|idleDuration|net`
+  excluding comment lines. Doc comments recording that C38/C41 struck them are required by C38 itself.
+- **DoD-14** — scope to post-fork history: `git log --format=%B f0c57c5c..HEAD`. As written it can never pass
+  and contradicts INF-135's own INF-136.
 
 ---
 
@@ -925,7 +997,6 @@ elsewhere MUST treat this document as authoritative (INF-150).
 | Numpad hint diagram under the task stream | CP-061 |
 | In-test crocodile mascot (the `Monkey.tsx` shell is the template) | INV-184 / A-06 |
 | Momentary (sliding-window) tpm chart line | CP-115, doc 03 §9.8 |
-| Custom domain, Cloudflare zone, DNS | INF-025 |
 | Staging / preview environment | INF-003 |
 | Sentry error reporting | INF-146, INV-118d |
 | Prometheus + swagger-stats dashboard | C25 |
@@ -934,6 +1005,11 @@ elsewhere MUST treat this document as authoritative (INF-150).
 | Bespoke croco calc default theme (v1 ships `serika_dark`) | OQ-16 / INV-082 |
 | A "bailed out early" test-ending concept | C38 — deliberately not built, see AC-187 |
 | Blind mode | C41 — struck, no defined behaviour survives CP-036 |
+| SB-214's side-by-side pixel-baseline PNG diff of the settings bar | Coordinator ruling **R6** (task #57) — deferred, MUST NOT block. SB-214's other clauses are implemented and asserted in `__tests__/components/pages/test/TestConfigGeometry.spec.tsx`; only the image comparison against a captured monkeytype baseline is outstanding, and it needs a rendered browser plus a stored baseline the repo does not carry |
+
+**Note on the custom domain.** The row that used to read "Custom domain, Cloudflare zone, DNS | INF-025" is
+**removed**: decision **D1** (§2.32) put `crococalc.com` + `www` into v1 and it is implemented. INF-047's
+"no custom domain" still stands for the **API**.
 
 ---
 
@@ -1408,9 +1484,12 @@ A validation stage MUST be able to verify every line below mechanically or by di
 ### 7.1 Requirement coverage
 
 - [ ] **DoD-01** Doc 05 uses the `INV-` prefix throughout; `grep -c '^\s*|\?\s*\*\*\?ME-' docs/requirements/05-*.md` → 0.
-- [ ] **DoD-02** Every ID in the §1 index that is not listed in §2.31 has an implementing commit, a test, or an
-      explicit inspection note. Produce a coverage report of **1111** rows. §6.2 and §6.3 make this producible;
-      before revision 2 ~40 IDs and roughly a third of `frontend/src/ts` had no owning package.
+- [x] **DoD-02** Every ID in the §1 index that is not listed in §2.31 has an implementing commit, a test, or an
+      explicit inspection note. §6.2 and §6.3 make this producible; before revision 2 ~40 IDs and roughly a
+      third of `frontend/src/ts` had no owning package. **Produced:** `docs/coverage/requirement-coverage.md`,
+      regenerate with `node scripts/requirement-coverage.mjs`. The row count is **1113**, not the 1111 this
+      item was written against: revision 3 added the lettered `INF-053a` and `INF-062a` after the §1 headline
+      was fixed, so INF moved 158 → 160. Every other per-document count matches §1 exactly.
 - [ ] **DoD-03** Every ID listed in §2.31 is implemented **as ruled here**, not as written in its source.
 
 ### 7.2 Deletion sweep (path-existence assertions)
@@ -1430,9 +1509,11 @@ A validation stage MUST be able to verify every line below mechanically or by di
       `packages/schemas/src/layouts.ts`, `packages/schemas/src/quotes.ts`, `packages/schemas/src/presets.ts`.
 - [ ] **DoD-04a** The monkeytype anti-cheat **stub** is gone, asserted by behaviour rather than by path
       (revision 2, review gap 25 — DoD-04 previously forbade `backend/src/anticheat/index.ts`, which is the
-      natural entry point WP-10 must write): `grep -rn "BYPASS_ANTICHEAT" backend/ docker/ infra/` returns
-      nothing, and `backend/src/anticheat/` exports a real implementation of ME-179 … ME-183 whose
-      `validateResult` can return `false` (proven by DoD-49).
+      natural entry point WP-10 must write): as scoped by **C44**, no `BYPASS_*` variable is set or read —
+      `grep -rn "BYPASS_ANTICHEAT" backend/ docker/ infra/ | grep -v "^\s*[#/]"` returns nothing (a comment
+      recording that upstream hardcoded one is evidence of the removal, not of its survival) — and
+      `backend/src/anticheat/` exports a real implementation of ME-179 … ME-183 whose `validateResult` can
+      return `false` (proven by DoD-49).
 - [ ] **DoD-05** These **do** exist: `packages/math-engine/`, `frontend/src/ts/components/common/Icon.tsx`,
       `frontend/src/ts/commandline/`, `frontend/src/ts/elements/caret.ts`, `frontend/src/styles/caret.scss`,
       `frontend/src/styles/result.scss`, `frontend/wrangler.jsonc`, `frontend/static/_headers`,
@@ -1447,16 +1528,23 @@ A validation stage MUST be able to verify every line below mechanically or by di
       and `character` are matched as **whole words** and `password*` is exempt, which the revision-1 pattern
       silently dropped altogether:
       `grep -riE "monkey|monkeytype|typing|wpm|words per minute|keyboard layout|quote|(^|[^a-z])(words?|characters?)([^a-z]|$)" frontend/src | grep -viE "passwords?|passwordless"`
+      Per **C44**, the subject is **user-visible strings**: comment lines and legacy *migration* comparisons
+      against stored monkeytype values (`configObj.showAverage === "wpm"`) are out of scope, so the assertion
+      is on the residue after `grep -v` of comment-only lines.
 - [ ] **DoD-08** `grep -ri "redis\|bullmq" backend/ docker/ infra/` returns nothing outside changelog/history.
 - [ ] **DoD-09** `grep -ri "monkeytype\.com" frontend/src backend/src infra/` returns nothing.
 - [ ] **DoD-10** `grep -rn "Math.random" packages/math-engine/src` returns nothing (ME-166).
 - [ ] **DoD-11** `grep -rn "api.iconify.design" frontend/src frontend/dist` returns nothing (SB-063, AC-021).
 - [ ] **DoD-12** `grep -rn "fa-\|@fortawesome" frontend/src` returns nothing.
 - [ ] **DoD-13** `grep -rn "#words\|wordsInput\|wpmChart\|resultWordsHistory" frontend/src` returns nothing.
-- [ ] **DoD-13a** `grep -rn "bailedOut\|bailOut\|idleDuration\|settingsSignature\|blindMode" frontend/src backend/src packages/`
-      returns nothing (C37, C38, C41, C4), and `grep -rnw "net" packages/ backend/src` finds no metric field
-      of that name (C40).
-- [ ] **DoD-14** `git log --format=%B | grep -i "claude\|co-authored-by"` returns nothing (INF-135).
+- [ ] **DoD-13a** No **live identifier** named `bailedOut`, `bailOut`, `idleDuration`, `settingsSignature` or
+      `blindMode` survives in `frontend/src backend/src packages/` (C37, C38, C41, C4), and
+      `grep -rnw "net" packages/ backend/src` finds no metric field of that name (C40). Per **C44** the grep
+      excludes comment
+      lines: C38 itself requires the doc comments that record what was struck.
+- [ ] **DoD-14** `git log --format=%B f0c57c5c..HEAD | grep -i "claude\|co-authored-by"` returns nothing
+      (INF-135). Per **C44** the range is deliberate: unscoped, the grep matches monkeytype's inherited
+      commits, which INF-136 preserves and `NOTICE` clause 3 forbids rewriting, so it could never pass.
 - [ ] **DoD-15** Every commit added by stage 2 is single-line, all lowercase, ≤ 5 words (INF-134).
 
 ### 7.4 Automated tests
@@ -1486,7 +1574,8 @@ A validation stage MUST be able to verify every line below mechanically or by di
       and for any single-setting deviation (SB-205, AC-121).
 - [ ] **DoD-23** A result whose task log does not match `(mathSeed, mathSettings)` is rejected by the server
       (ME-174, ME-040/E40).
-- [ ] **DoD-24** The backend accepts a result with `acc = 12.5` (BL-5 cleared).
+- [ ] **DoD-24** The backend accepts a result with `acc = 12.5` (BL-5 cleared) — asserted end to end through
+      `POST /results`, not only at schema level.
 - [ ] **DoD-25** Backend integration tests (testcontainers Mongo, no Redis) pass.
 - [ ] **DoD-49** The plausibility layer rejects and accepts as specified (ME-179 … ME-183): a log at 121 tpm,
       a log with >5 % of inter-answer intervals under 150 ms, a log of ≥ 10 tasks with a median interval
@@ -1497,10 +1586,11 @@ A validation stage MUST be able to verify every line below mechanically or by di
       Mongo produce exactly one unit of work and single-runner state; re-running the same `periodKey` leaves
       the collections byte-identical; a lock stuck in `running` with a `heartbeatAt` older than 10 minutes is
       reclaimed.
-- [ ] **DoD-51** Every directory under `packages/`, `frontend/src/ts/`, `frontend/src/styles/`,
+- [x] **DoD-51** Every directory under `packages/`, `frontend/src/ts/`, `frontend/src/styles/`,
       `frontend/static/` and `backend/src/` in the reference checkout appears in at least one doc-05 row
-      **and** has exactly one owning work package under §6 / §6.2 (INV-206, review gap 11). Produce the
-      directory-to-owner listing as evidence.
+      **and** has exactly one owning work package under §6 / §6.2 (INV-206, review gap 11).
+      **Produced:** `docs/coverage/directory-ownership.md` — 102 tracked directories, 0 unowned; regenerate
+      with `node scripts/requirement-coverage.mjs`.
 - [ ] **DoD-52** Every typing-specific concept named in the brief — languages, word lists, quotes, zen mode,
       funbox, layouts/keymaps, on-screen keyboard, caret smoothing, per-character wpm/raw/consistency,
       stenography anti-cheat, lazy mode, punctuation — has an explicit cut row in doc 05 §11 (INV-207).
@@ -1539,7 +1629,8 @@ A validation stage MUST be able to verify every line below mechanically or by di
 
 - [ ] **DoD-37** `terraform apply` in `infra/terraform/prod` reports `No changes.` on a second consecutive run.
 - [ ] **DoD-38** `curl -s <api_base_url>/` → HTTP 200, `"message":"ok"`, non-zero `uptime`.
-- [ ] **DoD-39** `https://croco-calc.<subdomain>.workers.dev/` loads the SPA; `/leaderboards` → 200.
+- [ ] **DoD-39** `https://crococalc.com/` loads the SPA; `/leaderboards` → 200; `https://www.crococalc.com/`
+      does the same (D1 — the workers.dev origin stays reachable but is only a pre-DNS smoke-test path).
 - [ ] **DoD-40** Response headers on `/` and on a hashed asset match INF-020 / INF-021.
 - [ ] **DoD-41** The SPA calls the backend with no CORS error (INF-012, INF-054).
 - [ ] **DoD-42** All three sign-in providers work end to end (INF-104) — **blocked on BL-1/BL-2/BL-3**.
