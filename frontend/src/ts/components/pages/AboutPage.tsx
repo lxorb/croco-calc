@@ -493,7 +493,7 @@ export function AboutPage(): JSXElement {
               href="#supporters_title"
               class="p-0 pt-2 pr-2 pb-2"
             />
-            who helped financially by donating or enabling optional ads
+            who helped financially by donating
           </p>
           <p>
             <Button

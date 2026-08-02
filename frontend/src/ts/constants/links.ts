@@ -17,9 +17,11 @@ export const COMING_SOON_TOOLTIP = "coming soon";
 export const CONTACT_EMAIL = "contact@crococalc.com";
 
 /**
- * The address used for the bug and account subjects of the contact modal
- * (CP-155). Kept separate from `CONTACT_EMAIL` so support traffic can be
- * routed independently.
+ * The second address decision D2 provisions. Deliberately **not** used by the
+ * contact modal: CP-155 requires all six of its buttons to `mailto:` the one
+ * `CONTACT_EMAIL`, so support routing has to happen on the mailbox side (an
+ * alias or a filter on the `[Bug] ` / `[Account] ` subject prefixes) rather
+ * than in the markup.
  */
 export const SUPPORT_EMAIL = "support@crococalc.com";
 

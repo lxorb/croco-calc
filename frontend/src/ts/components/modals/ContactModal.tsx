@@ -1,57 +1,29 @@
 import { For, JSXElement } from "solid-js";
 
-import { CONTACT_EMAIL, SUPPORT_EMAIL } from "../../constants/links";
+import { CONTACT_EMAIL } from "../../constants/links";
 import { AnimatedModal } from "../common/AnimatedModal";
 import { Button } from "../common/Button";
 
 /**
  * CP-151 … CP-156. Mirrors the upstream contact modal; the second
- * business-inquiry address is gone (CP-154) — croco calc routes everything
- * through `CONTACT_EMAIL`, with bug and account traffic going to
- * `SUPPORT_EMAIL`.
+ * business-inquiry address is gone (CP-154) — croco calc has one address and
+ * all six buttons `mailto:` it (CP-155), differing only by subject prefix.
  */
 const BUTTONS: {
   label: string;
   icon: string;
   subject: string;
-  to: string;
 }[] = [
-  {
-    label: "Question",
-    icon: "ph:question-bold",
-    subject: "[Question] ",
-    to: CONTACT_EMAIL,
-  },
-  {
-    label: "Feedback",
-    icon: "ph:chat-dots-bold",
-    subject: "[Feedback] ",
-    to: CONTACT_EMAIL,
-  },
-  {
-    label: "Bug Report",
-    icon: "ph:bug-bold",
-    subject: "[Bug] ",
-    to: SUPPORT_EMAIL,
-  },
-  {
-    label: "Account Help",
-    icon: "ph:user-circle-bold",
-    subject: "[Account] ",
-    to: SUPPORT_EMAIL,
-  },
+  { label: "Question", icon: "ph:question-bold", subject: "[Question] " },
+  { label: "Feedback", icon: "ph:chat-dots-bold", subject: "[Feedback] " },
+  { label: "Bug Report", icon: "ph:bug-bold", subject: "[Bug] " },
+  { label: "Account Help", icon: "ph:user-circle-bold", subject: "[Account] " },
   {
     label: "Business Inquiry",
     icon: "ph:briefcase-bold",
     subject: "[Business] ",
-    to: CONTACT_EMAIL,
   },
-  {
-    label: "Other",
-    icon: "ph:dots-three-bold",
-    subject: "[Other] ",
-    to: CONTACT_EMAIL,
-  },
+  { label: "Other", icon: "ph:dots-three-bold", subject: "[Other] " },
 ];
 
 export function ContactModal(): JSXElement {
@@ -74,7 +46,7 @@ export function ContactModal(): JSXElement {
           {(button) => (
             <Button
               variant="button"
-              href={`mailto:${button.to}?subject=${button.subject}`}
+              href={`mailto:${CONTACT_EMAIL}?subject=${button.subject}`}
               text={button.label}
               class={buttonClass}
               icon={{
