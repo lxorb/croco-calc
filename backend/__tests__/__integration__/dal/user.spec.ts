@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { CustomThemeColors } from "@croco-calc/schemas/configs";
-import { PersonalBest, PersonalBests } from "@croco-calc/schemas/shared";
-import { MonkeyMail, ResultFilters } from "@croco-calc/schemas/users";
+import { PersonalBest } from "@croco-calc/schemas/shared";
+import { CrocoMail, ResultFilters } from "@croco-calc/schemas/users";
 import { ObjectId } from "mongodb";
 import * as UserDAL from "../../../src/dal/user";
 import { createConnection as createFriend } from "../../__testData__/connections";
 import * as UserTestData from "../../__testData__/users";
 
 const mockPersonalBest: PersonalBest = {
-  acc: 1,
-  consistency: 1,
-  difficulty: "normal" as const,
-  lazyMode: true,
-  language: "polish",
-  punctuation: false,
-  raw: 230,
-  wpm: 215,
+  score: 215,
+  correct: 220,
+  wrong: 5,
+  acc: 97,
+  tpm: 55,
+  spm: 53,
+  settings: UserTestData.TEST_SETTINGS,
+  settingsId: "1000:100:threeByTwo:99:1:1:1",
   timestamp: 13123123,
 };
 
@@ -24,48 +24,47 @@ const mockResultFilter: ResultFilters = {
   _id: "id",
   name: "sfdkjhgdf",
   pb: {
-    no: true,
-    yes: true,
-  },
-  difficulty: {
-    normal: true,
-    expert: false,
-    master: false,
-  },
-  mode: {
-    words: false,
-    time: true,
-    quote: false,
-    zen: false,
-    custom: false,
-  },
-  words: {
-    "10": false,
-    "25": false,
-    "50": false,
-    "100": false,
-    custom: false,
+    true: true,
+    false: true,
   },
   time: {
-    "15": false,
-    "30": true,
-    "60": false,
-    "120": false,
-    custom: false,
+    "1": false,
+    "2": true,
+    "4": false,
+    "8": false,
   },
-  quoteLength: {
-    short: false,
-    medium: false,
-    long: false,
-    thicc: false,
+  addition: {
+    off: false,
+    "100": true,
+    "1000": false,
   },
-  punctuation: {
-    on: false,
-    off: true,
+  multiplication: {
+    off: false,
+    "12": true,
+    "20": false,
+    "100": false,
   },
-  numbers: {
-    on: false,
-    off: true,
+  division: {
+    off: false,
+    tables: true,
+    threeByTwo: false,
+  },
+  fractionAddition: {
+    off: false,
+    "12": true,
+    "99": false,
+  },
+  fractionMultiplication: {
+    true: true,
+    false: false,
+  },
+  decimals: {
+    true: true,
+    false: false,
+  },
+  negatives: {
+    true: false,
+    false: true,
   },
   date: {
     last_day: false,
@@ -73,15 +72,6 @@ const mockResultFilter: ResultFilters = {
     last_month: false,
     last_3months: false,
     all: true,
-  },
-  tags: {
-    none: true,
-  },
-  language: {
-    english: true,
-  },
-  funbox: {
-    none: true,
   },
 };
 
@@ -212,11 +202,7 @@ describe("UserDal", () => {
       {
         $set: {
           personalBests: {
-            time: { 20: [mockPersonalBest] },
-            words: {},
-            quote: {},
-            zen: {},
-            custom: {},
+            time: { "4": [mockPersonalBest] },
           },
         },
       },
@@ -225,11 +211,7 @@ describe("UserDal", () => {
     const { personalBests } =
       (await UserDAL.getUser(testUser.uid, "test")) ?? {};
     expect(personalBests).toStrictEqual({
-      time: { 20: [mockPersonalBest] },
-      words: {},
-      quote: {},
-      custom: {},
-      zen: {},
+      time: { "4": [mockPersonalBest] },
     });
     // when
     await UserDAL.clearPb(testUser.uid);
@@ -238,10 +220,6 @@ describe("UserDal", () => {
     const updatedUser = (await UserDAL.getUser(testUser.uid, "test")) ?? {};
     expect(updatedUser.personalBests).toStrictEqual({
       time: {},
-      words: {},
-      quote: {},
-      custom: {},
-      zen: {},
     });
   });
 
@@ -390,316 +368,41 @@ describe("UserDal", () => {
     });
   });
 
-  describe("addTag", () => {
-    it("should return error if uid not found", async () => {
-      // when, then
-      await expect(
-        UserDAL.addTag("non existing uid", "tagName"),
-      ).rejects.toThrow("Maximum number of tags reached\nStack: add tag");
-    });
-
-    it("should return error if user has reached maximum", async () => {
-      // given
-      const { uid } = await UserTestData.createUser({
-        tags: new Array(15).fill(0).map(() => ({
-          _id: new ObjectId(),
-          name: "any",
-          personalBests: {} as any,
-        })),
-      });
-
-      // when, then
-      await expect(UserDAL.addTag(uid, "new")).rejects.toThrow(
-        "Maximum number of tags reached\nStack: add tag",
-      );
-    });
-
-    it("addTag success", async () => {
-      // given
-      const emptyPb: PersonalBests = {
-        time: {},
-        words: {},
-        quote: {},
-        zen: {},
-        custom: {},
-      };
-      const { uid } = await UserTestData.createUser({
-        tags: [
-          {
-            _id: new ObjectId(),
-            name: "first",
-            personalBests: emptyPb,
-          },
-        ],
-      });
-
-      // when
-      await UserDAL.addTag(uid, "newTag");
-
-      // then
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.tags).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ name: "first", personalBests: emptyPb }),
-          expect.objectContaining({ name: "newTag", personalBests: emptyPb }),
-        ]),
-      );
-    });
-  });
-
-  describe("editTag", () => {
-    it("should return error if uid not found", async () => {
-      // when, then
-      await expect(
-        UserDAL.editTag(
-          "non existing uid",
-          new ObjectId().toHexString(),
-          "newName",
-        ),
-      ).rejects.toThrow("Tag not found\nStack: edit tag");
-    });
-
-    it("should fail if tag not found", async () => {
-      // given
-      const tagOne: UserDAL.DBUserTag = {
-        _id: new ObjectId(),
-        name: "one",
-        personalBests: {} as any,
-      };
-      const { uid } = await UserTestData.createUser({
-        tags: [tagOne],
-      });
-
-      // when, then
-      await expect(
-        UserDAL.editTag(uid, new ObjectId().toHexString(), "newName"),
-      ).rejects.toThrow("Tag not found\nStack: edit tag");
-    });
-
-    it("editTag success", async () => {
-      // given
-      const tagOne: UserDAL.DBUserTag = {
-        _id: new ObjectId(),
-        name: "one",
-        personalBests: {} as any,
-      };
-      const { uid } = await UserTestData.createUser({
-        tags: [tagOne],
-      });
-
-      // when
-      await UserDAL.editTag(uid, tagOne._id.toHexString(), "newTagName");
-
-      // then
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.tags ?? [][0]).toStrictEqual([
-        { ...tagOne, name: "newTagName" },
-      ]);
-    });
-  });
-
-  describe("removeTag", () => {
-    it("should return error if uid not found", async () => {
-      // when, then
-      await expect(
-        UserDAL.removeTag("non existing uid", new ObjectId().toHexString()),
-      ).rejects.toThrow("Tag not found\nStack: remove tag");
-    });
-
-    it("should return error if tag is unknown", async () => {
-      // given
-      const tagOne: UserDAL.DBUserTag = {
-        _id: new ObjectId(),
-        name: "one",
-        personalBests: {} as any,
-      };
-      const { uid } = await UserTestData.createUser({
-        tags: [tagOne],
-      });
-
-      // when, then
-      await expect(
-        UserDAL.removeTag(uid, new ObjectId().toHexString()),
-      ).rejects.toThrow("Tag not found\nStack: remove tag");
-    });
-    it("should remove tag", async () => {
-      // given
-      const tagOne = {
-        _id: new ObjectId(),
-        name: "tagOne",
-        personalBests: {} as any,
-      };
-      const tagTwo = {
-        _id: new ObjectId(),
-        name: "tagTwo",
-        personalBests: {} as any,
-      };
-      const tagThree = {
-        _id: new ObjectId(),
-        name: "tagThree",
-        personalBests: {} as any,
-      };
-
-      const { uid } = await UserTestData.createUser({
-        tags: [tagOne, tagTwo, tagThree],
-      });
-
-      // when, then
-      await UserDAL.removeTag(uid, tagTwo._id.toHexString());
-
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.tags).toStrictEqual([tagOne, tagThree]);
-    });
-  });
-
-  describe("removeTagPb", () => {
-    it("should return error if uid not found", async () => {
-      // when, then
-      await expect(
-        UserDAL.removeTagPb("non existing uid", new ObjectId().toHexString()),
-      ).rejects.toThrow("Tag not found\nStack: remove tag pb");
-    });
-
-    it("should return error if tag is unknown", async () => {
-      // given
-      const tagOne: UserDAL.DBUserTag = {
-        _id: new ObjectId(),
-        name: "one",
-        personalBests: {} as any,
-      };
-      const { uid } = await UserTestData.createUser({
-        tags: [tagOne],
-      });
-
-      // when, then
-      await expect(
-        UserDAL.removeTagPb(uid, new ObjectId().toHexString()),
-      ).rejects.toThrow("Tag not found\nStack: remove tag pb");
-    });
-    it("should remove tag pb", async () => {
-      // given
-      const tagOne = {
-        _id: new ObjectId(),
-        name: "tagOne",
-        personalBests: {
-          custom: { custom: [mockPersonalBest] },
-        } as PersonalBests,
-      };
-      const tagTwo = {
-        _id: new ObjectId(),
-        name: "tagTwo",
-        personalBests: {
-          custom: { custom: [mockPersonalBest] },
-        } as PersonalBests,
-      };
-      const tagThree = {
-        _id: new ObjectId(),
-        name: "tagThree",
-        personalBests: {
-          custom: { custom: [mockPersonalBest] },
-        } as PersonalBests,
-      };
-
-      const { uid } = await UserTestData.createUser({
-        tags: [tagOne, tagTwo, tagThree],
-      });
-
-      // when, then
-      await UserDAL.removeTagPb(uid, tagTwo._id.toHexString());
-
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.tags).toStrictEqual([
-        tagOne,
-        {
-          ...tagTwo,
-          personalBests: {
-            time: {},
-            words: {},
-            quote: {},
-            zen: {},
-            custom: {},
-          },
-        },
-        tagThree,
-      ]);
-    });
-  });
-
   describe("updateProfile", () => {
     it("updateProfile should appropriately handle multiple profile updates", async () => {
       const uid = new ObjectId().toHexString();
       await UserDAL.addUser("test name", "test email", uid);
 
-      await UserDAL.updateProfile(
-        uid,
-        {
-          bio: "test bio",
-        },
-        {
-          badges: [],
-        },
-      );
+      await UserDAL.updateProfile(uid, {
+        bio: "test bio",
+      });
 
       const user = await UserDAL.getUser(uid, "test add result filters");
       expect(user.profileDetails).toStrictEqual({
         bio: "test bio",
       });
-      expect(user.inventory).toStrictEqual({
-        badges: [],
-      });
 
-      await UserDAL.updateProfile(
-        uid,
-        {
-          keyboard: "test keyboard",
-          socialProfiles: {
-            twitter: "test twitter",
-          },
-        },
-        {
-          badges: [
-            {
-              id: 1,
-              selected: true,
-            },
-          ],
-        },
-      );
-
-      const updatedUser = await UserDAL.getUser(uid, "test add result filters");
-      expect(updatedUser.profileDetails).toStrictEqual({
-        bio: "test bio",
-        keyboard: "test keyboard",
+      await UserDAL.updateProfile(uid, {
         socialProfiles: {
           twitter: "test twitter",
         },
       });
-      expect(updatedUser.inventory).toStrictEqual({
-        badges: [
-          {
-            id: 1,
-            selected: true,
-          },
-        ],
+
+      const updatedUser = await UserDAL.getUser(uid, "test add result filters");
+      expect(updatedUser.profileDetails).toStrictEqual({
+        bio: "test bio",
+        socialProfiles: {
+          twitter: "test twitter",
+        },
       });
 
-      await UserDAL.updateProfile(
-        uid,
-        {
-          bio: "test bio 2",
-          socialProfiles: {
-            github: "test github",
-            website: "test website",
-          },
+      await UserDAL.updateProfile(uid, {
+        bio: "test bio 2",
+        socialProfiles: {
+          github: "test github",
+          website: "test website",
         },
-        {
-          badges: [
-            {
-              id: 1,
-            },
-          ],
-        },
-      );
+      });
 
       const updatedUser2 = await UserDAL.getUser(
         uid,
@@ -707,19 +410,11 @@ describe("UserDal", () => {
       );
       expect(updatedUser2.profileDetails).toStrictEqual({
         bio: "test bio 2",
-        keyboard: "test keyboard",
         socialProfiles: {
           twitter: "test twitter",
           github: "test github",
           website: "test website",
         },
-      });
-      expect(updatedUser2.inventory).toStrictEqual({
-        badges: [
-          {
-            id: 1,
-          },
-        ],
       });
     });
     it("should omit undefined or empty object values", async () => {
@@ -727,7 +422,6 @@ describe("UserDal", () => {
       const givenUser = await UserTestData.createUser({
         profileDetails: {
           bio: "test bio",
-          keyboard: "test keyboard",
           socialProfiles: {
             twitter: "test twitter",
             github: "test github",
@@ -738,7 +432,7 @@ describe("UserDal", () => {
       //WHEN
       await UserDAL.updateProfile(givenUser.uid, {
         bio: undefined, //ignored
-        keyboard: "updates",
+        showActivityOnPublicProfile: true,
         socialProfiles: {}, //ignored
       });
 
@@ -746,7 +440,7 @@ describe("UserDal", () => {
       const read = await UserDAL.getUser(givenUser.uid, "read");
       expect(read.profileDetails).toStrictEqual({
         ...givenUser.profileDetails,
-        keyboard: "updates",
+        showActivityOnPublicProfile: true,
       });
     });
   });
@@ -755,22 +449,14 @@ describe("UserDal", () => {
     const uid = new ObjectId().toHexString();
     await UserDAL.addUser("test name", "test email", uid);
 
-    await UserDAL.updateProfile(
-      uid,
-      {
-        bio: "test bio",
-        keyboard: "test keyboard",
-        socialProfiles: {
-          twitter: "test twitter",
-          github: "test github",
-        },
+    await UserDAL.updateProfile(uid, {
+      bio: "test bio",
+      socialProfiles: {
+        twitter: "test twitter",
+        github: "test github",
       },
-      {
-        badges: [],
-      },
-    );
+    });
 
-    await UserDAL.incrementBananas(uid, 100);
     await UserDAL.incrementXp(uid, 15);
 
     await UserDAL.resetUser(uid);
@@ -778,21 +464,11 @@ describe("UserDal", () => {
 
     expect(resetUser.profileDetails).toStrictEqual({
       bio: "",
-      keyboard: "",
       socialProfiles: {},
     });
 
-    expect(resetUser.inventory).toStrictEqual({
-      badges: [],
-    });
-
-    expect(resetUser.bananas).toStrictEqual(0);
     expect(resetUser.xp).toStrictEqual(0);
-    expect(resetUser.streak).toStrictEqual({
-      length: 0,
-      lastResultTimestamp: 0,
-      maxLength: 0,
-    });
+    expect(resetUser.personalBests).toStrictEqual({ time: {} });
   });
 
   it("getInbox should return the user's inbox", async () => {
@@ -908,155 +584,6 @@ describe("UserDal", () => {
     ]);
   });
 
-  describe("updateStreak", () => {
-    it("should return error if uid not found", async () => {
-      // when, then
-      await expect(UserDAL.updateStreak("non existing uid", 0)).rejects.toThrow(
-        "User not found\nStack: calculate streak",
-      );
-    });
-
-    it("updateStreak should update streak", async () => {
-      const { uid } = await UserTestData.createUser();
-
-      const testSteps = [
-        {
-          date: "2023/06/07 21:00:00 UTC",
-          expectedStreak: 1,
-        },
-        {
-          date: "2023/06/07 23:00:00 UTC",
-          expectedStreak: 1,
-        },
-        {
-          date: "2023/06/08 00:00:00 UTC",
-          expectedStreak: 2,
-        },
-        {
-          date: "2023/06/08 23:00:00 UTC",
-          expectedStreak: 2,
-        },
-        {
-          date: "2023/06/09 00:00:00 UTC",
-          expectedStreak: 3,
-        },
-        {
-          date: "2023/06/11 00:00:00 UTC",
-          expectedStreak: 1,
-        },
-      ];
-
-      for (const { date, expectedStreak } of testSteps) {
-        const milis = new Date(date).getTime();
-        Date.now = vi.fn(() => milis);
-
-        const streak = await UserDAL.updateStreak(uid, milis);
-
-        expect(streak).toBe(expectedStreak);
-      }
-    });
-
-    it("positive streak offset should award streak correctly", async () => {
-      const { uid } = await UserTestData.createUser({
-        streak: { hourOffset: 10 } as any,
-      });
-
-      const testSteps = [
-        {
-          date: "2023/06/06 21:00:00 UTC",
-          expectedStreak: 1,
-        },
-        {
-          date: "2023/06/07 01:00:00 UTC",
-          expectedStreak: 1,
-        },
-        {
-          date: "2023/06/07 09:00:00 UTC",
-          expectedStreak: 1,
-        },
-        {
-          date: "2023/06/07 10:00:00 UTC",
-          expectedStreak: 2,
-        },
-        {
-          date: "2023/06/07 23:00:00 UTC",
-          expectedStreak: 2,
-        },
-        {
-          date: "2023/06/08 00:00:00 UTC",
-          expectedStreak: 2,
-        },
-        {
-          date: "2023/06/08 01:00:00 UTC",
-          expectedStreak: 2,
-        },
-        {
-          date: "2023/06/08 09:00:00 UTC",
-          expectedStreak: 2,
-        },
-        {
-          date: "2023/06/08 10:00:00 UTC",
-          expectedStreak: 3,
-        },
-        {
-          date: "2023/06/10 10:00:00 UTC",
-          expectedStreak: 1,
-        },
-      ];
-
-      for (const { date, expectedStreak } of testSteps) {
-        const milis = new Date(date).getTime();
-        Date.now = vi.fn(() => milis);
-
-        const streak = await UserDAL.updateStreak(uid, milis);
-
-        expect(streak).toBe(expectedStreak);
-      }
-    });
-
-    it("negative streak offset should award streak correctly", async () => {
-      const { uid } = await UserTestData.createUser({
-        streak: { hourOffset: -4 } as any,
-      });
-
-      const testSteps = [
-        {
-          date: "2023/06/06 19:00:00 UTC",
-          expectedStreak: 1,
-        },
-        {
-          date: "2023/06/06 20:00:00 UTC",
-          expectedStreak: 2,
-        },
-        {
-          date: "2023/06/07 01:00:00 UTC",
-          expectedStreak: 2,
-        },
-        {
-          date: "2023/06/07 19:00:00 UTC",
-          expectedStreak: 2,
-        },
-        {
-          date: "2023/06/07 20:00:00 UTC",
-          expectedStreak: 3,
-        },
-        {
-          date: "2023/06/09 23:00:00 UTC",
-          expectedStreak: 1,
-        },
-      ];
-
-      for (const { date, expectedStreak } of testSteps) {
-        const milis = new Date(date).getTime();
-        Date.now = vi.fn(() => milis);
-
-        const streak = await UserDAL.updateStreak(uid, milis);
-
-        expect(streak).toBe(expectedStreak);
-      }
-    });
-  });
-
   describe("incrementTestActivity", () => {
     it("ignores user without migration", async () => {
       // given
@@ -1165,7 +692,7 @@ describe("UserDal", () => {
       let user = await UserTestData.createUser({ personalBests: undefined });
 
       //WHEN
-      const read = await UserDAL.getPersonalBests(user.uid, "time", "15");
+      const read = await UserDAL.getPersonalBests(user.uid, "time", "4");
 
       expect(read).toBeUndefined();
     });
@@ -1178,33 +705,6 @@ describe("UserDal", () => {
       ).rejects.toThrow("User not found\nStack: stack");
     });
 
-    it("should get streak", async () => {
-      //GIVEN
-      let user = await UserTestData.createUser({
-        streak: {
-          hourOffset: 1,
-          length: 5,
-          lastResultTimestamp: 4711,
-          maxLength: 23,
-        },
-      });
-
-      //WHEN
-      const partial = await UserDAL.getPartialUser(user.uid, "streak", [
-        "streak",
-      ]);
-
-      //THEN
-      expect(partial).toStrictEqual({
-        _id: user._id,
-        streak: {
-          hourOffset: 1,
-          length: 5,
-          lastResultTimestamp: 4711,
-          maxLength: 23,
-        },
-      });
-    });
     it("should get with missing personalBests", async () => {
       //GIVEN
       let user = await UserTestData.createUser({ personalBests: undefined });
@@ -1268,68 +768,10 @@ describe("UserDal", () => {
       });
     });
   });
-  describe("linkDiscord", () => {
-    it("throws for nonexisting user", async () => {
-      await expect(async () =>
-        UserDAL.linkDiscord("unknown", "", ""),
-      ).rejects.toThrow("User not found\nStack: link discord");
-    });
-    it("should update", async () => {
-      //given
-      const { uid } = await UserTestData.createUser({
-        discordId: "discordId",
-        discordAvatar: "discordAvatar",
-      });
-      //when
-      await UserDAL.linkDiscord(uid, "newId", "newAvatar");
-
-      //then
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.discordId).toEqual("newId");
-      expect(read.discordAvatar).toEqual("newAvatar");
-    });
-    it("should update without avatar", async () => {
-      //given
-      const { uid } = await UserTestData.createUser({
-        discordId: "discordId",
-        discordAvatar: "discordAvatar",
-      });
-
-      //when
-      await UserDAL.linkDiscord(uid, "newId");
-
-      //then
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.discordId).toEqual("newId");
-      expect(read.discordAvatar).toEqual("discordAvatar");
-    });
-  });
-  describe("unlinkDiscord", () => {
-    it("throws for nonexisting user", async () => {
-      await expect(async () =>
-        UserDAL.unlinkDiscord("unknown"),
-      ).rejects.toThrow("User not found\nStack: unlink discord");
-    });
-    it("should update", async () => {
-      //given
-      const { uid } = await UserTestData.createUser({
-        discordId: "discordId",
-        discordAvatar: "discordAvatar",
-      });
-
-      //when
-      await UserDAL.unlinkDiscord(uid);
-
-      //then
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.discordId).toBeUndefined();
-      expect(read.discordAvatar).toBeUndefined();
-    });
-  });
   describe("updateInbox", () => {
     it("claims rewards on read", async () => {
       //GIVEN
-      const rewardOne: MonkeyMail = {
+      const rewardOne: CrocoMail = {
         id: "b5866d4c-0749-41b6-b101-3656249d39b9",
         body: "test",
         subject: "reward one",
@@ -1338,10 +780,9 @@ describe("UserDal", () => {
         rewards: [
           { type: "xp", item: 400 },
           { type: "xp", item: 600 },
-          { type: "badge", item: { id: 4 } },
         ],
       };
-      const rewardTwo: MonkeyMail = {
+      const rewardTwo: CrocoMail = {
         id: "3692b9f5-84fb-4d9b-bd39-9a3217b3a33a",
         body: "test",
         subject: "reward two",
@@ -1349,7 +790,7 @@ describe("UserDal", () => {
         read: false,
         rewards: [{ type: "xp", item: 2000 }],
       };
-      const rewardThree: MonkeyMail = {
+      const rewardThree: CrocoMail = {
         id: "0d73b3e0-dc79-4abb-bcaf-66fa6b09a58a",
         body: "test",
         subject: "reward three",
@@ -1357,7 +798,7 @@ describe("UserDal", () => {
         read: true,
         rewards: [{ type: "xp", item: 3000 }],
       };
-      const rewardFour: MonkeyMail = {
+      const rewardFour: CrocoMail = {
         id: "d852d2cf-1802-4cd0-9fb4-336650fc470a",
         body: "test",
         subject: "reward four",
@@ -1398,7 +839,7 @@ describe("UserDal", () => {
     it("claims rewards on delete", async () => {
       //GIVEN
       //GIVEN
-      const rewardOne: MonkeyMail = {
+      const rewardOne: CrocoMail = {
         id: "b5866d4c-0749-41b6-b101-3656249d39b9",
         body: "test",
         subject: "reward one",
@@ -1407,10 +848,9 @@ describe("UserDal", () => {
         rewards: [
           { type: "xp", item: 400 },
           { type: "xp", item: 600 },
-          { type: "badge", item: { id: 4 } },
         ],
       };
-      const rewardTwo: MonkeyMail = {
+      const rewardTwo: CrocoMail = {
         id: "3692b9f5-84fb-4d9b-bd39-9a3217b3a33a",
         body: "test",
         subject: "reward two",
@@ -1419,7 +859,7 @@ describe("UserDal", () => {
         rewards: [{ type: "xp", item: 2000 }],
       };
 
-      const rewardThree: MonkeyMail = {
+      const rewardThree: CrocoMail = {
         id: "0d73b3e0-dc79-4abb-bcaf-66fa6b09a58a",
         body: "test",
         subject: "reward three",
@@ -1444,46 +884,36 @@ describe("UserDal", () => {
 
     it("updates badge", async () => {
       //GIVEN
-      const rewardOne: MonkeyMail = {
+      const rewardOne: CrocoMail = {
         id: "b5866d4c-0749-41b6-b101-3656249d39b9",
         body: "test",
         subject: "reward one",
         timestamp: 2,
         read: false,
-        rewards: [
-          { type: "xp", item: 400 },
-          { type: "badge", item: { id: 4 } },
-        ],
+        rewards: [{ type: "xp", item: 400 }],
       };
-      const rewardTwo: MonkeyMail = {
+      const rewardTwo: CrocoMail = {
         id: "3692b9f5-84fb-4d9b-bd39-9a3217b3a33a",
         body: "test",
         subject: "reward two",
         timestamp: 1,
         read: false,
         rewards: [
-          { type: "badge", item: { id: 3 } },
-          { type: "badge", item: { id: 4 } },
-          { type: "badge", item: { id: 5 } },
+          { type: "xp", item: 300 },
+          { type: "xp", item: 500 },
         ],
       };
-      const rewardThree: MonkeyMail = {
+      const rewardThree: CrocoMail = {
         id: "0d73b3e0-dc79-4abb-bcaf-66fa6b09a58a",
         body: "test",
         subject: "reward three",
         timestamp: 0,
         read: true,
-        rewards: [{ type: "badge", item: { id: 6 } }],
+        rewards: [{ type: "xp", item: 600 }],
       };
 
       let user = await UserTestData.createUser({
         inbox: [rewardOne, rewardTwo, rewardThree],
-        inventory: {
-          badges: [
-            { id: 1, selected: true },
-            { id: 3, selected: false },
-          ],
-        },
       });
 
       //WNEN
@@ -1494,22 +924,16 @@ describe("UserDal", () => {
       );
 
       //THEN
-      const { inbox, inventory } = await UserDAL.getUser(user.uid, "");
+      const { inbox } = await UserDAL.getUser(user.uid, "");
       expect(inbox).toStrictEqual([
         { ...rewardOne, read: true, rewards: [] },
         { ...rewardTwo, read: true, rewards: [] },
         { ...rewardThree },
       ]);
-      expect(inventory?.badges).toStrictEqual([
-        { id: 1, selected: true }, //previously owned
-        { id: 3, selected: false }, // previously owned, no duplicate
-        { id: 4 }, // gets only added once
-        { id: 5 },
-      ]);
     });
     it("read and delete the same message does not claim reward twice", async () => {
       //GIVEN
-      const rewardOne: MonkeyMail = {
+      const rewardOne: CrocoMail = {
         id: "b5866d4c-0749-41b6-b101-3656249d39b9",
         body: "test",
         subject: "reward one",
@@ -1517,7 +941,7 @@ describe("UserDal", () => {
         read: false,
         rewards: [{ type: "xp", item: 1000 }],
       };
-      const rewardTwo: MonkeyMail = {
+      const rewardTwo: CrocoMail = {
         id: "3692b9f5-84fb-4d9b-bd39-9a3217b3a33a",
         body: "test",
         subject: "reward two",
@@ -1544,7 +968,7 @@ describe("UserDal", () => {
 
     it("concurrent calls dont claim a reward multiple times", async () => {
       //GIVEN
-      const rewardOne: MonkeyMail = {
+      const rewardOne: CrocoMail = {
         id: "b5866d4c-0749-41b6-b101-3656249d39b9",
         body: "test",
         subject: "reward one",
@@ -1553,10 +977,9 @@ describe("UserDal", () => {
         rewards: [
           { type: "xp", item: 400 },
           { type: "xp", item: 600 },
-          { type: "badge", item: { id: 4 } },
         ],
       };
-      const rewardTwo: MonkeyMail = {
+      const rewardTwo: CrocoMail = {
         id: "3692b9f5-84fb-4d9b-bd39-9a3217b3a33a",
         body: "test",
         subject: "reward two",
@@ -1564,7 +987,7 @@ describe("UserDal", () => {
         read: false,
         rewards: [{ type: "xp", item: 2000 }],
       };
-      const rewardThree: MonkeyMail = {
+      const rewardThree: CrocoMail = {
         id: "0d73b3e0-dc79-4abb-bcaf-66fa6b09a58a",
         body: "test",
         subject: "reward three",
@@ -1597,36 +1020,11 @@ describe("UserDal", () => {
       expect(xp).toEqual(3100);
     });
   });
-  describe("isDiscordIdAvailable", () => {
-    it("should return true for available discordId", async () => {
-      const discordId = new ObjectId().toHexString();
-      await expect(UserDAL.isDiscordIdAvailable(discordId)).resolves.toBe(true);
-    });
-
-    it("should return false if discordId is taken", async () => {
-      // given
-      const discordId = new ObjectId().toHexString();
-      await UserTestData.createUser({
-        discordId: discordId,
-      });
-
-      // when, then
-      await expect(UserDAL.isDiscordIdAvailable(discordId)).resolves.toBe(
-        false,
-      );
-    });
-  });
   describe("updateLbMemory", () => {
     it("should return error if uid not found", async () => {
       // when, then
       await expect(
-        UserDAL.updateLbMemory(
-          "non existing uid",
-          "time",
-          "15",
-          "english",
-          4711,
-        ),
+        UserDAL.updateLbMemory("non existing uid", "time", "4", 4711),
       ).rejects.toThrow("User not found\nStack: update lb memory");
     });
 
@@ -1635,46 +1033,41 @@ describe("UserDal", () => {
       const { uid } = await UserTestData.createUser({});
 
       //WHEN
-      await UserDAL.updateLbMemory(uid, "time", "15", "english", 4711);
+      await UserDAL.updateLbMemory(uid, "time", "4", 4711);
 
       //THEN
       const read = await UserDAL.getUser(uid, "read");
       expect(read.lbMemory).toStrictEqual({
         time: {
-          "15": {
-            english: 4711,
-          },
+          "4": 4711,
         },
       });
     });
     it("updates on empty lbMemory.mode", async () => {
       //GIVEN
       const { uid } = await UserTestData.createUser({
-        lbMemory: { custom: {} },
+        lbMemory: { time: {} },
       });
 
       //WHEN
-      await UserDAL.updateLbMemory(uid, "time", "15", "english", 4711);
+      await UserDAL.updateLbMemory(uid, "time", "4", 4711);
 
       //THEN
       const read = await UserDAL.getUser(uid, "read");
       expect(read.lbMemory).toStrictEqual({
-        custom: {},
         time: {
-          "15": {
-            english: 4711,
-          },
+          "4": 4711,
         },
       });
     });
     it("updates on empty lbMemory.mode.mode2", async () => {
       //GIVEN
       const { uid } = await UserTestData.createUser({
-        lbMemory: { time: { "30": {} } },
+        lbMemory: { time: { "8": 12 } },
       });
 
       //WHEN
-      await UserDAL.updateLbMemory(uid, "time", "15", "english", 4711);
+      await UserDAL.updateLbMemory(uid, "time", "4", 4711);
 
       //THEN
       const read = await UserDAL.getUser(uid, "read");
@@ -1686,105 +1079,6 @@ describe("UserDal", () => {
           "30": {},
         },
       });
-    });
-  });
-  describe("incrementBananas", () => {
-    it("should not return error if uuid not found", async () => {
-      // when, then
-      await UserDAL.incrementBananas("non existing uid", 60);
-    });
-
-    it("increments bananas", async () => {
-      //GIVEN
-      const name = `user${new ObjectId().toHexString()}`;
-      const { uid } = await UserTestData.createUser({
-        name,
-        bananas: 1,
-        personalBests: {
-          time: {
-            "60": [
-              { wpm: 100 } as PersonalBest,
-              { wpm: 30 } as PersonalBest, //highest PB should be used
-            ],
-          },
-        } as any,
-      });
-
-      //within 25% of PB
-
-      await UserDAL.incrementBananas(uid, 75);
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.bananas).toEqual(2);
-      expect(read.name).toEqual(name);
-
-      //NOT within 25% of PB
-      await UserDAL.incrementBananas(uid, 74);
-      expect((await UserDAL.getUser(uid, "read")).bananas).toEqual(2);
-    });
-
-    it("ignores missing personalBests", async () => {
-      //GIVEN
-      const { uid } = await UserTestData.createUser({
-        bananas: 1,
-      });
-
-      //WHEN
-      await UserDAL.incrementBananas(uid, 75);
-
-      //THEM
-      expect((await UserDAL.getUser(uid, "read")).bananas).toBe(1);
-    });
-
-    it("ignores missing personalBests time", async () => {
-      //GIVEN
-      const { uid } = await UserTestData.createUser({
-        bananas: 1,
-        personalBests: {} as any,
-      });
-
-      //WHEN
-      await UserDAL.incrementBananas(uid, 75);
-
-      //THEM
-      expect((await UserDAL.getUser(uid, "read")).bananas).toBe(1);
-    });
-    it("ignores missing personalBests time 60", async () => {
-      //GIVEN
-      const { uid } = await UserTestData.createUser({
-        bananas: 1,
-        personalBests: { time: {} } as any,
-      });
-
-      //WHEN
-      await UserDAL.incrementBananas(uid, 75);
-
-      //THEM
-      expect((await UserDAL.getUser(uid, "read")).bananas).toBe(1);
-    });
-    it("ignores empty personalBests time 60", async () => {
-      //GIVEN
-      const { uid } = await UserTestData.createUser({
-        bananas: 1,
-        personalBests: { time: { "60": [] } } as any,
-      });
-
-      //WHEN
-      await UserDAL.incrementBananas(uid, 75);
-
-      //THEM
-      expect((await UserDAL.getUser(uid, "read")).bananas).toBe(1);
-    });
-    it("should increment missing bananas", async () => {
-      //GIVEN
-      const { uid } = await UserTestData.createUser({
-        personalBests: { time: { "60": [{ wpm: 100 }] } } as any,
-      });
-
-      //WHEN
-      await UserDAL.incrementBananas(uid, 75);
-
-      //THEM
-      expect((await UserDAL.getUser(uid, "read")).bananas).toBe(1);
     });
   });
 
@@ -1964,140 +1258,6 @@ describe("UserDal", () => {
     });
   });
 
-  describe("addFavoriteQuote", () => {
-    it("should return error if uid not found", async () => {
-      // when, then
-      await expect(
-        UserDAL.addFavoriteQuote("non existing uid", "english", "1", 5),
-      ).rejects.toThrow(
-        "Maximum number of favorite quotes reached\nStack: add favorite quote",
-      );
-    });
-
-    it("should return error if user has reached maximum", async () => {
-      // given
-      const { uid } = await UserTestData.createUser({
-        favoriteQuotes: {
-          english: ["1", "2"],
-          german: ["3", "4"],
-          polish: ["5"],
-        },
-      });
-
-      // when, then
-      await expect(
-        UserDAL.addFavoriteQuote(uid, "polish", "6", 5),
-      ).rejects.toThrow(
-        "Maximum number of favorite quotes reached\nStack: add favorite quote",
-      );
-    });
-
-    it("addFavoriteQuote success", async () => {
-      // given
-      const { uid } = await UserTestData.createUser({
-        favoriteQuotes: {
-          english: ["1"],
-          german: ["2"],
-          polish: ["3"],
-        },
-      });
-
-      // when
-      await UserDAL.addFavoriteQuote(uid, "english", "4", 5);
-
-      // then
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.favoriteQuotes).toStrictEqual({
-        english: ["1", "4"],
-        german: ["2"],
-        polish: ["3"],
-      });
-    });
-
-    it("should not add a quote twice", async () => {
-      // given
-      const { uid } = await UserTestData.createUser({
-        favoriteQuotes: {
-          english: ["1", "3", "4"],
-          german: ["2"],
-        },
-      });
-      // when
-      await UserDAL.addFavoriteQuote(uid, "english", "4", 5);
-
-      // then
-      const read = await UserDAL.getUser(uid, "read");
-
-      expect(read.favoriteQuotes).toStrictEqual({
-        english: ["1", "3", "4"],
-        german: ["2"],
-      });
-    });
-  });
-
-  describe("removeFavoriteQuote", () => {
-    it("should return error if uid not found", async () => {
-      // when, then
-      await expect(
-        UserDAL.removeFavoriteQuote("non existing uid", "english", "0"),
-      ).rejects.toThrow("User not found\nStack: remove favorite quote");
-    });
-
-    it("should not fail if quote is not favorite", async () => {
-      // given
-      const { uid } = await UserTestData.createUser({
-        favoriteQuotes: {
-          english: ["1", "2"],
-        },
-      });
-
-      // when
-      await UserDAL.removeFavoriteQuote(uid, "english", "3");
-      await UserDAL.removeFavoriteQuote(uid, "german", "1");
-
-      //then
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.favoriteQuotes).toStrictEqual({
-        english: ["1", "2"],
-      });
-    });
-    it("should remove", async () => {
-      // given
-      const { uid } = await UserTestData.createUser({
-        favoriteQuotes: {
-          english: ["1", "2", "3"],
-        },
-      });
-
-      // when
-      await UserDAL.removeFavoriteQuote(uid, "english", "2");
-
-      //%hen
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.favoriteQuotes).toStrictEqual({
-        english: ["1", "3"],
-      });
-    });
-  });
-
-  describe("clearStreakHourOffset", () => {
-    it("should clear streak hour offset", async () => {
-      // given
-      const { uid } = await UserTestData.createUser({
-        streak: {
-          hourOffset: 1,
-        } as any,
-      });
-
-      // when
-      await UserDAL.clearStreakHourOffset(uid);
-
-      //then
-      const read = await UserDAL.getUser(uid, "read");
-      expect(read.streak?.hourOffset).toBeUndefined();
-    });
-  });
-
   describe("getFriends", () => {
     it("get list of friends", async () => {
       //GIVEN
@@ -2108,16 +1268,12 @@ describe("UserDal", () => {
         name: "One",
         personalBests: {
           time: {
-            "15": [UserTestData.pb(100)],
-            "60": [UserTestData.pb(85), UserTestData.pb(90)],
+            "4": [UserTestData.pb(100)],
+            "8": [UserTestData.pb(85), UserTestData.pb(90)],
           },
-        } as any,
-        inventory: {
-          badges: [{ id: 42, selected: true }, { id: 23 }, { id: 5 }],
         },
         banned: true,
         lbOptOut: true,
-        premium: { expirationTimestamp: -1 } as any,
       });
       const friendOneRequest = await createFriend({
         initiatorUid: uid,
@@ -2127,24 +1283,10 @@ describe("UserDal", () => {
       });
       const friendTwo = await UserTestData.createUser({
         name: "Two",
-        discordId: "discordId",
-        discordAvatar: "discordAvatar",
         timeSpent: 600,
         startedTests: 150,
         completedTests: 125,
-        streak: {
-          length: 10,
-          maxLength: 50,
-          lastResultTimestamp: 0,
-          hourOffset: -1,
-        },
         xp: 42,
-        inventory: {
-          badges: [{ id: 23 }, { id: 5 }],
-        },
-        premium: {
-          expirationTimestamp: vi.getRealSystemTime() + 5000,
-        } as any,
       });
       const friendTwoRequest = await createFriend({
         initiatorUid: uid,
@@ -2176,30 +1318,21 @@ describe("UserDal", () => {
           lastModified: 100,
           connectionId: friendOneRequest._id,
           // oxlint-disable-next-line no-non-null-assertion
-          top15: friendOne.personalBests.time["15"]![0] as any,
+          top4: friendOne.personalBests.time["4"]![0] as any,
           // oxlint-disable-next-line no-non-null-assertion
-          top60: friendOne.personalBests.time["60"]![1] as any,
-          badgeId: 42,
+          top8: friendOne.personalBests.time["8"]![1] as any,
           banned: true,
           lbOptOut: true,
-          isPremium: true,
         },
         {
           uid: friendTwo.uid,
           name: "Two",
           lastModified: 200,
           connectionId: friendTwoRequest._id,
-          discordId: friendTwo.discordId,
-          discordAvatar: friendTwo.discordAvatar,
           timeSpent: friendTwo.timeSpent,
           startedTests: friendTwo.startedTests,
           completedTests: friendTwo.completedTests,
-          streak: {
-            length: friendTwo.streak?.length,
-            maxLength: friendTwo.streak?.maxLength,
-          },
           xp: friendTwo.xp,
-          isPremium: true,
         },
         {
           uid: friendThree.uid,

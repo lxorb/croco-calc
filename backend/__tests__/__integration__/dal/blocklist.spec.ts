@@ -51,28 +51,6 @@ describe("BlocklistDal", () => {
         timestamp: now,
       });
     });
-    it("adds user with discordId", async () => {
-      //GIVEN
-      const now = 1715082588;
-      vi.setSystemTime(now);
-
-      const name = `user${new ObjectId().toHexString()}`;
-      const email = `${name}@example.com`;
-      const discordId = `${name}DiscordId`;
-
-      //WHEN
-      await BlacklistDal.add({ name, email, discordId });
-
-      //THEN
-      await expect(
-        BlacklistDal.getCollection().findOne({
-          discordIdHash: BlacklistDal.hash(discordId),
-        }),
-      ).resolves.toMatchObject({
-        discordIdHash: BlacklistDal.hash(discordId),
-        timestamp: now,
-      });
-    });
     it("adds user should not create duplicate name", async () => {
       //GIVEN
       const now = 1715082588;
@@ -131,39 +109,13 @@ describe("BlocklistDal", () => {
           .toArray(),
       ).resolves.toHaveLength(1);
     });
-    it("adds user should not create duplicate discordId", async () => {
-      //GIVEN
-      const now = 1715082588;
-      vi.setSystemTime(now);
-
-      const name = `user${new ObjectId().toHexString()}`;
-      const name2 = `user${new ObjectId().toHexString()}`;
-      const email = `${name}@example.com`;
-      const discordId = `${name}DiscordId`;
-
-      await BlacklistDal.add({ name, email, discordId });
-
-      //WHEN
-      await BlacklistDal.add({ name: name2, email, discordId });
-
-      //THEN
-
-      await expect(
-        BlacklistDal.getCollection()
-          .find({
-            discordIdHash: BlacklistDal.hash(discordId),
-          })
-          .toArray(),
-      ).resolves.toHaveLength(1);
-    });
   });
   describe("contains", () => {
     it("contains user", async () => {
       //GIVEN
       const name = `user${new ObjectId().toHexString()}`;
       const email = `${name}@example.com`;
-      const discordId = `${name}DiscordId`;
-      await BlacklistDal.add({ name, email, discordId });
+      await BlacklistDal.add({ name, email });
       await BlacklistDal.add({ name: "test", email: "test@example.com" });
 
       //WHEN / THEN
@@ -173,7 +125,7 @@ describe("BlocklistDal", () => {
         BlacklistDal.contains({ name: name.toUpperCase() }),
       ).resolves.toBeTruthy();
       await expect(
-        BlacklistDal.contains({ name, email: "unknown", discordId: "unknown" }),
+        BlacklistDal.contains({ name, email: "unknown" }),
       ).resolves.toBeTruthy();
 
       //by email
@@ -182,21 +134,12 @@ describe("BlocklistDal", () => {
         BlacklistDal.contains({ email: email.toUpperCase() }),
       ).resolves.toBeTruthy();
       await expect(
-        BlacklistDal.contains({ name: "unknown", email, discordId: "unknown" }),
+        BlacklistDal.contains({ name: "unknown", email }),
       ).resolves.toBeTruthy();
 
-      //by discordId
-      await expect(BlacklistDal.contains({ discordId })).resolves.toBeTruthy();
+      //by name and email
       await expect(
-        BlacklistDal.contains({ discordId: discordId.toUpperCase() }),
-      ).resolves.toBeTruthy();
-      await expect(
-        BlacklistDal.contains({ name: "unknown", email: "unknown", discordId }),
-      ).resolves.toBeTruthy();
-
-      //by name and email and discordId
-      await expect(
-        BlacklistDal.contains({ name, email, discordId }),
+        BlacklistDal.contains({ name, email }),
       ).resolves.toBeTruthy();
     });
     it("does not contain user", async () => {
@@ -212,14 +155,7 @@ describe("BlocklistDal", () => {
         BlacklistDal.contains({ email: "unknown" }),
       ).resolves.toBeFalsy();
       await expect(
-        BlacklistDal.contains({ discordId: "unknown" }),
-      ).resolves.toBeFalsy();
-      await expect(
-        BlacklistDal.contains({
-          name: "unknown",
-          email: "unknown",
-          discordId: "unknown",
-        }),
+        BlacklistDal.contains({ name: "unknown", email: "unknown" }),
       ).resolves.toBeFalsy();
 
       await expect(BlacklistDal.contains({})).resolves.toBeFalsy();
@@ -271,56 +207,19 @@ describe("BlocklistDal", () => {
         BlacklistDal.contains({ email: "test@example.com" }),
       ).resolves.toBeTruthy();
     });
-    it("removes existing discordId", async () => {
+    it("removes existing username and email", async () => {
       //GIVEN
       const name = `user${new ObjectId().toHexString()}`;
       const email = `${name}@example.com`;
-      const discordId = `${name}DiscordId`;
-      await BlacklistDal.add({ name, email, discordId });
-      await BlacklistDal.add({
-        name: "test",
-        email: "test@example.com",
-        discordId: "testDiscordId",
-      });
+      await BlacklistDal.add({ name, email });
+      await BlacklistDal.add({ name: "test", email: "test@example.com" });
 
       //WHEN
-      await BlacklistDal.remove({ discordId });
-
-      //THEN
-      await expect(BlacklistDal.contains({ discordId })).resolves.toBeFalsy();
-      await expect(BlacklistDal.contains({ name })).resolves.toBeTruthy();
-      await expect(BlacklistDal.contains({ email })).resolves.toBeTruthy();
-
-      //decoy still exists
-      await expect(
-        BlacklistDal.contains({ name: "test" }),
-      ).resolves.toBeTruthy();
-      await expect(
-        BlacklistDal.contains({ email: "test@example.com" }),
-      ).resolves.toBeTruthy();
-      await expect(
-        BlacklistDal.contains({ discordId: "testDiscordId" }),
-      ).resolves.toBeTruthy();
-    });
-    it("removes existing username,email and discordId", async () => {
-      //GIVEN
-      const name = `user${new ObjectId().toHexString()}`;
-      const email = `${name}@example.com`;
-      const discordId = `${name}DiscordId`;
-      await BlacklistDal.add({ name, email, discordId });
-      await BlacklistDal.add({
-        name: "test",
-        email: "test@example.com",
-        discordId: "testDiscordId",
-      });
-
-      //WHEN
-      await BlacklistDal.remove({ name, email, discordId });
+      await BlacklistDal.remove({ name, email });
 
       //THEN
       await expect(BlacklistDal.contains({ email })).resolves.toBeFalsy();
       await expect(BlacklistDal.contains({ name })).resolves.toBeFalsy();
-      await expect(BlacklistDal.contains({ discordId })).resolves.toBeFalsy();
 
       //decoy still exists
       await expect(
@@ -328,9 +227,6 @@ describe("BlocklistDal", () => {
       ).resolves.toBeTruthy();
       await expect(
         BlacklistDal.contains({ email: "test@example.com" }),
-      ).resolves.toBeTruthy();
-      await expect(
-        BlacklistDal.contains({ discordId: "testDiscordId" }),
       ).resolves.toBeTruthy();
     });
 
@@ -338,8 +234,7 @@ describe("BlocklistDal", () => {
       //GIVEN
       const name = `user${new ObjectId().toHexString()}`;
       const email = `${name}@example.com`;
-      const discordId = `${name}DiscordId`;
-      await BlacklistDal.add({ name, email, discordId });
+      await BlacklistDal.add({ name, email });
       await BlacklistDal.add({ name: "test", email: "test@example.com" });
 
       //WHEN
@@ -348,7 +243,6 @@ describe("BlocklistDal", () => {
       //THEN
       await expect(BlacklistDal.contains({ email })).resolves.toBeTruthy();
       await expect(BlacklistDal.contains({ name })).resolves.toBeTruthy();
-      await expect(BlacklistDal.contains({ discordId })).resolves.toBeTruthy();
     });
   });
   describe("hash", () => {
