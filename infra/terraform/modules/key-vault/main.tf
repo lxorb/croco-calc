@@ -73,16 +73,26 @@ resource "azurerm_key_vault" "this" {
   tags = var.tags
 }
 
-resource "azurerm_role_assignment" "operator_secrets_officer" {
-  scope                = azurerm_key_vault.this.id
-  role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = var.operator_principal_id
+# The operator and the CI identity are the *same* principal whenever the apply
+# runs from infra.yml, and Azure rejects a second (scope, role, principal)
+# triple with RoleAssignmentExists — which would break INF-080's idempotency
+# criterion. Collapsing both into one keyed resource makes the duplicate
+# disappear at plan time instead. Both ids are known at plan time (one is
+# azurerm_client_config, the other a data source), so they are legal for_each
+# keys.
+locals {
+  secrets_officer_principal_ids = toset(compact([
+    var.operator_principal_id,
+    var.cicd_principal_id,
+  ]))
 }
 
-resource "azurerm_role_assignment" "cicd_secrets_officer" {
+resource "azurerm_role_assignment" "secrets_officer" {
+  for_each = local.secrets_officer_principal_ids
+
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = var.cicd_principal_id
+  principal_id         = each.value
 }
 
 resource "azurerm_role_assignment" "api_secrets_user" {
@@ -99,7 +109,7 @@ resource "azurerm_key_vault_secret" "mongodb_uri" {
   key_vault_id = azurerm_key_vault.this.id
   content_type = "text/plain"
 
-  depends_on = [azurerm_role_assignment.operator_secrets_officer]
+  depends_on = [azurerm_role_assignment.secrets_officer]
 }
 
 resource "azurerm_key_vault_secret" "firebase_service_account" {
@@ -108,7 +118,7 @@ resource "azurerm_key_vault_secret" "firebase_service_account" {
   key_vault_id = azurerm_key_vault.this.id
   content_type = "application/json"
 
-  depends_on = [azurerm_role_assignment.operator_secrets_officer]
+  depends_on = [azurerm_role_assignment.secrets_officer]
 }
 
 resource "azurerm_key_vault_secret" "recaptcha_secret" {
@@ -117,7 +127,7 @@ resource "azurerm_key_vault_secret" "recaptcha_secret" {
   key_vault_id = azurerm_key_vault.this.id
   content_type = "text/plain"
 
-  depends_on = [azurerm_role_assignment.operator_secrets_officer]
+  depends_on = [azurerm_role_assignment.secrets_officer]
 }
 
 output "vault_id" {
