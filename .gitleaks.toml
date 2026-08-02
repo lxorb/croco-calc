@@ -1,0 +1,30 @@
+# croco calc secret scan configuration (INF-089).
+#
+# Consumed by the `secret-scan` job in .github/workflows/ci.yml, and usable
+# locally with:
+#
+#   gitleaks dir --config .gitleaks.toml --redact --exit-code 1 .
+#
+# A local run additionally flags backend/src/credentials/serviceAccountKey.json
+# and frontend/src/ts/constants/firebase-config.ts. Those are REAL credentials
+# and are deliberately NOT allowlisted here — they are gitignored (INF-088), so
+# they never exist in a CI checkout, and if they ever did the scan must scream.
+
+title = "croco calc"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Google's published reCAPTCHA test key pair"
+regexTarget = "match"
+
+# Google documents exactly one always-passing key pair for local development and
+# CI, and publishes both halves at
+# https://developers.google.com/recaptcha/docs/faq
+#   site key   6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+#   secret key 6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe
+# They are public constants, not credentials, so they are not "detected
+# credentials" in INF-089's sense. INF-107 separately forbids them reaching
+# production configuration; that is enforced by review, not by this scanner.
+regexes = ['''6LeIxAcTAAAA[A-Za-z0-9_-]{28}''']

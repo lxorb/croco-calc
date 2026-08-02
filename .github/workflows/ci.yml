@@ -110,6 +110,34 @@ jobs:
         name: Install dependencies
         run: pnpm install
 
+  # INF-089: a credential must never reach the repository. This runs on every
+  # push and pull request, independently of pre-ci's path filters — a secret can
+  # land in any file, including ones no build job cares about.
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: "8.30.0"
+          # sha256 of gitleaks_8.30.0_linux_x64.tar.gz. INF-132 pins third-party
+          # actions; a downloaded binary gets the same treatment.
+          GITLEAKS_SHA256: "79a3ab579b53f71efd634f3aaf7e04a0fa0cf206b7ed434638d1547a2470a66e"
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      # A fresh checkout contains exactly the tracked tree, so this scans what
+      # the repository actually publishes. Exit code 1 on any finding.
+      - name: Scan the working tree
+        run: gitleaks dir --config .gitleaks.toml --no-banner --redact --exit-code 1 .
+
   check-format:
     name: check-format
     runs-on: ubuntu-latest
