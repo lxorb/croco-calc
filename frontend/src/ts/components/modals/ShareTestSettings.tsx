@@ -106,7 +106,7 @@ export function ShareTestSettings(): JSXElement {
       <Show when={url().length > 2000}>
         <div class="flex place-items-center gap-2 text-xs text-error">
           <Icon icon="ph:warning-bold" />
-          <span>The URL is over 2000 characters long - it might not work</span>
+          <span>This URL is very long - it might not work</span>
         </div>
       </Show>
     </AnimatedModal>

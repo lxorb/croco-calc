@@ -9,7 +9,7 @@ import Ape from "../../ape";
 
 const commands: Command[] = [
   {
-    id: "viewTypingPage",
+    id: "viewTestPage",
     display: "View Test Page",
     alias: "navigate go to start begin test",
     icon: "ph:calculator-bold",

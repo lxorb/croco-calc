@@ -415,7 +415,7 @@ function buildSingleListCommands(
 
 /**
  * The separator between a flattened command and its option in single-list mode.
- * Cached iconify markup (C30: zero `fa-` strings anywhere in `frontend/src`).
+ * Cached iconify markup (C30 / DoD-12: no font awesome left in `frontend/src`).
  * `commandline.ts` string-replaces it to splice the active-value checkmark in,
  * so both sides must call this one function rather than inline the markup.
  */

@@ -4,7 +4,7 @@ import { Icon } from "../components/common/Icon";
 
 /**
  * Iconify markup for the command palette (master C30, WP-04 exit criterion:
- * zero `fa-` class strings anywhere in `frontend/src`).
+ * zero font awesome class strings anywhere in `frontend/src`, per DoD-12).
  *
  * `commandline.ts` builds its suggestion list as one big HTML string, so it
  * cannot mount `<Icon />` as a component. Rather than duplicate the generated
@@ -19,7 +19,7 @@ import { Icon } from "../components/common/Icon";
  */
 const cache = new Map<string, string>();
 
-/** The palette's fallback icon — monkeytype used `fa-chevron-right` here. */
+/** The palette's fallback icon — the reference used a chevron glyph here. */
 export const DEFAULT_COMMAND_ICON = "ph:caret-right-bold";
 
 export function getIconHtml(icon?: string, extraClass?: string): string {
@@ -45,8 +45,8 @@ export function getIconHtml(icon?: string, extraClass?: string): string {
 }
 
 /**
- * An empty, correctly sized box, used where monkeytype rendered a bare
- * `<i class="fas fa-fw"></i>` purely to reserve the checkmark column. The
+ * An empty, correctly sized box, used where the reference rendered a bare
+ * fixed-width font awesome `<i>` purely to reserve the checkmark column. The
  * width matches `svg.icon-fw` in `styles/icons.scss`, which is qualified with
  * `svg` and therefore cannot be reused on a placeholder element.
  */
