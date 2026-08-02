@@ -1,47 +1,15 @@
 import { CompletedEvent } from "@croco-calc/schemas/results";
 
+/**
+ * croco calc has exactly one test mode: a fixed 1/2/4/8 minute timed test
+ * (INV-174, master C31), and no bail-out concept at all (master C38, AC-187).
+ * A run is therefore too short only if it did not last the configured duration.
+ * The authoritative `testDuration === time * 60` check is ME-182 and lives in
+ * the anti-cheat layer (WP-10); this is the cheap guard the result controller
+ * uses before it gets there.
+ */
+const MIN_TEST_DURATION_SECONDS = 60;
+
 export function isTestTooShort(result: CompletedEvent): boolean {
-  const { mode, mode2, customText, testDuration, bailedOut } = result;
-
-  if (mode === "time") {
-    const seconds = parseInt(mode2);
-
-    const setTimeTooShort = seconds > 0 && seconds < 15;
-    const infiniteTimeTooShort = seconds === 0 && testDuration < 15;
-    const bailedOutTooShort = bailedOut
-      ? bailedOut && testDuration < 15
-      : false;
-    return setTimeTooShort || infiniteTimeTooShort || bailedOutTooShort;
-  }
-
-  if (mode === "words") {
-    const wordCount = parseInt(mode2);
-
-    const setWordTooShort = wordCount > 0 && wordCount < 10;
-    const infiniteWordTooShort = wordCount === 0 && testDuration < 15;
-    const bailedOutTooShort = bailedOut
-      ? bailedOut && testDuration < 15
-      : false;
-    return setWordTooShort || infiniteWordTooShort || bailedOutTooShort;
-  }
-
-  if (mode === "custom") {
-    if (!customText) return true;
-    const wordLimitTooShort =
-      (customText.limit.mode === "word" ||
-        customText.limit.mode === "section") &&
-      customText.limit.value < 10;
-    const timeLimitTooShort =
-      customText.limit.mode === "time" && customText.limit.value < 15;
-    const bailedOutTooShort = bailedOut
-      ? bailedOut && testDuration < 15
-      : false;
-    return wordLimitTooShort || timeLimitTooShort || bailedOutTooShort;
-  }
-
-  if (mode === "zen") {
-    return testDuration < 15;
-  }
-
-  return false;
+  return result.testDuration < MIN_TEST_DURATION_SECONDS;
 }

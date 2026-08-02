@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { buildMonkeyMail } from "../../src/utils/monkey-mail";
+import { buildCrocoMail } from "../../src/utils/croco-mail";
 
-describe("Monkey Mail", () => {
+describe("Croco Mail", () => {
   it("should properly create a mail object", () => {
     const mailConfig = {
       subject: "",
@@ -9,7 +9,7 @@ describe("Monkey Mail", () => {
       timestamp: Date.now(),
     };
 
-    const mail = buildMonkeyMail(mailConfig) as any;
+    const mail = buildCrocoMail(mailConfig) as any;
 
     expect(mail.id).toBeDefined();
     expect(mail.subject).toBe("");

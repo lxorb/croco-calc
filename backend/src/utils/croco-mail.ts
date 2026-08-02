@@ -1,9 +1,9 @@
-import { MonkeyMail } from "@croco-calc/schemas/users";
+import { CrocoMail } from "@croco-calc/schemas/users";
 import { v4 } from "uuid";
 
-type MonkeyMailOptions = Partial<Omit<MonkeyMail, "id" | "read">>;
+type CrocoMailOptions = Partial<Omit<CrocoMail, "id" | "read">>;
 
-export function buildMonkeyMail(options: MonkeyMailOptions): MonkeyMail {
+export function buildCrocoMail(options: CrocoMailOptions): CrocoMail {
   return {
     id: v4(),
     subject: options.subject ?? "",

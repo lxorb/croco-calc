@@ -5,10 +5,10 @@ import { callController } from "../ts-rest-adapter";
 
 const s = initServer();
 export default s.router(publicContract, {
-  getSpeedHistogram: {
-    handler: async (r) => callController(PublicController.getSpeedHistogram)(r),
+  getScoreHistogram: {
+    handler: async (r) => callController(PublicController.getScoreHistogram)(r),
   },
-  getTypingStats: {
-    handler: async (r) => callController(PublicController.getTypingStats)(r),
+  getSiteStats: {
+    handler: async (r) => callController(PublicController.getSiteStats)(r),
   },
 });

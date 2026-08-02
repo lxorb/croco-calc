@@ -1,4 +1,4 @@
-import MonkeyError from "../utils/error";
+import CrocoError from "../utils/error";
 import type { Response, NextFunction } from "express";
 import { DBUser, getPartialUser } from "../dal/user";
 import { isAdmin } from "../dal/admin-uids";
@@ -53,20 +53,9 @@ const permissionChecks: Record<PermissionId, PermissionCheck> = {
         metadata?.authenticationOptions,
       ),
   },
-  quoteMod: buildUserPermission(
-    ["quoteMod"],
-    (user) =>
-      user.quoteMod === true ||
-      (typeof user.quoteMod === "string" && (user.quoteMod as string) !== ""),
-  ),
   canReport: buildUserPermission(
     ["canReport"],
     (user) => user.canReport !== false,
-  ),
-  canManageApeKeys: buildUserPermission(
-    ["canManageApeKeys"],
-    (user) => user.canManageApeKeys ?? true,
-    "You have lost access to ape keys, please contact support",
   ),
 };
 
@@ -91,7 +80,7 @@ export function verifyPermissions<
     const checks = requiredPermissionIds.map((id) => permissionChecks[id]);
 
     if (checks.some((it) => it === undefined)) {
-      next(new MonkeyError(500, "Unknown permission id."));
+      next(new CrocoError(500, "Unknown permission id."));
       return;
     }
 
@@ -100,7 +89,7 @@ export function verifyPermissions<
     for (const check of requestChecks) {
       if (!(await check.criteria(req, metadata))) {
         next(
-          new MonkeyError(
+          new CrocoError(
             403,
             check.invalidMessage ?? "You don't have permission to do this.",
           ),
@@ -118,7 +107,7 @@ export function verifyPermissions<
 
     if (!checkResult.passed) {
       next(
-        new MonkeyError(
+        new CrocoError(
           403,
           checkResult.invalidMessage ?? "You don't have permission to do this.",
         ),

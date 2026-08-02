@@ -1,7 +1,7 @@
 import type { Response, NextFunction } from "express";
 import { TsRestRequestHandler } from "@ts-rest/express";
 import { EndpointMetadata } from "@croco-calc/contracts/util/api";
-import MonkeyError from "../utils/error";
+import CrocoError from "../utils/error";
 import { Configuration } from "@croco-calc/schemas/configuration";
 import {
   ConfigurationPath,
@@ -32,7 +32,7 @@ export function verifyRequiredConfiguration<
           requireConfiguration.path,
         );
         if (!value) {
-          throw new MonkeyError(
+          throw new CrocoError(
             503,
             requireConfiguration.invalidMessage ??
               "This endpoint is currently unavailable.",
@@ -57,19 +57,19 @@ function getValue(
 
   for (const key of keys) {
     if (result === undefined || result === null) {
-      throw new MonkeyError(500, `Invalid configuration path: "${path}"`);
+      throw new CrocoError(500, `Invalid configuration path: "${path}"`);
     }
     result = result[key];
   }
 
   if (result === undefined || result === null) {
-    throw new MonkeyError(
+    throw new CrocoError(
       500,
       `Required configuration doesnt exist: "${path}"`,
     );
   }
   if (typeof result !== "boolean") {
-    throw new MonkeyError(
+    throw new CrocoError(
       500,
       `Required configuration is not a boolean: "${path}"`,
     );

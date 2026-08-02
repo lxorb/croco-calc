@@ -31,7 +31,7 @@ import { PersonalBest } from "@croco-calc/schemas/shared";
 import { mockAuthenticateWithApeKey } from "../../__testData__/auth";
 import { randomUUID } from "node:crypto";
 import { MonkeyMail, UserStreak } from "@croco-calc/schemas/users";
-import MonkeyError, { isFirebaseError } from "../../../src/utils/error";
+import CrocoError, { isFirebaseError } from "../../../src/utils/error";
 import * as WeeklyXpLeaderboard from "../../../src/services/weekly-xp-leaderboard";
 import * as ConnectionsDal from "../../../src/dal/connections";
 import { pb } from "../../__testData__/users";
@@ -733,7 +733,7 @@ describe("user controller test", () => {
 
     it("should not fail if userInfo cannot be found", async () => {
       //GIVEN
-      getUserMock.mockRejectedValue(new MonkeyError(404, "user not found"));
+      getUserMock.mockRejectedValue(new CrocoError(404, "user not found"));
 
       //WHEN
       await mockApp
@@ -2750,11 +2750,11 @@ describe("user controller test", () => {
       //GIVEN
       const stats: Pick<
         UserDal.DBUser,
-        "startedTests" | "completedTests" | "timeTyping"
+        "startedTests" | "completedTests" | "timeSpent"
       > = {
         startedTests: 5,
         completedTests: 3,
-        timeTyping: 42,
+        timeSpent: 42,
       };
       getStatsMock.mockResolvedValue(stats);
 
@@ -2956,7 +2956,7 @@ describe("user controller test", () => {
       },
       completedTests: 23,
       startedTests: 42,
-      timeTyping: 234,
+      timeSpent: 234,
       addedAt: 1000,
       discordId: "discordId",
       discordAvatar: "discordAvatar",
@@ -3001,7 +3001,7 @@ describe("user controller test", () => {
           typingStats: {
             completedTests: 23,
             startedTests: 42,
-            timeTyping: 234,
+            timeSpent: 234,
           },
           personalBests: {
             time: {
@@ -3102,7 +3102,7 @@ describe("user controller test", () => {
           typingStats: {
             completedTests: 23,
             startedTests: 42,
-            timeTyping: 234,
+            timeSpent: 234,
           },
           personalBests: {
             time: {
@@ -3190,7 +3190,7 @@ describe("user controller test", () => {
         socialProfiles: {
           github: "github",
           twitter: "twitter",
-          website: "https://monkeytype.com",
+          website: "https://crococalc.com",
         },
         showActivityOnPublicProfile: false,
       };
@@ -3218,7 +3218,7 @@ describe("user controller test", () => {
           socialProfiles: {
             github: "github",
             twitter: "twitter",
-            website: "https://monkeytype.com",
+            website: "https://crococalc.com",
           },
           showActivityOnPublicProfile: false,
         },
@@ -3380,7 +3380,7 @@ describe("user controller test", () => {
         .set("Authorization", `Bearer ${uid}`)
         .send({
           socialProfiles: {
-            website: "http://monkeytype.com",
+            website: "http://crococalc.com",
           },
         })
         .expect(422);

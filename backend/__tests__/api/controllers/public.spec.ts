@@ -124,7 +124,7 @@ describe("PublicController", () => {
       getTypingStatsMock.mockResolvedValue({
         testsCompleted: 23,
         testsStarted: 42,
-        timeTyping: 1000,
+        timeSpent: 1000,
       } as any);
 
       //WHEN
@@ -136,7 +136,7 @@ describe("PublicController", () => {
         data: {
           testsCompleted: 23,
           testsStarted: 42,
-          timeTyping: 1000,
+          timeSpent: 1000,
         },
       });
     });

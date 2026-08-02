@@ -6,11 +6,11 @@ import * as AdminUids from "../../src/dal/admin-uids";
 import * as UserDal from "../../src/dal/user";
 import { DecodedToken } from "../../src/middlewares/auth";
 import { verifyPermissions } from "../../src/middlewares/permission";
-import MonkeyError from "../../src/utils/error";
+import CrocoError from "../../src/utils/error";
 import * as Misc from "../../src/utils/misc";
-import { enableMonkeyErrorExpects } from "../__testData__/monkey-error";
+import { enableCrocoErrorExpects } from "../__testData__/croco-error";
 
-enableMonkeyErrorExpects();
+enableCrocoErrorExpects();
 const uid = "123456789";
 
 describe("permission middleware", () => {
@@ -64,8 +64,8 @@ describe("permission middleware", () => {
 
       //THEN
       expect(next).toHaveBeenCalledWith(
-        expect.toMatchMonkeyError(
-          new MonkeyError(403, "You don't have permission to do this."),
+        expect.toMatchCrocoError(
+          new CrocoError(403, "You don't have permission to do this."),
         ),
       );
     });
@@ -99,8 +99,8 @@ describe("permission middleware", () => {
 
       //THEN
       expect(next).toHaveBeenCalledWith(
-        expect.toMatchMonkeyError(
-          new MonkeyError(403, "You don't have permission to do this."),
+        expect.toMatchCrocoError(
+          new CrocoError(403, "You don't have permission to do this."),
         ),
       );
     });
@@ -113,8 +113,8 @@ describe("permission middleware", () => {
 
       //THEN
       expect(next).toHaveBeenCalledWith(
-        expect.toMatchMonkeyError(
-          new MonkeyError(403, "You don't have permission to do this."),
+        expect.toMatchCrocoError(
+          new CrocoError(403, "You don't have permission to do this."),
         ),
       );
       expect(isAdminMock).toHaveBeenCalledWith(uid);
@@ -152,8 +152,8 @@ describe("permission middleware", () => {
 
       //THEN
       expect(next).toHaveBeenCalledWith(
-        expect.toMatchMonkeyError(
-          new MonkeyError(
+        expect.toMatchCrocoError(
+          new CrocoError(
             403,
             "Failed to check permissions, authentication required.",
           ),
@@ -208,8 +208,8 @@ describe("permission middleware", () => {
 
       //THEN
       expect(next).toHaveBeenCalledWith(
-        expect.toMatchMonkeyError(
-          new MonkeyError(403, "You don't have permission to do this."),
+        expect.toMatchCrocoError(
+          new CrocoError(403, "You don't have permission to do this."),
         ),
       );
     });
@@ -223,8 +223,8 @@ describe("permission middleware", () => {
 
       //THEN
       expect(next).toHaveBeenCalledWith(
-        expect.toMatchMonkeyError(
-          new MonkeyError(403, "You don't have permission to do this."),
+        expect.toMatchCrocoError(
+          new CrocoError(403, "You don't have permission to do this."),
         ),
       );
     });
@@ -244,8 +244,8 @@ describe("permission middleware", () => {
 
       //THEN
       expect(next).toHaveBeenCalledWith(
-        expect.toMatchMonkeyError(
-          new MonkeyError(403, "You don't have permission to do this."),
+        expect.toMatchCrocoError(
+          new CrocoError(403, "You don't have permission to do this."),
         ),
       );
       expect(getPartialUserMock).toHaveBeenCalledWith(
@@ -292,8 +292,8 @@ describe("permission middleware", () => {
 
       //THEN
       expect(next).toHaveBeenCalledWith(
-        expect.toMatchMonkeyError(
-          new MonkeyError(
+        expect.toMatchCrocoError(
+          new CrocoError(
             403,
             "You have lost access to ape keys, please contact support",
           ),

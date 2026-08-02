@@ -1,8 +1,8 @@
 import { AppRoute, AppRouter } from "@ts-rest/core";
 import { TsRestRequest } from "@ts-rest/express";
-import { MonkeyResponse } from "../utils/monkey-response";
+import { CrocoResponse } from "../utils/croco-response";
 import { Context } from "../middlewares/context";
-import { MonkeyRequest } from "./types";
+import { CrocoRequest } from "./types";
 
 export function callController<
   TRoute extends AppRoute | AppRouter,
@@ -14,13 +14,13 @@ export function callController<
   // oxlint-disable-next-line no-unnecessary-type-parameters
   TStatus = 200,
 >(
-  handler: MonkeyHandler<TQuery, TBody, TParams, TResponse>,
+  handler: CrocoHandler<TQuery, TBody, TParams, TResponse>,
 ): (all: TypeSafeTsRestRequest<TRoute, TQuery, TBody, TParams>) => Promise<{
   status: TStatus;
-  body: MonkeyResponse<TResponse>;
+  body: CrocoResponse<TResponse>;
 }> {
   return async (all) => {
-    const req: MonkeyRequest<TQuery, TBody, TParams> = {
+    const req: CrocoRequest<TQuery, TBody, TParams> = {
       body: all.body as TBody,
       query: all.query as TQuery,
       params: all.params as TParams,
@@ -62,9 +62,9 @@ type WithoutParams = {
   params?: never;
 };
 
-type MonkeyHandler<TQuery, TBody, TParams, TResponse> = (
-  req: MonkeyRequest<TQuery, TBody, TParams>,
-) => Promise<MonkeyResponse<TResponse>>;
+type CrocoHandler<TQuery, TBody, TParams, TResponse> = (
+  req: CrocoRequest<TQuery, TBody, TParams>,
+) => Promise<CrocoResponse<TResponse>>;
 
 type TypeSafeTsRestRequest<
   TRoute extends AppRoute | AppRouter,

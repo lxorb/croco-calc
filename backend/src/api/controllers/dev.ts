@@ -1,4 +1,4 @@
-import { MonkeyResponse } from "../../utils/monkey-response";
+import { CrocoResponse } from "../../utils/croco-response";
 import * as UserDal from "../../dal/user";
 import FirebaseAdmin from "../../init/firebase-admin";
 import Logger from "../../utils/logger";
@@ -7,20 +7,23 @@ import { UTCDate } from "@date-fns/utc";
 import * as ResultDal from "../../dal/result";
 import { ObjectId } from "mongodb";
 import * as LeaderboardDal from "../../dal/leaderboards";
-import MonkeyError from "../../utils/error";
+import CrocoError from "../../utils/error";
 
-import { Mode, PersonalBest, PersonalBests } from "@croco-calc/schemas/shared";
+import { PersonalBest, PersonalBests } from "@croco-calc/schemas/shared";
 import {
   AddDebugInboxItemRequest,
   GenerateDataRequest,
   GenerateDataResponse,
 } from "@croco-calc/contracts/dev";
-import { buildMonkeyMail } from "../../utils/monkey-mail";
+import { buildCrocoMail } from "../../utils/croco-mail";
 import { roundTo2 } from "@croco-calc/util/numbers";
-import { MonkeyRequest } from "../types";
+import { CrocoRequest } from "../types";
 import { DBResult } from "../../utils/result";
 import { LbPersonalBests } from "../../utils/pb";
-import { Language } from "@croco-calc/schemas/languages";
+import {
+  buildSettingsId,
+  MathGeneratorSettings,
+} from "@croco-calc/schemas/math";
 
 const CREATE_RESULT_DEFAULT_OPTIONS = {
   firstTestTimestamp: DateUtils.startOfDay(new UTCDate(Date.now())).valueOf(),
@@ -30,7 +33,7 @@ const CREATE_RESULT_DEFAULT_OPTIONS = {
 };
 
 export async function createTestData(
-  req: MonkeyRequest<undefined, GenerateDataRequest>,
+  req: CrocoRequest<undefined, GenerateDataRequest>,
 ): Promise<GenerateDataResponse> {
   const { username, createUser } = req.body;
   const user = await getOrCreateUser(username, "password", createUser);
@@ -41,38 +44,32 @@ export async function createTestData(
   await updateUser(uid);
   await updateLeaderboard();
 
-  return new MonkeyResponse("test data created", { uid, email });
+  return new CrocoResponse("test data created", { uid, email });
 }
 
 export async function addDebugInboxItem(
-  req: MonkeyRequest<undefined, AddDebugInboxItemRequest>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, AddDebugInboxItemRequest>,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
   const { rewardType } = req.body;
   const inboxConfig = req.ctx.configuration.users.inbox;
 
   const rewards =
-    rewardType === "xp"
-      ? [{ type: "xp" as const, item: 1000 }]
-      : rewardType === "badge"
-        ? [{ type: "badge" as const, item: { id: 1 } }]
-        : [];
+    rewardType === "xp" ? [{ type: "xp" as const, item: 1000 }] : [];
 
   const body =
     rewardType === "xp"
       ? "Here is your 1000 XP reward for debugging."
-      : rewardType === "badge"
-        ? "Here is your Developer badge reward."
-        : "A debug inbox item with no reward.";
+      : "A debug inbox item with no reward.";
 
-  const mail = buildMonkeyMail({
+  const mail = buildCrocoMail({
     subject: "Debug Inbox Item",
     body,
     rewards,
   });
 
   await UserDal.addToInbox(uid, [mail], inboxConfig);
-  return new MonkeyResponse("Debug inbox item added", null);
+  return new CrocoResponse("Debug inbox item added", null);
 }
 
 async function getOrCreateUser(
@@ -85,7 +82,7 @@ async function getOrCreateUser(
   if (existingUser !== undefined && existingUser !== null) {
     return existingUser;
   } else if (!createUser) {
-    throw new MonkeyError(404, `User ${username} does not exist.`);
+    throw new CrocoError(404, `User ${username} does not exist.`);
   }
 
   const email = `${username}@example.com`;
@@ -143,44 +140,56 @@ function random(min: number, max: number): number {
   return roundTo2(Math.random() * (max - min) + min);
 }
 
+/**
+ * The default settings snapshot (SB-110). Generated results use it so the fake
+ * data lands on the leaderboards, which is the point of the dev generator.
+ */
+const DEV_SETTINGS: MathGeneratorSettings = {
+  addition: "1000",
+  multiplication: "100",
+  division: "threeByTwo",
+  fractionAddition: "99",
+  fractionMultiplication: true,
+  decimals: true,
+  negatives: true,
+};
+
+const DEV_SETTINGS_ID = buildSettingsId(DEV_SETTINGS);
+
 function createResult(
   user: UserDal.DBUser,
   timestamp: Date, //evil, we modify this value
 ): DBResult {
-  const mode: Mode = randomValue(["time", "words"]);
-  const mode2: number =
-    mode === "time"
-      ? randomValue([15, 30, 60, 120])
-      : randomValue([10, 25, 50, 100]);
-  const testDuration = mode2;
+  const minutes = randomValue([1, 2, 4, 8]);
+  const mode2 = `${minutes}` as "1" | "2" | "4" | "8";
+  const testDuration = minutes * 60;
+
+  const correct = Math.round(random(minutes * 10, minutes * 30));
+  const wrong = Math.round(random(0, minutes * 8));
+  const answered = correct + wrong;
+  const acc = answered === 0 ? 0 : roundTo2((correct / answered) * 100);
 
   timestamp = DateUtils.addSeconds(timestamp, testDuration);
   return {
     _id: new ObjectId(),
     uid: user.uid,
-    wpm: random(80, 120),
-    rawWpm: random(80, 120),
-    charStats: [131, 0, 0, 0],
-    acc: random(80, 100),
-    language: "english",
-    mode: mode,
-    mode2: mode2 as unknown as never,
+    score: correct - wrong,
+    correct,
+    wrong,
+    acc,
+    tpm: roundTo2(answered / minutes),
+    spm: roundTo2((correct - wrong) / minutes),
+    consistency: random(50, 100),
+    mode: "time",
+    mode2,
     timestamp: timestamp.valueOf(),
-    testDuration: testDuration,
-    consistency: random(80, 100),
-    keyConsistency: 33.18,
+    testDuration,
+    settings: DEV_SETTINGS,
+    settingsId: DEV_SETTINGS_ID,
     chartData: {
-      wpm: createArray(testDuration, () => random(80, 120)),
-      burst: createArray(testDuration, () => random(80, 120)),
-      err: createArray(testDuration, () => (Math.random() < 0.1 ? 1 : 0)),
-    },
-    keySpacingStats: {
-      average: 113.88,
-      sd: 77.3,
-    },
-    keyDurationStats: {
-      average: 107.13,
-      sd: 39.86,
+      score: createArray(testDuration, () => Math.round(random(0, correct))),
+      tpm: createArray(testDuration, () => random(5, 40)),
+      wrong: createArray(testDuration, () => (Math.random() < 0.1 ? 1 : 0)),
     },
     isPb: Math.random() < 0.1,
     name: user.name,
@@ -188,7 +197,7 @@ function createResult(
 }
 
 async function updateUser(uid: string): Promise<void> {
-  //update timetyping and completedTests
+  //update timeSpent and completedTests
   const stats = await ResultDal.getResultCollection()
     .aggregate([
       {
@@ -199,11 +208,10 @@ async function updateUser(uid: string): Promise<void> {
       {
         $group: {
           _id: {
-            language: "$language",
             mode: "$mode",
             mode2: "$mode2",
           },
-          timeTyping: {
+          timeSpent: {
             $sum: "$testDuration",
           },
           completedTests: {
@@ -214,7 +222,7 @@ async function updateUser(uid: string): Promise<void> {
     ])
     .toArray();
 
-  const timeTyping = stats.reduce((a, c) => (a + c["timeTyping"]) as number, 0);
+  const timeSpent = stats.reduce((a, c) => (a + c["timeSpent"]) as number, 0);
   const completedTests = stats.reduce(
     (a, c) => (a + c["completedTests"]) as number,
     0,
@@ -223,24 +231,19 @@ async function updateUser(uid: string): Promise<void> {
   //update PBs
   const lbPersonalBests: LbPersonalBests = {
     time: {
-      15: {},
-      60: {},
+      4: {},
+      8: {},
     },
   };
 
   const personalBests: PersonalBests = {
     time: {},
-    custom: {},
-    words: {},
-    zen: {},
-    quote: {},
   };
   const modes = stats.map(
     (it) =>
       it["_id"] as {
-        language: Language;
-        mode: "time" | "custom" | "words" | "quote" | "zen";
-        mode2: `${number}` | "custom" | "zen";
+        mode: "time";
+        mode2: "1" | "2" | "4" | "8";
       },
   );
 
@@ -248,11 +251,10 @@ async function updateUser(uid: string): Promise<void> {
     const best = (await ResultDal.getResultCollection().findOne(
       {
         uid,
-        language: mode.language,
         mode: mode.mode,
         mode2: mode.mode2,
       },
-      { sort: { wpm: -1, timestamp: 1 } },
+      { sort: { score: -1, timestamp: 1 } },
     )) as DBResult;
 
     personalBests[mode.mode] ??= {};
@@ -260,28 +262,22 @@ async function updateUser(uid: string): Promise<void> {
       personalBests[mode.mode][mode.mode2] = [];
     }
 
-    const entry = {
+    const entry: PersonalBest = {
+      score: best.score,
+      correct: best.correct,
+      wrong: best.wrong,
       acc: best.acc,
-      consistency: best.consistency,
-      difficulty: best.difficulty ?? "normal",
-      lazyMode: best.lazyMode,
-      language: mode.language,
-      punctuation: best.punctuation,
-      raw: best.rawWpm,
-      wpm: best.wpm,
-      numbers: best.numbers,
+      tpm: best.tpm,
+      spm: best.spm,
+      settings: best.settings,
+      settingsId: best.settingsId,
       timestamp: best.timestamp,
-    } as PersonalBest;
+    };
 
     (personalBests[mode.mode][mode.mode2] as PersonalBest[]).push(entry);
 
-    if (mode.mode === "time") {
-      if (lbPersonalBests[mode.mode][mode.mode2] === undefined) {
-        lbPersonalBests[mode.mode][mode.mode2] = {};
-      }
-
-      // oxlint-disable-next-line no-unsafe-member-access
-      lbPersonalBests[mode.mode][mode.mode2][mode.language] = entry;
+    if (mode.mode2 === "4" || mode.mode2 === "8") {
+      lbPersonalBests[mode.mode][mode.mode2] = entry;
     }
 
     //update testActivity
@@ -293,7 +289,7 @@ async function updateUser(uid: string): Promise<void> {
     { uid },
     {
       $set: {
-        timeTyping: timeTyping,
+        timeSpent: timeSpent,
         completedTests: completedTests,
         startedTests: Math.round(completedTests * 1.25),
         personalBests: personalBests,
@@ -304,8 +300,8 @@ async function updateUser(uid: string): Promise<void> {
 }
 
 async function updateLeaderboard(): Promise<void> {
-  await LeaderboardDal.update("time", "15", "english");
-  await LeaderboardDal.update("time", "60", "english");
+  await LeaderboardDal.update("time", "4");
+  await LeaderboardDal.update("time", "8");
 }
 
 function randomValue<T>(values: T[]): T {

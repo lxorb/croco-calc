@@ -11,7 +11,7 @@ import {
   RedisDailyLeaderboardEntry,
   RedisDailyLeaderboardEntrySchema,
 } from "@croco-calc/schemas/leaderboards";
-import MonkeyError from "./error";
+import CrocoError from "./error";
 import { Mode, Mode2 } from "@croco-calc/schemas/shared";
 import { getCurrentDayTimestamp } from "@croco-calc/util/date-and-time";
 
@@ -125,7 +125,7 @@ export class DailyLeaderboard {
     }
 
     if (page < 0 || pageSize < 0) {
-      throw new MonkeyError(500, "Invalid page or pageSize");
+      throw new CrocoError(500, "Invalid page or pageSize");
     }
 
     if (userIds?.length === 0) {

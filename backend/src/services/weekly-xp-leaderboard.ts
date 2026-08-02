@@ -8,7 +8,7 @@ import {
   XpLeaderboardEntry,
 } from "@croco-calc/schemas/leaderboards";
 import { getCurrentWeekTimestamp } from "@croco-calc/util/date-and-time";
-import MonkeyError from "../utils/error";
+import CrocoError from "../utils/error";
 import { parseWithSchema as parseJsonWithSchema } from "@croco-calc/util/json";
 import { omit } from "../utils/misc";
 
@@ -132,7 +132,7 @@ export class WeeklyXpLeaderboard {
     }
 
     if (page < 0 || pageSize < 0) {
-      throw new MonkeyError(500, "Invalid page or pageSize");
+      throw new CrocoError(500, "Invalid page or pageSize");
     }
 
     if (userIds?.length === 0) {

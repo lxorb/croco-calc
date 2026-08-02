@@ -12,10 +12,6 @@ type Statuses = {
   BOT_DETECTED: Status;
   DUPLICATE_RESULT: Status;
   GIT_GUD: Status;
-  APE_KEY_INVALID: Status;
-  APE_KEY_INACTIVE: Status;
-  APE_KEY_MALFORMED: Status;
-  APE_KEY_RATE_LIMIT_EXCEEDED: Status;
 };
 
 const statuses: Statuses = {
@@ -50,22 +46,6 @@ const statuses: Statuses = {
   GIT_GUD: {
     code: 469,
     message: "Git gud scrub",
-  },
-  APE_KEY_INVALID: {
-    code: 470,
-    message: "Invalid ApeKey",
-  },
-  APE_KEY_INACTIVE: {
-    code: 471,
-    message: "ApeKey is inactive",
-  },
-  APE_KEY_MALFORMED: {
-    code: 472,
-    message: "ApeKey is malformed",
-  },
-  APE_KEY_RATE_LIMIT_EXCEEDED: {
-    code: 479,
-    message: "ApeKey rate limit exceeded",
   },
 };
 

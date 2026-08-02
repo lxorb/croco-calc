@@ -7,7 +7,7 @@ import { getCachedConfiguration } from "../../src/init/configuration";
 import * as ApeKeys from "../../src/dal/ape-keys";
 import { ObjectId } from "mongodb";
 import { hashSync } from "bcrypt";
-import MonkeyError from "../../src/utils/error";
+import CrocoError from "../../src/utils/error";
 import * as Misc from "../../src/utils/misc";
 import crypto from "crypto";
 import {
@@ -16,10 +16,10 @@ import {
 } from "@croco-calc/contracts/util/api";
 import * as Prometheus from "../../src/utils/prometheus";
 import { TsRestRequestWithContext } from "../../src/api/types";
-import { enableMonkeyErrorExpects } from "../__testData__/monkey-error";
+import { enableCrocoErrorExpects } from "../__testData__/croco-error";
 import { Context } from "../../src/middlewares/context";
 
-enableMonkeyErrorExpects();
+enableCrocoErrorExpects();
 const mockDecodedToken: DecodedIdToken = {
   uid: "123456789",
   email: "newuser@mail.com",
@@ -99,7 +99,7 @@ describe("middlewares/auth", () => {
     it("should fail if token is not fresh", async () => {
       //GIVEN
       Date.now = vi.fn(() => 60001);
-      const expectedError = new MonkeyError(
+      const expectedError = new CrocoError(
         401,
         "Unauthorized\nStack: This endpoint requires a fresh token",
       );
@@ -107,12 +107,12 @@ describe("middlewares/auth", () => {
       //WHEN
       await expect(async () =>
         authenticate({}, { requireFreshToken: true }),
-      ).rejects.toMatchMonkeyError(expectedError);
+      ).rejects.toMatchCrocoError(expectedError);
 
       //THEN
 
       expect(nextFunction).toHaveBeenLastCalledWith(
-        expect.toMatchMonkeyError(expectedError),
+        expect.toMatchCrocoError(expectedError),
       );
       expect(prometheusIncrementAuthMock).not.toHaveBeenCalled();
       expect(prometheusRecordAuthTimeMock).toHaveBeenCalledOnce();
@@ -248,8 +248,8 @@ describe("middlewares/auth", () => {
       //WHEN / THEN
       await expect(async () =>
         authenticate({ headers: { authorization: "Uid 123" } }),
-      ).rejects.toMatchMonkeyError(
-        new MonkeyError(401, "Bearer type uid is not supported"),
+      ).rejects.toMatchCrocoError(
+        new CrocoError(401, "Bearer type uid is not supported"),
       );
     });
     it("should fail without authentication", async () => {

@@ -4,10 +4,10 @@ import { Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TsRestRequestWithContext } from "../../src/api/types";
 import { verifyRequiredConfiguration } from "../../src/middlewares/configuration";
-import MonkeyError from "../../src/utils/error";
-import { enableMonkeyErrorExpects } from "../__testData__/monkey-error";
+import CrocoError from "../../src/utils/error";
+import { enableCrocoErrorExpects } from "../__testData__/croco-error";
 
-enableMonkeyErrorExpects();
+enableCrocoErrorExpects();
 describe("configuration middleware", () => {
   const handler = verifyRequiredConfiguration();
   const res: Response = {} as any;
@@ -63,8 +63,8 @@ describe("configuration middleware", () => {
 
     //THEN
     expect(next).toHaveBeenCalledWith(
-      expect.toMatchMonkeyError(
-        new MonkeyError(503, "This endpoint is currently unavailable."),
+      expect.toMatchCrocoError(
+        new CrocoError(503, "This endpoint is currently unavailable."),
       ),
     );
   });
@@ -80,7 +80,7 @@ describe("configuration middleware", () => {
 
     //THEN
     expect(next).toHaveBeenCalledWith(
-      expect.toMatchMonkeyError(new MonkeyError(503, "Feature not enabled.")),
+      expect.toMatchCrocoError(new CrocoError(503, "Feature not enabled.")),
     );
   });
   it("should fail for invalid path", () => {
@@ -92,8 +92,8 @@ describe("configuration middleware", () => {
 
     //THEN
     expect(next).toHaveBeenCalledWith(
-      expect.toMatchMonkeyError(
-        new MonkeyError(500, 'Invalid configuration path: "invalid.path"'),
+      expect.toMatchCrocoError(
+        new CrocoError(500, 'Invalid configuration path: "invalid.path"'),
       ),
     );
   });
@@ -109,8 +109,8 @@ describe("configuration middleware", () => {
 
     //THEN
     expect(next).toHaveBeenCalledWith(
-      expect.toMatchMonkeyError(
-        new MonkeyError(
+      expect.toMatchCrocoError(
+        new CrocoError(
           500,
           'Required configuration doesnt exist: "admin.endpointsEnabled"',
         ),
@@ -129,8 +129,8 @@ describe("configuration middleware", () => {
 
     //THEN
     expect(next).toHaveBeenCalledWith(
-      expect.toMatchMonkeyError(
-        new MonkeyError(
+      expect.toMatchCrocoError(
+        new CrocoError(
           500,
           'Required configuration doesnt exist: "admin.endpointsEnabled"',
         ),
@@ -149,8 +149,8 @@ describe("configuration middleware", () => {
 
     //THEN
     expect(next).toHaveBeenCalledWith(
-      expect.toMatchMonkeyError(
-        new MonkeyError(
+      expect.toMatchCrocoError(
+        new CrocoError(
           500,
           'Required configuration is not a boolean: "admin.endpointsEnabled"',
         ),
@@ -185,7 +185,7 @@ describe("configuration middleware", () => {
 
     //THEN
     expect(next).toHaveBeenCalledWith(
-      expect.toMatchMonkeyError(new MonkeyError(503, "admin disabled")),
+      expect.toMatchCrocoError(new CrocoError(503, "admin disabled")),
     );
   });
 });

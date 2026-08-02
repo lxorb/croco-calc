@@ -1,7 +1,7 @@
 import { Collection, Document, Filter, ObjectId } from "mongodb";
 import * as db from "../init/db";
 import { Connection, ConnectionStatus } from "@croco-calc/schemas/connections";
-import MonkeyError from "../utils/error";
+import CrocoError from "../utils/error";
 import { WithObjectId } from "../utils/misc";
 
 export type DBConnection = WithObjectId<
@@ -51,7 +51,7 @@ export async function create(
   });
 
   if (count >= maxPerUser) {
-    throw new MonkeyError(
+    throw new CrocoError(
       409,
       "Maximum number of connections reached",
       "create connection request",
@@ -97,7 +97,7 @@ export async function create(
         message = "Duplicate connection";
       }
 
-      throw new MonkeyError(409, message);
+      throw new CrocoError(409, message);
     }
 
     throw e;
@@ -109,7 +109,7 @@ export async function create(
  * @param receiverUid
  * @param id
  * @param status
- * @throws MonkeyError if the connection id is unknown or the recieverUid does not match
+ * @throws CrocoError if the connection id is unknown or the recieverUid does not match
  */
 export async function updateStatus(
   receiverUid: string,
@@ -125,7 +125,7 @@ export async function updateStatus(
   );
 
   if (updateResult.matchedCount === 0) {
-    throw new MonkeyError(404, "No permission or connection not found");
+    throw new CrocoError(404, "No permission or connection not found");
   }
 }
 
@@ -133,7 +133,7 @@ export async function updateStatus(
  * delete a connection by the id.
  * @param uid
  * @param id
- * @throws MonkeyError if the connection id is unknown or uid does not match
+ * @throws CrocoError if the connection id is unknown or uid does not match
  */
 export async function deleteById(uid: string, id: string): Promise<void> {
   const deletionResult = await getCollection().deleteOne({
@@ -151,7 +151,7 @@ export async function deleteById(uid: string, id: string): Promise<void> {
   });
 
   if (deletionResult.deletedCount === 0) {
-    throw new MonkeyError(404, "No permission or connection not found");
+    throw new CrocoError(404, "No permission or connection not found");
   }
 }
 

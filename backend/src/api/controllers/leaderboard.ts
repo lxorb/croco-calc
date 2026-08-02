@@ -1,7 +1,7 @@
-import { MonkeyResponse } from "../../utils/monkey-response";
+import { CrocoResponse } from "../../utils/croco-response";
 import * as LeaderboardsDAL from "../../dal/leaderboards";
 import * as ConnectionsDal from "../../dal/connections";
-import MonkeyError from "../../utils/error";
+import CrocoError from "../../utils/error";
 import * as DailyLeaderboards from "../../utils/daily-leaderboards";
 import * as WeeklyXpLeaderboard from "../../services/weekly-xp-leaderboard";
 import {
@@ -25,11 +25,11 @@ import {
   getCurrentWeekTimestamp,
   MILLISECONDS_IN_DAY,
 } from "@croco-calc/util/date-and-time";
-import { MonkeyRequest } from "../types";
+import { CrocoRequest } from "../types";
 import { omit } from "../../utils/misc";
 
 export async function getLeaderboard(
-  req: MonkeyRequest<GetLeaderboardQuery>,
+  req: CrocoRequest<GetLeaderboardQuery>,
 ): Promise<GetLeaderboardResponse> {
   const { language, mode, mode2, page, pageSize, friendsOnly } = req.query;
   const { uid } = req.ctx.decodedToken;
@@ -40,7 +40,7 @@ export async function getLeaderboard(
     (mode2 !== "15" && mode2 !== "60") ||
     language !== "english"
   ) {
-    throw new MonkeyError(404, "There is no leaderboard for this mode");
+    throw new CrocoError(404, "There is no leaderboard for this mode");
   }
 
   const friendsOnlyUid = getFriendsOnlyUid(uid, friendsOnly, connectionsConfig);
@@ -56,7 +56,7 @@ export async function getLeaderboard(
   );
 
   if (leaderboard === false) {
-    throw new MonkeyError(
+    throw new CrocoError(
       503,
       "Leaderboard is currently updating. Please try again in a few seconds.",
     );
@@ -70,7 +70,7 @@ export async function getLeaderboard(
   );
   const normalizedLeaderboard = leaderboard.map((it) => omit(it, ["_id"]));
 
-  return new MonkeyResponse("Leaderboard retrieved", {
+  return new CrocoResponse("Leaderboard retrieved", {
     count,
     entries: normalizedLeaderboard,
     pageSize,
@@ -78,7 +78,7 @@ export async function getLeaderboard(
 }
 
 export async function getRankFromLeaderboard(
-  req: MonkeyRequest<GetLeaderboardRankQuery>,
+  req: CrocoRequest<GetLeaderboardRankQuery>,
 ): Promise<GetLeaderboardRankResponse> {
   const { language, mode, mode2, friendsOnly } = req.query;
   const { uid } = req.ctx.decodedToken;
@@ -92,17 +92,17 @@ export async function getRankFromLeaderboard(
     getFriendsOnlyUid(uid, friendsOnly, connectionsConfig) !== undefined,
   );
   if (data === false) {
-    throw new MonkeyError(
+    throw new CrocoError(
       503,
       "Leaderboard is currently updating. Please try again in a few seconds.",
     );
   }
 
   if (data === null) {
-    return new MonkeyResponse("Rank retrieved", null);
+    return new CrocoResponse("Rank retrieved", null);
   }
 
-  return new MonkeyResponse("Rank retrieved", omit(data, ["_id"]));
+  return new CrocoResponse("Rank retrieved", omit(data, ["_id"]));
 }
 
 function getDailyLeaderboardWithError(
@@ -122,14 +122,14 @@ function getDailyLeaderboardWithError(
     customTimestamp,
   );
   if (!dailyLeaderboard) {
-    throw new MonkeyError(404, "There is no daily leaderboard for this mode");
+    throw new CrocoError(404, "There is no daily leaderboard for this mode");
   }
 
   return dailyLeaderboard;
 }
 
 export async function getDailyLeaderboard(
-  req: MonkeyRequest<GetDailyLeaderboardQuery>,
+  req: CrocoRequest<GetDailyLeaderboardQuery>,
 ): Promise<GetDailyLeaderboardResponse> {
   const { page, pageSize, friendsOnly } = req.query;
   const { uid } = req.ctx.decodedToken;
@@ -154,7 +154,7 @@ export async function getDailyLeaderboard(
     friendUids,
   );
 
-  return new MonkeyResponse("Daily leaderboard retrieved", {
+  return new CrocoResponse("Daily leaderboard retrieved", {
     entries: results?.entries ?? [],
     count: results?.count ?? 0,
     minWpm: results?.minWpm ?? 0,
@@ -163,7 +163,7 @@ export async function getDailyLeaderboard(
 }
 
 export async function getDailyLeaderboardRank(
-  req: MonkeyRequest<GetDailyLeaderboardRankQuery>,
+  req: CrocoRequest<GetDailyLeaderboardRankQuery>,
 ): Promise<GetLeaderboardDailyRankResponse> {
   const { friendsOnly } = req.query;
   const { uid } = req.ctx.decodedToken;
@@ -186,7 +186,7 @@ export async function getDailyLeaderboardRank(
     friendUids,
   );
 
-  return new MonkeyResponse("Daily leaderboard rank retrieved", rank);
+  return new CrocoResponse("Daily leaderboard rank retrieved", rank);
 }
 
 function getWeeklyXpLeaderboardWithError(
@@ -200,14 +200,14 @@ function getWeeklyXpLeaderboardWithError(
 
   const weeklyXpLeaderboard = WeeklyXpLeaderboard.get(config, customTimestamp);
   if (!weeklyXpLeaderboard) {
-    throw new MonkeyError(404, "XP leaderboard for this week not found.");
+    throw new CrocoError(404, "XP leaderboard for this week not found.");
   }
 
   return weeklyXpLeaderboard;
 }
 
 export async function getWeeklyXpLeaderboard(
-  req: MonkeyRequest<GetWeeklyXpLeaderboardQuery>,
+  req: CrocoRequest<GetWeeklyXpLeaderboardQuery>,
 ): Promise<GetWeeklyXpLeaderboardResponse> {
   const { page, pageSize, weeksBefore, friendsOnly } = req.query;
 
@@ -232,7 +232,7 @@ export async function getWeeklyXpLeaderboard(
     friendUids,
   );
 
-  return new MonkeyResponse("Weekly xp leaderboard retrieved", {
+  return new CrocoResponse("Weekly xp leaderboard retrieved", {
     entries: results?.entries ?? [],
     count: results?.count ?? 0,
     pageSize,
@@ -240,7 +240,7 @@ export async function getWeeklyXpLeaderboard(
 }
 
 export async function getWeeklyXpLeaderboardRank(
-  req: MonkeyRequest<GetWeeklyXpLeaderboardRankQuery>,
+  req: CrocoRequest<GetWeeklyXpLeaderboardRankQuery>,
 ): Promise<GetWeeklyXpLeaderboardRankResponse> {
   const { friendsOnly } = req.query;
   const { uid } = req.ctx.decodedToken;
@@ -262,7 +262,7 @@ export async function getWeeklyXpLeaderboardRank(
     friendUids,
   );
 
-  return new MonkeyResponse("Weekly xp leaderboard rank retrieved", rankEntry);
+  return new CrocoResponse("Weekly xp leaderboard rank retrieved", rankEntry);
 }
 
 async function getFriendsUids(
@@ -272,7 +272,7 @@ async function getFriendsUids(
 ): Promise<string[] | undefined> {
   if (uid !== "" && friendsOnly) {
     if (!friendsConfig.enabled) {
-      throw new MonkeyError(503, "This feature is currently unavailable.");
+      throw new CrocoError(503, "This feature is currently unavailable.");
     }
     return await ConnectionsDal.getFriendsUids(uid);
   }
@@ -286,7 +286,7 @@ function getFriendsOnlyUid(
 ): string | undefined {
   if (uid !== "" && friendsOnly === true) {
     if (!friendsConfig.enabled) {
-      throw new MonkeyError(503, "This feature is currently unavailable.");
+      throw new CrocoError(503, "This feature is currently unavailable.");
     }
     return uid;
   }

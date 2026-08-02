@@ -2,26 +2,6 @@ import { Collection, ObjectId, UpdateResult } from "mongodb";
 import * as db from "../init/db";
 import { Config, PartialConfig } from "@croco-calc/schemas/configs";
 
-const configLegacyProperties: Record<string, ""> = {
-  "config.swapEscAndTab": "",
-  "config.quickTab": "",
-  "config.chartStyle": "",
-  "config.chartAverage10": "",
-  "config.chartAverage100": "",
-  "config.alwaysShowCPM": "",
-  "config.resultFilters": "",
-  "config.chartAccuracy": "",
-  "config.liveSpeed": "",
-  "config.extraTestColor": "",
-  "config.savedLayout": "",
-  "config.showTimerBar": "",
-  "config.showDiscordDot": "",
-  "config.maxConfidence": "",
-  "config.capsLockBackspace": "",
-  "config.showAvg": "",
-  "config.enableAds": "",
-};
-
 export type DBConfig = {
   _id: ObjectId;
   uid: string;
@@ -41,7 +21,7 @@ export async function saveConfig(
 
   return await getConfigCollection().updateOne(
     { uid },
-    { $set: configChanges, $unset: configLegacyProperties },
+    { $set: configChanges },
     { upsert: true },
   );
 }

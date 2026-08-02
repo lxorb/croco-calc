@@ -9,15 +9,15 @@ import {
 import objectHash from "object-hash";
 import Logger from "../../utils/logger";
 import "dotenv/config";
-import { MonkeyResponse } from "../../utils/monkey-response";
-import MonkeyError from "../../utils/error";
+import { CrocoResponse } from "../../utils/croco-response";
+import CrocoError from "../../utils/error";
 import { isTestTooShort } from "../../utils/validation";
 import {
   implemented as anticheatImplemented,
   validateResult,
   validateKeys,
 } from "../../anticheat/index";
-import MonkeyStatusCodes from "../../constants/monkey-status-codes";
+import CrocoStatusCodes from "../../constants/croco-status-codes";
 import {
   incrementResult,
   incrementDailyLeaderboard,
@@ -25,7 +25,7 @@ import {
 import GeorgeQueue from "../../queues/george-queue";
 import { getDailyLeaderboard } from "../../utils/daily-leaderboards";
 import * as UserDAL from "../../dal/user";
-import { buildMonkeyMail } from "../../utils/monkey-mail";
+import { buildCrocoMail } from "../../utils/croco-mail";
 import * as WeeklyXpLeaderboard from "../../services/weekly-xp-leaderboard";
 import { UAParser } from "ua-parser-js";
 import { canFunboxGetPb } from "../../utils/pb";
@@ -59,7 +59,7 @@ import {
   getCurrentDayTimestamp,
   getStartOfDayTimestamp,
 } from "@croco-calc/util/date-and-time";
-import { MonkeyRequest } from "../types";
+import { CrocoRequest } from "../types";
 import { getFunbox, checkCompatibility } from "@monkeytype/funbox";
 import { tryCatch } from "@croco-calc/util/trycatch";
 import { getCachedConfiguration } from "../../init/configuration";
@@ -88,7 +88,7 @@ const autoRoleChallengeNames = new Set(
 );
 
 export async function getResults(
-  req: MonkeyRequest<GetResultsQuery>,
+  req: CrocoRequest<GetResultsQuery>,
 ): Promise<GetResultsResponse> {
   const { uid } = req.ctx.decodedToken;
   const premiumFeaturesEnabled = req.ctx.configuration.users.premium.enabled;
@@ -110,7 +110,7 @@ export async function getResults(
     !premiumFeaturesEnabled &&
     limit + offset > req.ctx.configuration.results.limits.regularUser
   ) {
-    throw new MonkeyError(503, "Premium feature disabled.");
+    throw new CrocoError(503, "Premium feature disabled.");
   }
 
   if (limit + offset > maxLimit) {
@@ -118,7 +118,7 @@ export async function getResults(
       //batch is partly in the allowed ranged. Set the limit to the max allowed and return partly results.
       limit = maxLimit - offset;
     } else {
-      throw new MonkeyError(422, `Max results limit of ${maxLimit} exceeded.`);
+      throw new CrocoError(422, `Max results limit of ${maxLimit} exceeded.`);
     }
   }
 
@@ -138,37 +138,37 @@ export async function getResults(
     uid,
   );
 
-  return new MonkeyResponse("Results retrieved", replaceObjectIds(results));
+  return new CrocoResponse("Results retrieved", replaceObjectIds(results));
 }
 
 export async function getResultById(
-  req: MonkeyRequest<undefined, undefined, GetResultByIdPath>,
+  req: CrocoRequest<undefined, undefined, GetResultByIdPath>,
 ): Promise<GetResultByIdResponse> {
   const { uid } = req.ctx.decodedToken;
   const { resultId } = req.params;
 
   const result = await ResultDAL.getResult(uid, resultId);
-  return new MonkeyResponse("Result retrieved", replaceObjectId(result));
+  return new CrocoResponse("Result retrieved", replaceObjectId(result));
 }
 
 export async function getLastResult(
-  req: MonkeyRequest,
+  req: CrocoRequest,
 ): Promise<GetLastResultResponse> {
   const { uid } = req.ctx.decodedToken;
   const result = await ResultDAL.getLastResult(uid);
-  return new MonkeyResponse("Result retrieved", replaceObjectId(result));
+  return new CrocoResponse("Result retrieved", replaceObjectId(result));
 }
 
-export async function deleteAll(req: MonkeyRequest): Promise<MonkeyResponse> {
+export async function deleteAll(req: CrocoRequest): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
 
   await ResultDAL.deleteAll(uid);
   void addLog("user_results_deleted", "", uid);
-  return new MonkeyResponse("All results deleted", null);
+  return new CrocoResponse("All results deleted", null);
 }
 
 export async function updateTags(
-  req: MonkeyRequest<undefined, UpdateResultTagsRequest>,
+  req: CrocoRequest<undefined, UpdateResultTagsRequest>,
 ): Promise<UpdateResultTagsResponse> {
   const { uid } = req.ctx.decodedToken;
   const { tagIds, resultId } = req.body;
@@ -185,20 +185,20 @@ export async function updateTags(
 
   const user = await UserDAL.getPartialUser(uid, "update tags", ["tags"]);
   const tagPbs = await UserDAL.checkIfTagPb(uid, user, result);
-  return new MonkeyResponse("Result tags updated", {
+  return new CrocoResponse("Result tags updated", {
     tagPbs,
   });
 }
 
 export async function addResult(
-  req: MonkeyRequest<undefined, AddResultRequest>,
+  req: CrocoRequest<undefined, AddResultRequest>,
 ): Promise<AddResultResponse> {
   const { uid } = req.ctx.decodedToken;
 
   const user = await UserDAL.getUser(uid, "add result");
 
   if (user.needsToChangeName) {
-    throw new MonkeyError(
+    throw new CrocoError(
       403,
       "Please change your name before submitting a result",
     );
@@ -208,12 +208,12 @@ export async function addResult(
   completedEvent.uid = uid;
 
   if (isTestTooShort(completedEvent)) {
-    const status = MonkeyStatusCodes.TEST_TOO_SHORT;
-    throw new MonkeyError(status.code, status.message);
+    const status = CrocoStatusCodes.TEST_TOO_SHORT;
+    throw new CrocoError(status.code, status.message);
   }
 
   if (user.lbOptOut !== true && completedEvent.acc < 75) {
-    throw new MonkeyError(400, "Accuracy too low");
+    throw new CrocoError(400, "Accuracy too low");
   }
 
   const resulthash = completedEvent.hash;
@@ -230,19 +230,19 @@ export async function addResult(
         },
         uid,
       );
-      const status = MonkeyStatusCodes.RESULT_HASH_INVALID;
-      throw new MonkeyError(status.code, "Incorrect result hash");
+      const status = CrocoStatusCodes.RESULT_HASH_INVALID;
+      throw new CrocoError(status.code, "Incorrect result hash");
     }
   } else {
     Logger.warning("Object hash check is disabled, skipping hash check");
   }
 
   if (completedEvent.funbox.length !== new Set(completedEvent.funbox).size) {
-    throw new MonkeyError(400, "Duplicate funboxes");
+    throw new CrocoError(400, "Duplicate funboxes");
   }
 
   if (!checkCompatibility(completedEvent.funbox)) {
-    throw new MonkeyError(400, "Impossible funbox combination");
+    throw new CrocoError(400, "Impossible funbox combination");
   }
 
   let keySpacingStats: KeyStats | undefined = undefined;
@@ -296,8 +296,8 @@ export async function addResult(
         user.lbOptOut === true,
       )
     ) {
-      const status = MonkeyStatusCodes.RESULT_DATA_INVALID;
-      throw new MonkeyError(status.code, "Result data doesn't make sense");
+      const status = CrocoStatusCodes.RESULT_DATA_INVALID;
+      throw new CrocoError(status.code, "Result data doesn't make sense");
     } else if (isDevEnvironment()) {
       Logger.success("Result data validated");
     }
@@ -350,8 +350,8 @@ export async function addResult(
       },
       uid,
     );
-    const status = MonkeyStatusCodes.RESULT_SPACING_INVALID;
-    throw new MonkeyError(status.code, "Invalid result spacing");
+    const status = CrocoStatusCodes.RESULT_SPACING_INVALID;
+    throw new CrocoError(status.code, "Invalid result spacing");
   }
 
   //check keyspacing and duration here for bots
@@ -363,11 +363,11 @@ export async function addResult(
     user.lbOptOut !== true
   ) {
     if (!keySpacingStats || !keyDurationStats) {
-      const status = MonkeyStatusCodes.MISSING_KEY_DATA;
-      throw new MonkeyError(status.code, "Missing key data");
+      const status = CrocoStatusCodes.MISSING_KEY_DATA;
+      throw new CrocoError(status.code, "Missing key data");
     }
     if (completedEvent.keyOverlap === undefined) {
-      throw new MonkeyError(400, "Old key data format");
+      throw new CrocoError(400, "Old key data format");
     }
     if (anticheatImplemented()) {
       if (
@@ -382,7 +382,7 @@ export async function addResult(
             autoBanConfig.maxHours,
           );
           if (didUserGetBanned) {
-            const mail = buildMonkeyMail({
+            const mail = buildCrocoMail({
               subject: "Banned",
               body: "Your account has been automatically banned for triggering the anticheat system. If you believe this is a mistake, please contact support.",
             });
@@ -394,8 +394,8 @@ export async function addResult(
             user.banned = true;
           }
         }
-        const status = MonkeyStatusCodes.BOT_DETECTED;
-        throw new MonkeyError(status.code, "Possible bot detected");
+        const status = CrocoStatusCodes.BOT_DETECTED;
+        throw new CrocoError(status.code, "Possible bot detected");
       }
     } else {
       if (!isDevEnvironment()) {
@@ -419,8 +419,8 @@ export async function addResult(
         },
         uid,
       );
-      const status = MonkeyStatusCodes.DUPLICATE_RESULT;
-      throw new MonkeyError(status.code, "Duplicate result");
+      const status = CrocoStatusCodes.DUPLICATE_RESULT;
+      throw new CrocoError(status.code, "Duplicate result");
     } else {
       lastHashes.unshift(resulthash);
       const maxHashes = req.ctx.configuration.users.lastHashesCheck.maxHashes;
@@ -567,7 +567,7 @@ export async function addResult(
     !badgeWaitingInInbox;
 
   if (shouldGetBadge) {
-    const mail = buildMonkeyMail({
+    const mail = buildCrocoMail({
       subject: "Badge",
       body: "Congratulations for reaching a 365 day streak! You have been awarded a special badge. Now, go touch some grass.",
       rewards: [
@@ -591,7 +591,7 @@ export async function addResult(
   );
 
   if (isNaN(xpGained.xp)) {
-    throw new MonkeyError(
+    throw new CrocoError(
       500,
       "Calculated XP is NaN",
       JSON.stringify({
@@ -603,7 +603,7 @@ export async function addResult(
   }
 
   if (xpGained.xp < 0) {
-    throw new MonkeyError(
+    throw new CrocoError(
       500,
       "Calculated XP is negative",
       JSON.stringify({
@@ -684,7 +684,7 @@ export async function addResult(
 
   incrementResult(completedEvent, dbresult.isPb);
 
-  return new MonkeyResponse("Result saved", data);
+  return new CrocoResponse("Result saved", data);
 }
 
 type XpResult = {

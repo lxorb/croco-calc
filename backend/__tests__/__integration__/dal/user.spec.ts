@@ -2129,7 +2129,7 @@ describe("UserDal", () => {
         name: "Two",
         discordId: "discordId",
         discordAvatar: "discordAvatar",
-        timeTyping: 600,
+        timeSpent: 600,
         startedTests: 150,
         completedTests: 125,
         streak: {
@@ -2191,7 +2191,7 @@ describe("UserDal", () => {
           connectionId: friendTwoRequest._id,
           discordId: friendTwo.discordId,
           discordAvatar: friendTwo.discordAvatar,
-          timeTyping: friendTwo.timeTyping,
+          timeSpent: friendTwo.timeSpent,
           startedTests: friendTwo.startedTests,
           completedTests: friendTwo.completedTests,
           streak: {

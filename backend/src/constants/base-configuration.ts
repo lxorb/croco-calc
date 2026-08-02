@@ -19,37 +19,17 @@ export const BASE_CONFIGURATION: Configuration = {
     },
     limits: {
       regularUser: 1000,
-      premiumUser: 10000,
     },
     maxBatchSize: 1000,
   },
-  quotes: {
-    reporting: {
-      enabled: false,
-      maxReports: 0,
-      contentReportLimit: 0,
-    },
-    submissionsEnabled: false,
-    maxFavorites: 0,
-  },
   admin: {
     endpointsEnabled: false,
-  },
-  apeKeys: {
-    endpointsEnabled: false,
-    acceptKeys: false,
-    maxKeysPerUser: 0,
-    apeKeyBytes: 24,
-    apeKeySaltRounds: 5,
   },
   users: {
     signUp: false,
     lastHashesCheck: {
       enabled: false,
       maxHashes: 0,
-    },
-    discordIntegration: {
-      enabled: false,
     },
     autoBan: {
       enabled: false,
@@ -61,22 +41,18 @@ export const BASE_CONFIGURATION: Configuration = {
     },
     xp: {
       enabled: false,
-      funboxBonus: 0,
       gainMultiplier: 0,
       maxDailyBonus: 0,
       minDailyBonus: 0,
-      streak: {
-        enabled: false,
-        maxStreakDays: 0,
-        maxStreakMultiplier: 0,
-      },
     },
     inbox: {
       enabled: false,
       maxMail: 0,
     },
-    premium: {
+    reporting: {
       enabled: false,
+      maxReports: 0,
+      contentReportLimit: 0,
     },
   },
   rateLimiting: {
@@ -96,7 +72,7 @@ export const BASE_CONFIGURATION: Configuration = {
     xpRewardBrackets: [],
   },
   leaderboards: {
-    minTimeTyping: 2 * 60 * 60,
+    minTimeSpent: 2 * 60 * 60,
     weeklyXp: {
       enabled: false,
       expirationTimeInDays: 0, // This should atleast be 15
@@ -204,49 +180,12 @@ export const CONFIGURATION_FORM_SCHEMA: ObjectSchema<Configuration> = {
               label: "for regular users",
               min: 0,
             },
-            premiumUser: {
-              type: "number",
-              label: "for premium users",
-              min: 0,
-            },
           },
         },
         maxBatchSize: {
           type: "number",
           label: "results endpoint max batch size",
           min: 1,
-        },
-      },
-    },
-    quotes: {
-      type: "object",
-      label: "Quotes",
-      fields: {
-        reporting: {
-          type: "object",
-          label: "Reporting",
-          fields: {
-            enabled: {
-              type: "boolean",
-              label: "Enabled",
-            },
-            maxReports: {
-              type: "number",
-              label: "Max Reports",
-            },
-            contentReportLimit: {
-              type: "number",
-              label: "Content Report Limit",
-            },
-          },
-        },
-        submissionsEnabled: {
-          type: "boolean",
-          label: "Submissions Enabled",
-        },
-        maxFavorites: {
-          type: "number",
-          label: "Max Favorites",
         },
       },
     },
@@ -260,49 +199,10 @@ export const CONFIGURATION_FORM_SCHEMA: ObjectSchema<Configuration> = {
         },
       },
     },
-    apeKeys: {
-      type: "object",
-      label: "Ape Keys",
-      fields: {
-        endpointsEnabled: {
-          type: "boolean",
-          label: "Endpoints Enabled",
-        },
-        acceptKeys: {
-          type: "boolean",
-          label: "Accept Keys",
-        },
-        maxKeysPerUser: {
-          type: "number",
-          label: "Max Keys Per User",
-          min: 0,
-        },
-        apeKeyBytes: {
-          type: "number",
-          label: "Ape Key Bytes",
-          min: 24,
-        },
-        apeKeySaltRounds: {
-          type: "number",
-          label: "Ape Key Salt Rounds",
-          min: 5,
-        },
-      },
-    },
     users: {
       type: "object",
       label: "Users",
       fields: {
-        premium: {
-          type: "object",
-          label: "Premium",
-          fields: {
-            enabled: {
-              type: "boolean",
-              label: "Enabled",
-            },
-          },
-        },
         signUp: {
           type: "boolean",
           label: "Sign Up Enabled",
@@ -327,10 +227,6 @@ export const CONFIGURATION_FORM_SCHEMA: ObjectSchema<Configuration> = {
               type: "number",
               label: "Gain Multiplier",
             },
-            funboxBonus: {
-              type: "number",
-              label: "Funbox Bonus",
-            },
             maxDailyBonus: {
               type: "number",
               label: "Max Daily Bonus",
@@ -338,34 +234,6 @@ export const CONFIGURATION_FORM_SCHEMA: ObjectSchema<Configuration> = {
             minDailyBonus: {
               type: "number",
               label: "Min Daily Bonus",
-            },
-            streak: {
-              type: "object",
-              label: "Streak",
-              fields: {
-                enabled: {
-                  type: "boolean",
-                  label: "Enabled",
-                },
-                maxStreakDays: {
-                  type: "number",
-                  label: "Max Streak Days",
-                },
-                maxStreakMultiplier: {
-                  type: "number",
-                  label: "Max Streak Multiplier",
-                },
-              },
-            },
-          },
-        },
-        discordIntegration: {
-          type: "object",
-          label: "Discord Integration",
-          fields: {
-            enabled: {
-              type: "boolean",
-              label: "Enabled",
             },
           },
         },
@@ -411,6 +279,24 @@ export const CONFIGURATION_FORM_SCHEMA: ObjectSchema<Configuration> = {
             enabled: {
               type: "boolean",
               label: "Enabled",
+            },
+          },
+        },
+        reporting: {
+          type: "object",
+          label: "Reporting",
+          fields: {
+            enabled: {
+              type: "boolean",
+              label: "Enabled",
+            },
+            maxReports: {
+              type: "number",
+              label: "Max Reports",
+            },
+            contentReportLimit: {
+              type: "number",
+              label: "Content Report Limit",
             },
           },
         },
@@ -471,10 +357,6 @@ export const CONFIGURATION_FORM_SCHEMA: ObjectSchema<Configuration> = {
             type: "object",
             label: "Rule",
             fields: {
-              language: {
-                type: "string",
-                label: "Language",
-              },
               mode: {
                 type: "string",
                 label: "Mode",
@@ -493,10 +375,6 @@ export const CONFIGURATION_FORM_SCHEMA: ObjectSchema<Configuration> = {
             type: "object",
             label: "Rule",
             fields: {
-              language: {
-                type: "string",
-                label: "Language",
-              },
               mode: {
                 type: "string",
                 label: "Mode",
@@ -550,7 +428,7 @@ export const CONFIGURATION_FORM_SCHEMA: ObjectSchema<Configuration> = {
       type: "object",
       label: "Leaderboards",
       fields: {
-        minTimeTyping: {
+        minTimeSpent: {
           type: "number",
           label: "Minimum typing time the user needs to get on a leaderboard",
           hint: "Typing time in seconds. Change is only applied after restarting the server.",

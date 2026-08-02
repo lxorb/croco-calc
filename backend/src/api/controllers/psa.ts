@@ -1,8 +1,8 @@
 import { GetPsaResponse } from "@croco-calc/contracts/psas";
 import * as PsaDAL from "../../dal/psa";
-import { MonkeyResponse } from "../../utils/monkey-response";
+import { CrocoResponse } from "../../utils/croco-response";
 import { replaceObjectIds } from "../../utils/misc";
-import { MonkeyRequest } from "../types";
+import { CrocoRequest } from "../types";
 import { PSA } from "@croco-calc/schemas/psas";
 import { cacheWithTTL } from "../../utils/ttl-cache";
 
@@ -11,6 +11,6 @@ const cache = cacheWithTTL<PSA[]>(1 * 60 * 1000, async () => {
   return replaceObjectIds(await PsaDAL.get());
 });
 
-export async function getPsas(_req: MonkeyRequest): Promise<GetPsaResponse> {
-  return new MonkeyResponse("PSAs retrieved", (await cache()) ?? []);
+export async function getPsas(_req: CrocoRequest): Promise<GetPsaResponse> {
+  return new CrocoResponse("PSAs retrieved", (await cache()) ?? []);
 }

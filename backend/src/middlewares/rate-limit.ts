@@ -1,4 +1,4 @@
-import MonkeyError from "../utils/error";
+import CrocoError from "../utils/error";
 import type { Response, NextFunction, Request } from "express";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import {
@@ -15,7 +15,6 @@ import {
   RateLimitOptions,
   Window,
 } from "@croco-calc/contracts/rate-limit/index";
-import statuses from "../constants/monkey-status-codes";
 import { getMetadata } from "./utility";
 import {
   ExpressRequestWithContext,
@@ -26,18 +25,12 @@ import { AppRoute, AppRouter } from "@ts-rest/core";
 export const REQUEST_MULTIPLIER = isDevEnvironment() ? 100 : 1;
 
 export const customHandler = (
-  req: ExpressRequestWithContext,
+  _req: ExpressRequestWithContext,
   _res: Response,
   _next: NextFunction,
   _options: Options,
 ): void => {
-  if (req.ctx.decodedToken.type === "ApeKey") {
-    throw new MonkeyError(
-      statuses.APE_KEY_RATE_LIMIT_EXCEEDED.code,
-      statuses.APE_KEY_RATE_LIMIT_EXCEEDED.message,
-    );
-  }
-  throw new MonkeyError(429, "Request limit reached, please try again later.");
+  throw new CrocoError(429, "Request limit reached, please try again later.");
 };
 
 const getKey = (req: Request, _res: Response): string => {
@@ -110,23 +103,12 @@ export function rateLimitRequest<
       return;
     }
 
-    const hasApeKeyLimiterId = typeof metadataRateLimit === "object";
-    let rateLimiterId: RateLimiterId;
-
-    if (req.ctx.decodedToken.type === "ApeKey") {
-      rateLimiterId = hasApeKeyLimiterId
-        ? metadataRateLimit.apeKey
-        : "defaultApeRateLimit";
-    } else {
-      rateLimiterId = hasApeKeyLimiterId
-        ? metadataRateLimit.normal
-        : metadataRateLimit;
-    }
+    const rateLimiterId: RateLimiterId = metadataRateLimit;
 
     const rateLimiter = requestLimiters[rateLimiterId];
     if (rateLimiter === undefined) {
       next(
-        new MonkeyError(
+        new CrocoError(
           500,
           `Unknown rateLimiterId '${rateLimiterId}', how did you manage to do this?`,
         ),
@@ -143,7 +125,7 @@ export const rootRateLimiter = rateLimit({
   limit: 1000 * REQUEST_MULTIPLIER,
   keyGenerator: getKey,
   handler: (_req, _res, _next, _options): void => {
-    throw new MonkeyError(
+    throw new CrocoError(
       429,
       "Maximum API request (root) limit reached. Please try again later.",
     );
@@ -173,7 +155,7 @@ export async function badAuthRateLimiterHandler(
     const rateLimitStatus = await badAuthRateLimiter.get(key);
 
     if (rateLimitStatus !== null && rateLimitStatus?.remainingPoints <= 0) {
-      throw new MonkeyError(
+      throw new CrocoError(
         429,
         "Too many bad authentication attempts, please try again later.",
       );
@@ -203,10 +185,3 @@ export async function incrementBadAuth(
     await badAuthRateLimiter.penalty(key, penalty);
   } catch {}
 }
-
-export const webhookLimit = rateLimit({
-  windowMs: 1000,
-  limit: 1 * REQUEST_MULTIPLIER,
-  keyGenerator: getKeyWithUid,
-  handler: customHandler,
-});

@@ -3,21 +3,16 @@ import psas from "./psas";
 import publicStats from "./public";
 import users from "./users";
 import { join } from "path";
-import quotes from "./quotes";
 import results from "./results";
-import presets from "./presets";
-import apeKeys from "./ape-keys";
 import admin from "./admin";
 import docs from "./docs";
-import webhooks from "./webhooks";
 import dev from "./dev";
 import configs from "./configs";
 import configuration from "./configuration";
 import { version } from "../../version";
 import leaderboards from "./leaderboards";
 import connections from "./connections";
-import addSwaggerMiddlewares from "./swagger";
-import { MonkeyResponse } from "../../utils/monkey-response";
+import { CrocoResponse } from "../../utils/croco-response";
 import {
   Application,
   IRouter,
@@ -47,9 +42,7 @@ const API_ROUTE_MAP = {
 const s = initServer();
 const router = s.router(contract, {
   admin,
-  apeKeys,
   configs,
-  presets,
   psas,
   public: publicStats,
   leaderboards,
@@ -57,8 +50,6 @@ const router = s.router(contract, {
   configuration,
   dev,
   users,
-  quotes,
-  webhooks,
   connections,
 });
 
@@ -71,7 +62,7 @@ export function addApiRoutes(app: Application): void {
     res
       .status(404)
       .json(
-        new MonkeyResponse(
+        new CrocoResponse(
           `Unknown request URL (${req.method}: ${req.path})`,
           null,
         ),
@@ -150,8 +141,6 @@ function applyDevApiRoutes(app: Application): void {
 }
 
 function applyApiRoutes(app: Application): void {
-  addSwaggerMiddlewares(app);
-
   app.use(
     (
       req: ExpressRequestWithContext,
@@ -178,7 +167,7 @@ function applyApiRoutes(app: Application): void {
 
   app.get("/", (_req, res) => {
     res.status(200).json(
-      new MonkeyResponse("ok", {
+      new CrocoResponse("ok", {
         uptime: Date.now() - APP_START_TIME,
         version,
       }),

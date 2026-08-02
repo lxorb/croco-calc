@@ -1,4 +1,4 @@
-import MonkeyError from "../utils/error";
+import CrocoError from "../utils/error";
 import * as db from "../init/db";
 import { ObjectId } from "mongodb";
 
@@ -33,7 +33,7 @@ export async function createReport(
   contentReportLimit: number,
 ): Promise<void> {
   if (report.type === "user" && report.contentId === report.uid) {
-    throw new MonkeyError(400, "You cannot report yourself.");
+    throw new CrocoError(400, "You cannot report yourself.");
   }
 
   const reportsCount = await db
@@ -41,7 +41,7 @@ export async function createReport(
     .estimatedDocumentCount();
 
   if (reportsCount >= maxReports) {
-    throw new MonkeyError(
+    throw new CrocoError(
       503,
       "Reports are not being accepted at this time due to a large backlog of reports. Please try again later.",
     );
@@ -53,7 +53,7 @@ export async function createReport(
     .toArray();
 
   if (sameReports.length >= contentReportLimit) {
-    throw new MonkeyError(
+    throw new CrocoError(
       409,
       "A report limit for this content has been reached.",
     );
@@ -64,7 +64,7 @@ export async function createReport(
   }).length;
 
   if (countFromUserMakingReport > 0) {
-    throw new MonkeyError(409, "You have already reported this content.");
+    throw new CrocoError(409, "You have already reported this content.");
   }
 
   await db.collection<DBReport>(COLLECTION_NAME).insertOne(report);

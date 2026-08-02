@@ -50,21 +50,6 @@ export default s.router(usersContract, {
     handler: async (r) =>
       callController(UserController.removeResultFilterPreset)(r),
   },
-  getTags: {
-    handler: async (r) => callController(UserController.getTags)(r),
-  },
-  createTag: {
-    handler: async (r) => callController(UserController.addTag)(r),
-  },
-  editTag: {
-    handler: async (r) => callController(UserController.editTag)(r),
-  },
-  deleteTag: {
-    handler: async (r) => callController(UserController.removeTag)(r),
-  },
-  deleteTagPersonalBest: {
-    handler: async (r) => callController(UserController.clearTagPb)(r),
-  },
   getCustomThemes: {
     handler: async (r) => callController(UserController.getCustomThemes)(r),
   },
@@ -77,29 +62,8 @@ export default s.router(usersContract, {
   editCustomTheme: {
     handler: async (r) => callController(UserController.editCustomTheme)(r),
   },
-  getDiscordOAuth: {
-    handler: async (r) => callController(UserController.getOauthLink)(r),
-  },
-  linkDiscord: {
-    handler: async (r) => callController(UserController.linkDiscord)(r),
-  },
-  unlinkDiscord: {
-    handler: async (r) => callController(UserController.unlinkDiscord)(r),
-  },
   getStats: {
     handler: async (r) => callController(UserController.getStats)(r),
-  },
-  setStreakHourOffset: {
-    handler: async (r) => callController(UserController.setStreakHourOffset)(r),
-  },
-  getFavoriteQuotes: {
-    handler: async (r) => callController(UserController.getFavoriteQuotes)(r),
-  },
-  addQuoteToFavorites: {
-    handler: async (r) => callController(UserController.addFavoriteQuote)(r),
-  },
-  removeQuoteFromFavorites: {
-    handler: async (r) => callController(UserController.removeFavoriteQuote)(r),
   },
   getProfile: {
     handler: async (r) => callController(UserController.getProfile)(r),
@@ -125,9 +89,6 @@ export default s.router(usersContract, {
   getCurrentTestActivity: {
     handler: async (r) =>
       callController(UserController.getCurrentTestActivity)(r),
-  },
-  getStreak: {
-    handler: async (r) => callController(UserController.getStreak)(r),
   },
   getFriends: {
     handler: async (r) => callController(UserController.getFriends)(r),

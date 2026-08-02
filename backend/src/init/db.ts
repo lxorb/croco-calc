@@ -6,7 +6,7 @@ import {
   type MongoClientOptions,
   type WithId,
 } from "mongodb";
-import MonkeyError, { getErrorMessage } from "../utils/error";
+import CrocoError, { getErrorMessage } from "../utils/error";
 import Logger from "../utils/logger";
 
 let db: Db;
@@ -70,7 +70,7 @@ export const getDb = (): Db | undefined => db;
 
 export function collection<T>(collectionName: string): Collection<WithId<T>> {
   if (db === undefined) {
-    throw new MonkeyError(500, "Database is not initialized.");
+    throw new CrocoError(500, "Database is not initialized.");
   }
 
   return db.collection<WithId<T>>(collectionName);

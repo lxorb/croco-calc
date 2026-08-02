@@ -26,7 +26,7 @@ describe("LeaderboardsDal", () => {
       await createUser(lbPersonalBests, { banned: true });
       await createUser(lbPersonalBests, { lbOptOut: true });
       await createUser(lbPersonalBests, { needsToChangeName: true });
-      await createUser(lbPersonalBests, { timeTyping: 0 });
+      await createUser(lbPersonalBests, { timeSpent: 0 });
       await createUser(lbBests(pb(0, 90, 1)));
       await createUser(lbBests(pb(60, 0, 1)));
       await createUser(lbBests(pb(60, 90, 0)));
@@ -504,7 +504,7 @@ async function createUser(
       { uid },
       {
         $set: {
-          timeTyping: 7200,
+          timeSpent: 7200,
           discordId: `discord ${uid}`,
           discordAvatar: `avatar ${uid}`,
           ...userProperties,

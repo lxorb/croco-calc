@@ -11,7 +11,7 @@ describe("PublicDAL", function () {
     const typingStats = await PublicDAL.getTypingStats();
     expect(typingStats).toHaveProperty("testsCompleted");
     expect(typingStats).toHaveProperty("testsStarted");
-    expect(typingStats).toHaveProperty("timeTyping");
+    expect(typingStats).toHaveProperty("timeSpent");
   });
 
   it("should increment stats on update", async function () {
@@ -21,6 +21,6 @@ describe("PublicDAL", function () {
     const afterStats = await PublicDAL.getTypingStats();
     expect(afterStats.testsCompleted).toBe(priorStats.testsCompleted + 1);
     expect(afterStats.testsStarted).toBe(priorStats.testsStarted + 2);
-    expect(afterStats.timeTyping).toBe(priorStats.timeTyping + 60);
+    expect(afterStats.timeSpent).toBe(priorStats.timeSpent + 60);
   });
 });

@@ -1,11 +1,11 @@
 import { MonkeyResponseType } from "@croco-calc/contracts/util/api";
 
-export type MonkeyDataAware<T> = {
+export type CrocoDataAware<T> = {
   data: T | null;
 };
 
-export class MonkeyResponse<T = null>
-  implements MonkeyResponseType, MonkeyDataAware<T>
+export class CrocoResponse<T = null>
+  implements MonkeyResponseType, CrocoDataAware<T>
 {
   public message: string;
   public data: T;

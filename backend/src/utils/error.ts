@@ -47,7 +47,7 @@ export function getErrorMessage(error: unknown): string | undefined {
   return message;
 }
 
-class MonkeyError extends Error implements MonkeyServerErrorType {
+class CrocoError extends Error implements MonkeyServerErrorType {
   status: number;
   errorId: string;
   uid?: string;
@@ -75,4 +75,4 @@ class MonkeyError extends Error implements MonkeyServerErrorType {
   }
 }
 
-export default MonkeyError;
+export default CrocoError;

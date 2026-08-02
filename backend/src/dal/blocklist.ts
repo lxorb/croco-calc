@@ -4,13 +4,12 @@ import { createHash } from "crypto";
 import { User } from "@croco-calc/schemas/users";
 import { WithObjectId } from "../utils/misc";
 
-type BlocklistEntryProperties = Pick<User, "name" | "email" | "discordId">;
+type BlocklistEntryProperties = Pick<User, "name" | "email">;
 
 type BlocklistEntry = {
   _id: string;
   usernameHash?: string;
   emailHash?: string;
-  discordIdHash?: string;
   timestamp: number;
 };
 
@@ -45,19 +44,6 @@ export async function add(user: BlocklistEntryProperties): Promise<void> {
     ),
   );
 
-  if (user.discordId !== undefined && user.discordId !== "") {
-    const discordIdHash = hash(user.discordId);
-    inserts.push(
-      getCollection().replaceOne(
-        { discordIdHash },
-        {
-          discordIdHash,
-          timestamp,
-        },
-        { upsert: true },
-      ),
-    );
-  }
   await Promise.all(inserts);
 }
 
@@ -95,9 +81,6 @@ function getFilter(
   if (user.name !== undefined) {
     filter.push({ usernameHash: hash(user.name) });
   }
-  if (user.discordId !== undefined) {
-    filter.push({ discordIdHash: hash(user.discordId) });
-  }
   return filter;
 }
 
@@ -114,13 +97,6 @@ export async function createIndicies(): Promise<void> {
     {
       unique: true,
       partialFilterExpression: { emailHash: { $exists: true } },
-    },
-  );
-  await getCollection().createIndex(
-    { discordIdHash: 1 },
-    {
-      unique: true,
-      partialFilterExpression: { discordIdHash: { $exists: true } },
     },
   );
 }

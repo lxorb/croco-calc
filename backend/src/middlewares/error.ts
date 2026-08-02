@@ -1,15 +1,11 @@
 import * as db from "../init/db";
 import { v4 as uuidv4 } from "uuid";
 import Logger from "../utils/logger";
-import MonkeyError, { getErrorMessage } from "../utils/error";
+import CrocoError, { getErrorMessage } from "../utils/error";
 import { incrementBadAuth } from "./rate-limit";
 import type { NextFunction, Response } from "express";
-import { isCustomCode } from "../constants/monkey-status-codes";
+import { isCustomCode } from "../constants/croco-status-codes";
 
-import {
-  recordClientErrorByVersion,
-  recordServerErrorByVersion,
-} from "../utils/prometheus";
 import { isDevEnvironment } from "../utils/misc";
 import { version } from "../version";
 import { addLog } from "../dal/logs";
@@ -39,7 +35,7 @@ async function errorHandlingMiddleware(
   _next: NextFunction,
 ): Promise<void> {
   try {
-    const monkeyError = error as MonkeyError;
+    const monkeyError = error as CrocoError;
     let status = 500;
     const data: { errorId?: string; uid: string } = {
       errorId: monkeyError.errorId ?? uuidv4(),
@@ -52,22 +48,16 @@ async function errorHandlingMiddleware(
     } else if (error instanceof URIError || error instanceof SyntaxError) {
       status = 400;
       message = "Unprocessable request";
-    } else if (error instanceof MonkeyError) {
+    } else if (error instanceof CrocoError) {
       message = error.message;
       status = error.status;
     } else {
-      message = `Oops! Our monkeys dropped their bananas. Please try again later. - ${data.errorId}`;
+      message = `Oops! The crocodile ate your request. Please try again later. - ${data.errorId}`;
     }
 
     await incrementBadAuth(req, res, status);
 
-    if (status >= 400 && status < 500) {
-      recordClientErrorByVersion(req.headers["x-client-version"] as string);
-    }
-
     if (!isDevEnvironment() && status >= 500 && status !== 503) {
-      recordServerErrorByVersion(version);
-
       const { uid, errorId } = data as {
         uid: string;
         errorId: string;

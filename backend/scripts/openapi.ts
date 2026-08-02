@@ -21,17 +21,18 @@ export function getOpenApi(): OpenAPIObject {
     {
       openapi: "3.1.0",
       info: {
-        title: "Monkeytype API",
+        title: "croco calc API",
         description:
-          "Documentation for the endpoints provided by the Monkeytype API server.\n\nNote that authentication is performed with the Authorization HTTP header in the format `Authorization: ApeKey YOUR_APE_KEY`\n\nThere is a rate limit of `30 requests per minute` across all endpoints with some endpoints being more strict. Rate limit rates are shared across all ape keys.",
+          "Documentation for the endpoints provided by the croco calc API server.
+
+Authentication is performed with the Authorization HTTP header in the format `Authorization: Bearer FIREBASE_ID_TOKEN`.
+
+There is a rate limit of `30 requests per minute` across all endpoints, with some endpoints being more strict.",
         version: `2.${COMPATIBILITY_CHECK}.0`,
-        termsOfService: "https://monkeytype.com/terms-of-service",
+        termsOfService: "https://crococalc.com/terms-of-service",
         contact: {
           name: "Support",
-          email: "support@monkeytype.com",
-        },
-        "x-logo": {
-          url: "https://monkeytype.com/images/mtfulllogo.png",
+          email: "support@crococalc.com",
         },
         license: {
           name: "GPL-3.0",
@@ -40,7 +41,7 @@ export function getOpenApi(): OpenAPIObject {
       },
       servers: [
         {
-          url: "https://api.monkeytype.com",
+          url: process.env["BACKEND_URL"] ?? "http://localhost:5005",
           description: "Production server",
         },
       ],
@@ -49,10 +50,6 @@ export function getOpenApi(): OpenAPIObject {
           BearerAuth: {
             type: "http",
             scheme: "bearer",
-          },
-          ApeKey: {
-            type: "http",
-            scheme: "ApeKey",
           },
         },
       },
@@ -66,14 +63,8 @@ export function getOpenApi(): OpenAPIObject {
         {
           name: "configs",
           description:
-            "User specific configs like test settings, theme or tags.",
+            "User specific configs like test settings or theme.",
           "x-displayName": "User configs",
-          "x-public": "no",
-        },
-        {
-          name: "presets",
-          description: "User specific configuration presets.",
-          "x-displayName": "User presets",
           "x-public": "no",
         },
         {
@@ -83,20 +74,14 @@ export function getOpenApi(): OpenAPIObject {
           "x-public": "yes",
         },
         {
-          name: "ape-keys",
-          description: "Ape keys provide access to certain API endpoints.",
-          "x-displayName": "Ape Keys",
-          "x-public": "no",
-        },
-        {
           name: "public",
-          description: "Public endpoints such as typing stats.",
+          description: "Public endpoints such as site-wide stats.",
           "x-displayName": "Public",
           "x-public": "yes",
         },
         {
           name: "leaderboards",
-          description: "All-time and daily leaderboards of the fastest typers.",
+          description: "All-time, daily and weekly-XP leaderboards.",
           "x-displayName": "Leaderboards",
         },
         {
@@ -109,12 +94,6 @@ export function getOpenApi(): OpenAPIObject {
           name: "psas",
           description: "Public service announcements.",
           "x-displayName": "PSAs",
-          "x-public": "yes",
-        },
-        {
-          name: "quotes",
-          description: "Quote ratings and new quote submissions",
-          "x-displayName": "Quotes",
           "x-public": "yes",
         },
         {
@@ -176,13 +155,9 @@ function addAuth(
   const security: SecurityRequirementObject[] = [];
   if (!auth.isPublic && !auth.isPublicOnDev) {
     security.push({ BearerAuth: permissions });
-
-    if (auth.acceptApeKeys === true) {
-      security.push({ ApeKey: permissions });
-    }
   }
 
-  const includeInPublic = auth.isPublic === true || auth.acceptApeKeys === true;
+  const includeInPublic = auth.isPublic === true;
   operation["x-public"] = includeInPublic ? "yes" : "no";
   operation.security = security;
 

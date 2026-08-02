@@ -1,18 +1,18 @@
 import { expect } from "vitest";
-import MonkeyError from "../../src/utils/error";
+import CrocoError from "../../src/utils/error";
 import { MatcherResult } from "../vitest";
 
-export function enableMonkeyErrorExpects(): void {
+export function enableCrocoErrorExpects(): void {
   expect.extend({
-    toMatchMonkeyError(
-      received: MonkeyError,
-      expected: MonkeyError,
+    toMatchCrocoError(
+      received: CrocoError,
+      expected: CrocoError,
     ): MatcherResult {
       return {
         pass:
           received.status === expected.status &&
           received.message === expected.message,
-        message: () => "MonkeyError does not match:",
+        message: () => "CrocoError does not match:",
         actual: { status: received.status, message: received.message },
         expected: { status: expected.status, message: expected.message },
       };

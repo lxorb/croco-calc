@@ -3,28 +3,12 @@ import { AppRoute, AppRouter } from "@ts-rest/core";
 import { TsRestRequestHandler } from "@ts-rest/express";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { TsRestRequestWithContext } from "../api/types";
-import MonkeyError from "../utils/error";
+import CrocoError from "../utils/error";
 import { isDevEnvironment } from "../utils/misc";
-import { recordClientVersion as prometheusRecordClientVersion } from "../utils/prometheus";
 
 export type AsyncTsRestRequestHandler<T extends AppRouter | AppRoute> = (
   ...args: Parameters<TsRestRequestHandler<T>>
 ) => Promise<void>;
-/**
- * record the client version from the `x-client-version`  or ` client-version` header to prometheus
- */
-export function recordClientVersion(): RequestHandler {
-  return (req: Request, _res: Response, next: NextFunction) => {
-    const clientVersion =
-      (req.headers["x-client-version"] as string) ||
-      req.headers["client-version"];
-
-    prometheusRecordClientVersion(clientVersion?.toString() ?? "unknown");
-
-    next();
-  };
-}
-
 /** Endpoint is only available in dev environment, else return 503. */
 export function onlyAvailableOnDev(): RequestHandler {
   return (
@@ -34,7 +18,7 @@ export function onlyAvailableOnDev(): RequestHandler {
   ) => {
     if (!isDevEnvironment()) {
       next(
-        new MonkeyError(
+        new CrocoError(
           503,
           "Development endpoints are only available in DEV mode.",
         ),

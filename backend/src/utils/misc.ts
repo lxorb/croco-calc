@@ -2,7 +2,7 @@ import { MILLISECONDS_IN_DAY } from "@croco-calc/util/date-and-time";
 import { roundTo2 } from "@croco-calc/util/numbers";
 export { sanitizeString } from "@croco-calc/util/strings";
 import uaparser from "ua-parser-js";
-import { MonkeyRequest } from "../api/types";
+import { CrocoRequest } from "../api/types";
 import { ObjectId } from "mongodb";
 
 //todo split this file into smaller util files (grouped by functionality)
@@ -28,7 +28,7 @@ type AgentLog = {
   device?: string;
 };
 
-export function buildAgentLog(req: MonkeyRequest): AgentLog {
+export function buildAgentLog(req: CrocoRequest): AgentLog {
   const agent = uaparser(req.raw.headers["user-agent"]);
 
   const agentLog: AgentLog = {
@@ -184,7 +184,7 @@ export function isDevEnvironment(): boolean {
 export function getFrontendUrl(): string {
   return isDevEnvironment()
     ? "http://localhost:3000"
-    : (process.env["FRONTEND_URL"] ?? "https://monkeytype.com");
+    : (process.env["FRONTEND_URL"] ?? "https://crococalc.com");
 }
 
 /**

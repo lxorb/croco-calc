@@ -12,7 +12,7 @@ import { addLog } from "./logs";
 import { Collection, Document, ObjectId } from "mongodb";
 import { LeaderboardEntry } from "@croco-calc/schemas/leaderboards";
 import { DBUser, getUsersCollection } from "./user";
-import MonkeyError from "../utils/error";
+import CrocoError from "../utils/error";
 import { aggregateWithAcceptedConnections } from "./connections";
 
 export type DBLeaderboardEntry = LeaderboardEntry & {
@@ -43,7 +43,7 @@ export async function get(
   uid?: string,
 ): Promise<DBLeaderboardEntry[] | false> {
   if (page < 0 || pageSize < 0) {
-    throw new MonkeyError(500, "Invalid page or pageSize");
+    throw new CrocoError(500, "Invalid page or pageSize");
   }
 
   const skip = page * pageSize;

@@ -1,10 +1,9 @@
 import * as UserDAL from "../../dal/user";
-import MonkeyError, {
+import CrocoError, {
   getErrorMessage,
   isFirebaseError,
 } from "../../utils/error";
-import { MonkeyResponse } from "../../utils/monkey-response";
-import * as DiscordUtils from "../../utils/discord";
+import { CrocoResponse } from "../../utils/croco-response";
 import {
   buildAgentLog,
   getFrontendUrl,
@@ -13,9 +12,6 @@ import {
   replaceObjectIds,
   sanitizeString,
 } from "../../utils/misc";
-import GeorgeQueue from "../../queues/george-queue";
-import { deleteAllApeKeys } from "../../dal/ape-keys";
-import { deleteAllPresets } from "../../dal/preset";
 import { deleteAll as deleteAllResults } from "../../dal/result";
 import { deleteConfig } from "../../dal/config";
 import { verify } from "../../utils/captcha";
@@ -43,22 +39,15 @@ import { addImportantLog, addLog, deleteUserLogs } from "../../dal/logs";
 import {
   AddCustomThemeRequest,
   AddCustomThemeResponse,
-  AddFavoriteQuoteRequest,
   AddResultFilterPresetRequest,
   AddResultFilterPresetResponse,
-  AddTagRequest,
-  AddTagResponse,
   CheckNamePathParameters,
   CheckNameResponse,
   CreateUserRequest,
   DeleteCustomThemeRequest,
   EditCustomThemeRequst,
-  EditTagRequest,
-  ForgotPasswordEmailRequest,
   GetCurrentTestActivityResponse,
   GetCustomThemesResponse,
-  GetDiscordOauthLinkResponse,
-  GetFavoriteQuotesResponse,
   GetFriendsResponse,
   GetPersonalBestsQuery,
   GetPersonalBestsResponse,
@@ -66,18 +55,11 @@ import {
   GetProfileQuery,
   GetProfileResponse,
   GetStatsResponse,
-  GetStreakResponse,
-  GetTagsResponse,
   GetTestActivityResponse,
   GetUserInboxResponse,
   GetUserResponse,
-  LinkDiscordRequest,
-  LinkDiscordResponse,
-  RemoveFavoriteQuoteRequest,
   RemoveResultFilterPresetPathParams,
   ReportUserRequest,
-  SetStreakHourOffsetRequest,
-  TagIdPathParams,
   UpdateEmailRequest,
   UpdateLeaderboardMemoryRequest,
   UpdatePasswordRequest,
@@ -87,7 +69,7 @@ import {
   UpdateUserProfileResponse,
 } from "@croco-calc/contracts/users";
 import { MILLISECONDS_IN_DAY } from "@croco-calc/util/date-and-time";
-import { MonkeyRequest } from "../types";
+import { CrocoRequest } from "../types";
 import { tryCatch } from "@croco-calc/util/trycatch";
 import * as ConnectionsDal from "../../dal/connections";
 import { PersonalBest } from "@croco-calc/schemas/shared";
@@ -95,19 +77,19 @@ import { PersonalBest } from "@croco-calc/schemas/shared";
 async function verifyCaptcha(captcha: string): Promise<void> {
   const { data: verified, error } = await tryCatch(verify(captcha));
   if (error) {
-    throw new MonkeyError(
+    throw new CrocoError(
       422,
       "Request to the Captcha API failed, please try again later",
     );
   }
   if (!verified) {
-    throw new MonkeyError(422, "Captcha challenge failed");
+    throw new CrocoError(422, "Captcha challenge failed");
   }
 }
 
 export async function createNewUser(
-  req: MonkeyRequest<undefined, CreateUserRequest>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, CreateUserRequest>,
+): Promise<CrocoResponse> {
   const { name, captcha } = req.body;
   const { email, uid } = req.ctx.decodedToken;
 
@@ -115,23 +97,23 @@ export async function createNewUser(
     await verifyCaptcha(captcha);
 
     if (email.endsWith("@tidal.lol") || email.endsWith("@selfbot.cc")) {
-      throw new MonkeyError(400, "Invalid domain");
+      throw new CrocoError(400, "Invalid domain");
     }
 
     const available = await UserDAL.isNameAvailable(name, uid);
     if (!available) {
-      throw new MonkeyError(409, "Username unavailable");
+      throw new CrocoError(409, "Username unavailable");
     }
 
     const blocklisted = await BlocklistDal.contains({ name, email });
     if (blocklisted) {
-      throw new MonkeyError(409, "Username or email blocked");
+      throw new CrocoError(409, "Username or email blocked");
     }
 
     await UserDAL.addUser(name, email, uid);
     void addImportantLog("user_created", `${name} ${email}`, uid);
 
-    return new MonkeyResponse("User created", null);
+    return new CrocoResponse("User created", null);
   } catch (e) {
     //user was created in firebase from the frontend, remove it
     await firebaseDeleteUserIgnoreError(uid);
@@ -139,20 +121,15 @@ export async function createNewUser(
   }
 }
 
-export async function deleteUser(req: MonkeyRequest): Promise<MonkeyResponse> {
+export async function deleteUser(req: CrocoRequest): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
 
   const { data: userInfo, error } = await tryCatch(
-    UserDAL.getPartialUser(uid, "delete user", [
-      "banned",
-      "name",
-      "email",
-      "discordId",
-    ]),
+    UserDAL.getPartialUser(uid, "delete user", ["banned", "name", "email"]),
   );
 
   if (error) {
-    if (error instanceof MonkeyError && error.status === 404) {
+    if (error instanceof CrocoError && error.status === 404) {
       //userinfo was already deleted. We ignore this and still try to remove the  other data
     } else {
       throw error;
@@ -167,8 +144,6 @@ export async function deleteUser(req: MonkeyRequest): Promise<MonkeyResponse> {
   const tasks = [
     UserDAL.deleteUser(uid),
     deleteUserLogs(uid),
-    deleteAllApeKeys(uid),
-    deleteAllPresets(uid),
     deleteConfig(uid),
     deleteAllResults(uid),
     purgeUserFromDailyLeaderboards(
@@ -181,10 +156,6 @@ export async function deleteUser(req: MonkeyRequest): Promise<MonkeyResponse> {
     ),
     ConnectionsDal.deleteByUid(uid),
   ];
-
-  if (userInfo?.discordId !== undefined) {
-    tasks.push(GeorgeQueue.unlinkDiscord(userInfo.discordId, uid));
-  }
 
   await Promise.all(tasks);
 
@@ -205,26 +176,23 @@ export async function deleteUser(req: MonkeyRequest): Promise<MonkeyResponse> {
     uid,
   );
 
-  return new MonkeyResponse("User deleted", null);
+  return new CrocoResponse("User deleted", null);
 }
 
-export async function resetUser(req: MonkeyRequest): Promise<MonkeyResponse> {
+export async function resetUser(req: CrocoRequest): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
 
   const userInfo = await UserDAL.getPartialUser(uid, "reset user", [
     "banned",
-    "discordId",
     "email",
     "name",
   ]);
   if (userInfo.banned) {
-    throw new MonkeyError(403, "Banned users cannot reset their account");
+    throw new CrocoError(403, "Banned users cannot reset their account");
   }
 
   const promises = [
     UserDAL.resetUser(uid),
-    deleteAllApeKeys(uid),
-    deleteAllPresets(uid),
     deleteAllResults(uid),
     deleteConfig(uid),
     purgeUserFromDailyLeaderboards(
@@ -237,24 +205,21 @@ export async function resetUser(req: MonkeyRequest): Promise<MonkeyResponse> {
     ),
   ];
 
-  if (userInfo.discordId !== undefined && userInfo.discordId !== "") {
-    promises.push(GeorgeQueue.unlinkDiscord(userInfo.discordId, uid));
-  }
   await Promise.all(promises);
   void addImportantLog("user_reset", `${userInfo.email} ${userInfo.name}`, uid);
 
-  return new MonkeyResponse("User reset", null);
+  return new CrocoResponse("User reset", null);
 }
 
 export async function updateName(
-  req: MonkeyRequest<undefined, UpdateUserNameRequest>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, UpdateUserNameRequest>,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
   const { name } = req.body;
 
   const blocklisted = await BlocklistDal.contains({ name });
   if (blocklisted) {
-    throw new MonkeyError(409, "Username blocked");
+    throw new CrocoError(409, "Username blocked");
   }
 
   const user = await UserDAL.getPartialUser(uid, "update name", [
@@ -265,14 +230,14 @@ export async function updateName(
   ]);
 
   if (user.banned) {
-    throw new MonkeyError(403, "Banned users cannot change their name");
+    throw new CrocoError(403, "Banned users cannot change their name");
   }
 
   if (
     !user?.needsToChangeName &&
     Date.now() - (user.lastNameChange ?? 0) < MILLISECONDS_IN_DAY * 30
   ) {
-    throw new MonkeyError(409, "You can change your name once every 30 days");
+    throw new CrocoError(409, "You can change your name once every 30 days");
   }
 
   await UserDAL.updateName(uid, name, user.name);
@@ -284,10 +249,10 @@ export async function updateName(
     uid,
   );
 
-  return new MonkeyResponse("User's name updated", null);
+  return new CrocoResponse("User's name updated", null);
 }
 
-export async function clearPb(req: MonkeyRequest): Promise<MonkeyResponse> {
+export async function clearPb(req: CrocoRequest): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
 
   await UserDAL.clearPb(uid);
@@ -297,12 +262,12 @@ export async function clearPb(req: MonkeyRequest): Promise<MonkeyResponse> {
   );
   void addImportantLog("user_cleared_pbs", "", uid);
 
-  return new MonkeyResponse("User's PB cleared", null);
+  return new CrocoResponse("User's PB cleared", null);
 }
 
 export async function optOutOfLeaderboards(
-  req: MonkeyRequest,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
 
   await UserDAL.optOutOfLeaderboards(uid);
@@ -316,25 +281,25 @@ export async function optOutOfLeaderboards(
   );
   void addImportantLog("user_opted_out_of_leaderboards", "", uid);
 
-  return new MonkeyResponse("User opted out of leaderboards", null);
+  return new CrocoResponse("User opted out of leaderboards", null);
 }
 
 export async function checkName(
-  req: MonkeyRequest<undefined, undefined, CheckNamePathParameters>,
+  req: CrocoRequest<undefined, undefined, CheckNamePathParameters>,
 ): Promise<CheckNameResponse> {
   const { name } = req.params;
   const { uid } = req.ctx.decodedToken;
 
   const available = await UserDAL.isNameAvailable(name, uid);
 
-  return new MonkeyResponse("Check username", {
+  return new CrocoResponse("Check username", {
     available,
   });
 }
 
 export async function updateEmail(
-  req: MonkeyRequest<undefined, UpdateEmailRequest>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, UpdateEmailRequest>,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
   let { newEmail, previousEmail } = req.body;
 
@@ -347,23 +312,23 @@ export async function updateEmail(
   } catch (e) {
     if (isFirebaseError(e)) {
       if (e.code === "auth/email-already-exists") {
-        throw new MonkeyError(
+        throw new CrocoError(
           409,
           "The email address is already in use by another account",
         );
       } else if (e.code === "auth/invalid-email") {
-        throw new MonkeyError(400, "Invalid email address");
+        throw new CrocoError(400, "Invalid email address");
       } else if (e.code === "auth/too-many-requests") {
-        throw new MonkeyError(429, "Too many requests. Please try again later");
+        throw new CrocoError(429, "Too many requests. Please try again later");
       } else if (e.code === "auth/user-not-found") {
-        throw new MonkeyError(
+        throw new CrocoError(
           404,
           "User not found in the auth system",
           "update email",
           uid,
         );
       } else if (e.code === "auth/invalid-user-token") {
-        throw new MonkeyError(401, "Invalid user token", "update email", uid);
+        throw new CrocoError(401, "Invalid user token", "update email", uid);
       }
     } else {
       throw e;
@@ -376,23 +341,22 @@ export async function updateEmail(
     uid,
   );
 
-  return new MonkeyResponse("Email updated", null);
+  return new CrocoResponse("Email updated", null);
 }
 
 export async function updatePassword(
-  req: MonkeyRequest<undefined, UpdatePasswordRequest>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, UpdatePasswordRequest>,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
   const { newPassword } = req.body;
 
   await AuthUtil.updateUserPassword(uid, newPassword);
 
-  return new MonkeyResponse("Password updated", null);
+  return new CrocoResponse("Password updated", null);
 }
 
 type RelevantUserInfo = Omit<
   UserDAL.DBUser,
-  | "bananas"
   | "lbPersonalBests"
   | "inbox"
   | "nameHistory"
@@ -407,7 +371,6 @@ type RelevantUserInfo = Omit<
 
 function getRelevantUserInfo(user: UserDAL.DBUser): RelevantUserInfo {
   return omit(user, [
-    "bananas",
     "lbPersonalBests",
     "inbox",
     "nameHistory",
@@ -421,7 +384,7 @@ function getRelevantUserInfo(user: UserDAL.DBUser): RelevantUserInfo {
   ]);
 }
 
-export async function getUser(req: MonkeyRequest): Promise<GetUserResponse> {
+export async function getUser(req: CrocoRequest): Promise<GetUserResponse> {
   const { uid } = req.ctx.decodedToken;
 
   const { data: userInfo, error } = await tryCatch(
@@ -429,13 +392,13 @@ export async function getUser(req: MonkeyRequest): Promise<GetUserResponse> {
   );
 
   if (error) {
-    if (error instanceof MonkeyError && error.status === 404) {
+    if (error instanceof CrocoError && error.status === 404) {
       //if the user is in the auth system but not in the db, its possible that the user was created by bypassing captcha
       //since there is no data in the database anyway, we can just delete the user from the auth system
       //and ask them to sign up again
       try {
         await AuthUtil.deleteUser(uid);
-        throw new MonkeyError(
+        throw new CrocoError(
           404,
           "User not found in the database, but found in the auth system. We have deleted the ghost user from the auth system. Please sign up again.",
           "get user",
@@ -444,7 +407,7 @@ export async function getUser(req: MonkeyRequest): Promise<GetUserResponse> {
       } catch (e) {
         // oxlint-disable-next-line no-unsafe-member-access
         if (e.code === "auth/user-not-found") {
-          throw new MonkeyError(
+          throw new CrocoError(
             404,
             "User not found in the database or the auth system. Please sign up again.",
             "get user",
@@ -461,10 +424,6 @@ export async function getUser(req: MonkeyRequest): Promise<GetUserResponse> {
 
   userInfo.personalBests ??= {
     time: {},
-    words: {},
-    quote: {},
-    zen: {},
-    custom: {},
   };
 
   const agentLog = buildAgentLog(req);
@@ -481,8 +440,6 @@ export async function getUser(req: MonkeyRequest): Promise<GetUserResponse> {
     await UserDAL.flagForNameChange(uid);
   }
 
-  const isPremium = await UserDAL.checkIfUserIsPremium(uid, userInfo);
-
   const allTimeLbs = await getAllTimeLbs(uid);
   const testActivity = generateCurrentTestActivity(userInfo.testActivity);
   const relevantUserInfo = getRelevantUserInfo(userInfo);
@@ -492,9 +449,6 @@ export async function getUser(req: MonkeyRequest): Promise<GetUserResponse> {
   ).map((it) => replaceObjectId(it));
   delete relevantUserInfo.resultFilterPresets;
 
-  const tags = (relevantUserInfo.tags ?? []).map((it) => replaceObjectId(it));
-  delete relevantUserInfo.tags;
-
   const customThemes = (relevantUserInfo.customThemes ?? []).map((it) =>
     replaceObjectId(it),
   );
@@ -503,122 +457,19 @@ export async function getUser(req: MonkeyRequest): Promise<GetUserResponse> {
   const userData: User = {
     ...relevantUserInfo,
     resultFilterPresets,
-    tags,
     customThemes,
-    isPremium,
     allTimeLbs,
     testActivity,
   };
 
-  return new MonkeyResponse("User data retrieved", {
+  return new CrocoResponse("User data retrieved", {
     ...userData,
     inboxUnreadSize: inboxUnreadSize,
   });
 }
 
-export async function getOauthLink(
-  req: MonkeyRequest,
-): Promise<GetDiscordOauthLinkResponse> {
-  const { uid } = req.ctx.decodedToken;
-
-  //build the url
-  const url = await DiscordUtils.getOauthLink(uid);
-
-  //return
-  return new MonkeyResponse("Discord oauth link generated", {
-    url: url,
-  });
-}
-
-export async function linkDiscord(
-  req: MonkeyRequest<undefined, LinkDiscordRequest>,
-): Promise<LinkDiscordResponse> {
-  const { uid } = req.ctx.decodedToken;
-  const { tokenType, accessToken, state } = req.body;
-
-  if (!(await DiscordUtils.iStateValidForUser(state, uid))) {
-    throw new MonkeyError(403, "Invalid user token");
-  }
-
-  const userInfo = await UserDAL.getPartialUser(uid, "link discord", [
-    "banned",
-    "discordId",
-    "lbOptOut",
-  ]);
-  if (userInfo.banned) {
-    throw new MonkeyError(403, "Banned accounts cannot link with Discord");
-  }
-
-  const { id: discordId, avatar: discordAvatar } =
-    await DiscordUtils.getDiscordUser(tokenType, accessToken);
-
-  if (userInfo.discordId !== undefined && userInfo.discordId !== "") {
-    await UserDAL.linkDiscord(uid, userInfo.discordId, discordAvatar);
-    return new MonkeyResponse("Discord avatar updated", {
-      discordId,
-      discordAvatar,
-    });
-  }
-
-  if (!discordId) {
-    throw new MonkeyError(
-      500,
-      "Could not get Discord account info",
-      "discord id is undefined",
-    );
-  }
-
-  const discordIdAvailable = await UserDAL.isDiscordIdAvailable(discordId);
-  if (!discordIdAvailable) {
-    throw new MonkeyError(
-      409,
-      "This Discord account is linked to a different account",
-    );
-  }
-
-  if (await BlocklistDal.contains({ discordId })) {
-    throw new MonkeyError(409, "The Discord account is blocked");
-  }
-
-  await UserDAL.linkDiscord(uid, discordId, discordAvatar);
-
-  await GeorgeQueue.linkDiscord(discordId, uid, userInfo.lbOptOut ?? false);
-  void addImportantLog("user_discord_link", `linked to ${discordId}`, uid);
-
-  return new MonkeyResponse("Discord account linked", {
-    discordId,
-    discordAvatar,
-  });
-}
-
-export async function unlinkDiscord(
-  req: MonkeyRequest,
-): Promise<MonkeyResponse> {
-  const { uid } = req.ctx.decodedToken;
-
-  const userInfo = await UserDAL.getPartialUser(uid, "unlink discord", [
-    "banned",
-    "discordId",
-  ]);
-
-  if (userInfo.banned) {
-    throw new MonkeyError(403, "Banned accounts cannot unlink Discord");
-  }
-
-  const discordId = userInfo.discordId;
-  if (discordId === undefined || discordId === "") {
-    throw new MonkeyError(404, "User does not have a linked Discord account");
-  }
-
-  await GeorgeQueue.unlinkDiscord(discordId, uid);
-  await UserDAL.unlinkDiscord(uid);
-  void addImportantLog("user_discord_unlinked", discordId, uid);
-
-  return new MonkeyResponse("Discord account unlinked", null);
-}
-
 export async function addResultFilterPreset(
-  req: MonkeyRequest<undefined, AddResultFilterPresetRequest>,
+  req: CrocoRequest<undefined, AddResultFilterPresetRequest>,
 ): Promise<AddResultFilterPresetResponse> {
   const { uid } = req.ctx.decodedToken;
   const filter = req.body;
@@ -629,177 +480,92 @@ export async function addResultFilterPreset(
     filter,
     maxPresetsPerUser,
   );
-  return new MonkeyResponse(
+  return new CrocoResponse(
     "Result filter preset created",
     createdId.toHexString(),
   );
 }
 
 export async function removeResultFilterPreset(
-  req: MonkeyRequest<undefined, undefined, RemoveResultFilterPresetPathParams>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, undefined, RemoveResultFilterPresetPathParams>,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
   const { presetId } = req.params;
 
   await UserDAL.removeResultFilterPreset(uid, presetId);
-  return new MonkeyResponse("Result filter preset deleted", null);
-}
-
-export async function addTag(
-  req: MonkeyRequest<undefined, AddTagRequest>,
-): Promise<AddTagResponse> {
-  const { uid } = req.ctx.decodedToken;
-  const { tagName } = req.body;
-
-  const tag = await UserDAL.addTag(uid, tagName);
-  return new MonkeyResponse("Tag updated", replaceObjectId(tag));
-}
-
-export async function clearTagPb(
-  req: MonkeyRequest<undefined, undefined, TagIdPathParams>,
-): Promise<MonkeyResponse> {
-  const { uid } = req.ctx.decodedToken;
-  const { tagId } = req.params;
-
-  await UserDAL.removeTagPb(uid, tagId);
-  return new MonkeyResponse("Tag PB cleared", null);
-}
-
-export async function editTag(
-  req: MonkeyRequest<undefined, EditTagRequest>,
-): Promise<MonkeyResponse> {
-  const { uid } = req.ctx.decodedToken;
-  const { tagId, newName } = req.body;
-
-  await UserDAL.editTag(uid, tagId, newName);
-  return new MonkeyResponse("Tag updated", null);
-}
-
-export async function removeTag(
-  req: MonkeyRequest<undefined, undefined, TagIdPathParams>,
-): Promise<MonkeyResponse> {
-  const { uid } = req.ctx.decodedToken;
-  const { tagId } = req.params;
-
-  await UserDAL.removeTag(uid, tagId);
-  return new MonkeyResponse("Tag deleted", null);
-}
-
-export async function getTags(req: MonkeyRequest): Promise<GetTagsResponse> {
-  const { uid } = req.ctx.decodedToken;
-
-  const tags = await UserDAL.getTags(uid);
-  return new MonkeyResponse("Tags retrieved", replaceObjectIds(tags));
+  return new CrocoResponse("Result filter preset deleted", null);
 }
 
 export async function updateLbMemory(
-  req: MonkeyRequest<undefined, UpdateLeaderboardMemoryRequest>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, UpdateLeaderboardMemoryRequest>,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
-  const { mode, language, rank } = req.body;
+  const { mode, rank } = req.body;
   const mode2 = req.body.mode2;
 
-  await UserDAL.updateLbMemory(uid, mode, mode2, language, rank);
-  return new MonkeyResponse("Leaderboard memory updated", null);
+  await UserDAL.updateLbMemory(uid, mode, mode2, rank);
+  return new CrocoResponse("Leaderboard memory updated", null);
 }
 
 export async function getCustomThemes(
-  req: MonkeyRequest,
+  req: CrocoRequest,
 ): Promise<GetCustomThemesResponse> {
   const { uid } = req.ctx.decodedToken;
   const customThemes = await UserDAL.getThemes(uid);
-  return new MonkeyResponse(
+  return new CrocoResponse(
     "Custom themes retrieved",
     replaceObjectIds(customThemes),
   );
 }
 
 export async function addCustomTheme(
-  req: MonkeyRequest<undefined, AddCustomThemeRequest>,
+  req: CrocoRequest<undefined, AddCustomThemeRequest>,
 ): Promise<AddCustomThemeResponse> {
   const { uid } = req.ctx.decodedToken;
   const { name, colors } = req.body;
 
   const addedTheme = await UserDAL.addTheme(uid, { name, colors });
-  return new MonkeyResponse("Custom theme added", replaceObjectId(addedTheme));
+  return new CrocoResponse("Custom theme added", replaceObjectId(addedTheme));
 }
 
 export async function removeCustomTheme(
-  req: MonkeyRequest<undefined, DeleteCustomThemeRequest>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, DeleteCustomThemeRequest>,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
   const { themeId } = req.body;
   await UserDAL.removeTheme(uid, themeId);
-  return new MonkeyResponse("Custom theme removed", null);
+  return new CrocoResponse("Custom theme removed", null);
 }
 
 export async function editCustomTheme(
-  req: MonkeyRequest<undefined, EditCustomThemeRequst>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, EditCustomThemeRequst>,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
   const { themeId, theme } = req.body;
 
   await UserDAL.editTheme(uid, themeId, theme);
-  return new MonkeyResponse("Custom theme updated", null);
+  return new CrocoResponse("Custom theme updated", null);
 }
 
 export async function getPersonalBests(
-  req: MonkeyRequest<GetPersonalBestsQuery>,
+  req: CrocoRequest<GetPersonalBestsQuery>,
 ): Promise<GetPersonalBestsResponse> {
   const { uid } = req.ctx.decodedToken;
   const { mode, mode2 } = req.query;
 
   const data = (await UserDAL.getPersonalBests(uid, mode, mode2)) ?? null;
-  return new MonkeyResponse("Personal bests retrieved", data);
+  return new CrocoResponse("Personal bests retrieved", data);
 }
 
-export async function getStats(req: MonkeyRequest): Promise<GetStatsResponse> {
+export async function getStats(req: CrocoRequest): Promise<GetStatsResponse> {
   const { uid } = req.ctx.decodedToken;
 
   const data = (await UserDAL.getStats(uid)) ?? null;
-  return new MonkeyResponse("Personal stats retrieved", data);
-}
-
-export async function getFavoriteQuotes(
-  req: MonkeyRequest,
-): Promise<GetFavoriteQuotesResponse> {
-  const { uid } = req.ctx.decodedToken;
-
-  const quotes = await UserDAL.getFavoriteQuotes(uid);
-
-  return new MonkeyResponse("Favorite quotes retrieved", quotes);
-}
-
-export async function addFavoriteQuote(
-  req: MonkeyRequest<undefined, AddFavoriteQuoteRequest>,
-): Promise<MonkeyResponse> {
-  const { uid } = req.ctx.decodedToken;
-
-  const { language, quoteId } = req.body;
-
-  await UserDAL.addFavoriteQuote(
-    uid,
-    language,
-    quoteId,
-    req.ctx.configuration.quotes.maxFavorites,
-  );
-
-  return new MonkeyResponse("Quote added to favorites", null);
-}
-
-export async function removeFavoriteQuote(
-  req: MonkeyRequest<undefined, RemoveFavoriteQuoteRequest>,
-): Promise<MonkeyResponse> {
-  const { uid } = req.ctx.decodedToken;
-
-  const { quoteId, language } = req.body;
-  await UserDAL.removeFavoriteQuote(uid, language, quoteId);
-
-  return new MonkeyResponse("Quote removed from favorites", null);
+  return new CrocoResponse("Personal stats retrieved", data);
 }
 
 export async function getProfile(
-  req: MonkeyRequest<GetProfileQuery, undefined, GetProfilePathParams>,
+  req: CrocoRequest<GetProfileQuery, undefined, GetProfilePathParams>,
 ): Promise<GetProfileResponse> {
   const { uidOrName } = req.params;
 
@@ -810,17 +576,13 @@ export async function getProfile(
   const {
     name,
     banned,
-    inventory,
     profileDetails,
     personalBests,
     completedTests,
     startedTests,
-    timeTyping,
+    timeSpent,
     addedAt,
-    discordId,
-    discordAvatar,
     xp,
-    streak,
     lbOptOut,
   } = user;
 
@@ -836,54 +598,36 @@ export async function getProfile(
     }, {});
   };
 
-  const validTimePbs = extractValid(personalBests.time, [
-    "15",
-    "30",
-    "60",
-    "120",
-  ]);
-  const validWordsPbs = extractValid(personalBests.words, [
-    "10",
-    "25",
-    "50",
-    "100",
-  ]);
+  const validTimePbs = extractValid(personalBests.time, ["1", "2", "4", "8"]);
 
-  const typingStats = {
+  const testStats = {
     completedTests,
     startedTests,
-    timeTyping,
+    timeSpent,
   };
 
   const relevantPersonalBests = {
     time: validTimePbs,
-    words: validWordsPbs,
   };
 
   const baseProfile = {
     name,
     banned,
     addedAt,
-    typingStats,
+    testStats,
     personalBests: relevantPersonalBests,
-    discordId,
-    discordAvatar,
     xp,
-    streak: streak?.length ?? 0,
-    maxStreak: streak?.maxLength ?? 0,
     lbOptOut,
-    isPremium: await UserDAL.checkIfUserIsPremium(user.uid, user),
   };
 
   if (banned) {
-    return new MonkeyResponse("Profile retrived: banned user", baseProfile);
+    return new CrocoResponse("Profile retrived: banned user", baseProfile);
   }
 
   const allTimeLbs = await getAllTimeLbs(user.uid);
 
   const profileData = {
     ...baseProfile,
-    inventory,
     details: profileDetails,
     allTimeLbs,
     uid: user.uid,
@@ -894,41 +638,25 @@ export async function getProfile(
   } else {
     delete profileData.testActivity;
   }
-  return new MonkeyResponse("Profile retrieved", profileData);
+  return new CrocoResponse("Profile retrieved", profileData);
 }
 
 export async function updateProfile(
-  req: MonkeyRequest<undefined, UpdateUserProfileRequest>,
+  req: CrocoRequest<undefined, UpdateUserProfileRequest>,
 ): Promise<UpdateUserProfileResponse> {
   const { uid } = req.ctx.decodedToken;
-  const {
-    bio,
-    keyboard,
-    socialProfiles,
-    selectedBadgeId,
-    showActivityOnPublicProfile,
-  } = req.body;
+  const { bio, socialProfiles, showActivityOnPublicProfile } = req.body;
 
   const user = await UserDAL.getPartialUser(uid, "update user profile", [
     "banned",
-    "inventory",
   ]);
 
   if (user.banned) {
-    throw new MonkeyError(403, "Banned users cannot update their profile");
+    throw new CrocoError(403, "Banned users cannot update their profile");
   }
-
-  user.inventory?.badges.forEach((badge) => {
-    if (badge.id === selectedBadgeId) {
-      badge.selected = true;
-    } else {
-      delete badge.selected;
-    }
-  });
 
   const profileDetailsUpdates: Partial<UserProfileDetails> = {
     bio: sanitizeString(bio),
-    keyboard: sanitizeString(keyboard),
     socialProfiles: Object.fromEntries(
       Object.entries(socialProfiles ?? {}).map(([key, value]) => [
         key,
@@ -938,27 +666,27 @@ export async function updateProfile(
     showActivityOnPublicProfile,
   };
 
-  await UserDAL.updateProfile(uid, profileDetailsUpdates, user.inventory);
+  await UserDAL.updateProfile(uid, profileDetailsUpdates);
 
-  return new MonkeyResponse("Profile updated", profileDetailsUpdates);
+  return new CrocoResponse("Profile updated", profileDetailsUpdates);
 }
 
 export async function getInbox(
-  req: MonkeyRequest,
+  req: CrocoRequest,
 ): Promise<GetUserInboxResponse> {
   const { uid } = req.ctx.decodedToken;
 
   const inbox = await UserDAL.getInbox(uid);
 
-  return new MonkeyResponse("Inbox retrieved", {
+  return new CrocoResponse("Inbox retrieved", {
     inbox,
     maxMail: req.ctx.configuration.users.inbox.maxMail,
   });
 }
 
 export async function updateInbox(
-  req: MonkeyRequest<undefined, UpdateUserInboxRequest>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, UpdateUserInboxRequest>,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
   const { mailIdsToMarkRead, mailIdsToDelete } = req.body;
 
@@ -968,16 +696,16 @@ export async function updateInbox(
     mailIdsToDelete ?? [],
   );
 
-  return new MonkeyResponse("Inbox updated", null);
+  return new CrocoResponse("Inbox updated", null);
 }
 
 export async function reportUser(
-  req: MonkeyRequest<undefined, ReportUserRequest>,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest<undefined, ReportUserRequest>,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
   const {
     reporting: { maxReports, contentReportLimit },
-  } = req.ctx.configuration.quotes;
+  } = req.ctx.configuration.users;
 
   const { uid: uidToReport, reason, comment, captcha } = req.body;
 
@@ -996,94 +724,39 @@ export async function reportUser(
 
   await ReportDAL.createReport(newReport, maxReports, contentReportLimit);
 
-  return new MonkeyResponse("User reported", null);
-}
-
-export async function setStreakHourOffset(
-  req: MonkeyRequest<undefined, SetStreakHourOffsetRequest>,
-): Promise<MonkeyResponse> {
-  const { uid } = req.ctx.decodedToken;
-  const { hourOffset } = req.body;
-
-  const user = await UserDAL.getPartialUser(uid, "update user profile", [
-    "streak",
-  ]);
-
-  if (
-    user.streak?.hourOffset !== undefined &&
-    user.streak?.hourOffset !== null
-  ) {
-    throw new MonkeyError(403, "Streak hour offset already set");
-  }
-
-  await UserDAL.setStreakHourOffset(uid, hourOffset);
-
-  void addImportantLog("user_streak_hour_offset_set", { hourOffset }, uid);
-
-  return new MonkeyResponse("Streak hour offset set", null);
+  return new CrocoResponse("User reported", null);
 }
 
 export async function revokeAllTokens(
-  req: MonkeyRequest,
-): Promise<MonkeyResponse> {
+  req: CrocoRequest,
+): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
   await AuthUtil.revokeTokensByUid(uid);
   void addImportantLog("user_tokens_revoked", "", uid);
-  return new MonkeyResponse("All tokens revoked", null);
+  return new CrocoResponse("All tokens revoked", null);
 }
 
+/**
+ * AC-119: the all-time boards croco calc keeps are `time 4` and `time 8` only,
+ * and there is no language axis (INV-153). WP-10 owns `dal/leaderboards.ts` and
+ * the ranking itself; this only shapes the response.
+ */
 async function getAllTimeLbs(uid: string): Promise<AllTimeLbs> {
-  const allTime15English = await LeaderboardsDAL.getRank(
-    "time",
-    "15",
-    "english",
-    uid,
+  const entries = await Promise.all(
+    (["4", "8"] as const).map(async (mode2) => {
+      const rank = await LeaderboardsDAL.getRank("time", mode2, uid);
+      const count = await LeaderboardsDAL.getCount("time", mode2);
+
+      if (rank === false || rank === null) {
+        return [mode2, undefined] as const;
+      }
+
+      return [mode2, { rank: rank.rank, count }] as const;
+    }),
   );
-
-  const allTime15EnglishCount = await LeaderboardsDAL.getCount(
-    "time",
-    "15",
-    "english",
-  );
-
-  const allTime60English = await LeaderboardsDAL.getRank(
-    "time",
-    "60",
-    "english",
-    uid,
-  );
-
-  const allTime60EnglishCount = await LeaderboardsDAL.getCount(
-    "time",
-    "60",
-    "english",
-  );
-
-  const english15 =
-    allTime15English === false || allTime15English === null
-      ? undefined
-      : {
-          rank: allTime15English.rank,
-          count: allTime15EnglishCount,
-        };
-
-  const english60 =
-    allTime60English === false || allTime60English === null
-      ? undefined
-      : {
-          rank: allTime60English.rank,
-          count: allTime60EnglishCount,
-        };
 
   return {
-    time: {
-      "15": {
-        english: english15,
-      },
-      "60": {
-        english: english60,
-      },
-    },
+    time: Object.fromEntries(entries),
   };
 }
 
@@ -1125,25 +798,14 @@ export function generateCurrentTestActivity(
 }
 
 export async function getTestActivity(
-  req: MonkeyRequest,
+  req: CrocoRequest,
 ): Promise<GetTestActivityResponse> {
   const { uid } = req.ctx.decodedToken;
-  const premiumFeaturesEnabled = req.ctx.configuration.users.premium.enabled;
   const user = await UserDAL.getPartialUser(uid, "testActivity", [
     "testActivity",
-    "premium",
   ]);
-  const userHasPremium = await UserDAL.checkIfUserIsPremium(uid, user);
 
-  if (!premiumFeaturesEnabled) {
-    throw new MonkeyError(503, "Premium features are disabled");
-  }
-
-  if (!userHasPremium) {
-    throw new MonkeyError(503, "User does not have premium");
-  }
-
-  return new MonkeyResponse(
+  return new CrocoResponse(
     "Test activity data retrieved",
     user.testActivity ?? null,
   );
@@ -1158,7 +820,7 @@ async function firebaseDeleteUserIgnoreError(uid: string): Promise<void> {
 }
 
 export async function getCurrentTestActivity(
-  req: MonkeyRequest,
+  req: CrocoRequest,
 ): Promise<GetCurrentTestActivityResponse> {
   const { uid } = req.ctx.decodedToken;
 
@@ -1166,34 +828,17 @@ export async function getCurrentTestActivity(
     "testActivity",
   ]);
   const data = generateCurrentTestActivity(user.testActivity);
-  return new MonkeyResponse(
+  return new CrocoResponse(
     "Current test activity data retrieved",
     data ?? null,
   );
 }
 
-export async function getStreak(
-  req: MonkeyRequest,
-): Promise<GetStreakResponse> {
-  const { uid } = req.ctx.decodedToken;
-
-  const user = await UserDAL.getPartialUser(uid, "streak", ["streak"]);
-
-  return new MonkeyResponse("Streak data retrieved", user.streak ?? null);
-}
-
 export async function getFriends(
-  req: MonkeyRequest,
+  req: CrocoRequest,
 ): Promise<GetFriendsResponse> {
   const { uid } = req.ctx.decodedToken;
-  const premiumEnabled = req.ctx.configuration.users.premium.enabled;
   const data = await UserDAL.getFriends(uid);
 
-  if (!premiumEnabled) {
-    for (const friend of data) {
-      delete friend.isPremium;
-    }
-  }
-
-  return new MonkeyResponse("Friends retrieved", data);
+  return new CrocoResponse("Friends retrieved", data);
 }
