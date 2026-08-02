@@ -1430,6 +1430,17 @@ funbox/quotes/languages/layouts/sounds trees, `elements/merch-banner.tsx`, `elem
 that finds it must delete a file WP-01 already deleted has hit a sequencing bug and MUST raise it rather than
 re-adding the file.
 
+**Coordinator rulings amending this section (stage 2, recorded here so they survive the task list).**
+
+- **R1** (task #56) — `frontend/src/ts/components/pages/404Page.tsx`, `frontend/src/ts/ui.ts` and
+  `frontend/src/ts/pages/page.ts` had no owner in the table above. They are the shared shell/chrome, so they
+  belong to **WP-08**, which already owns `pages/**` and the layout tree.
+- **R2** (task #61) — the `backend/__tests__/**` tree is WP-11's, with one carve-out: **WP-10 MAY edit the six
+  specs whose subject modules it owns** — `api/controllers/result.ts`, `api/controllers/leaderboard.ts`,
+  `dal/leaderboards.ts`, `dal/result.ts`, `utils/result.ts`, `utils/pb.ts`. WP-11 handed those over
+  explicitly and keeps the rest.
+- **R6** (task #57) — SB-214's pixel-baseline PNG diff is deferred and MUST NOT block; §5.2 carries the row.
+
 ---
 
 ### 6.3 Residual requirement coverage (added in revision 2 — review gap 12)

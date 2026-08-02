@@ -24,10 +24,10 @@ deletion sweep DoD-04 is what proves those.
 | | Count |
 |---|---|
 | Indexed ids | 1113 |
-| Cited somewhere in the implementation | 731 |
+| Cited somewhere in the implementation | 732 |
 | Cited by at least one test | 407 |
-| No literal citation | 382 |
-| Listed in §2.31 (DoD-03 governs) | 125 |
+| No literal citation | 381 |
+| Listed in §2.31 (DoD-03 governs) | 126 |
 
 ## Rows
 
@@ -38,7 +38,7 @@ deletion sweep DoD-04 is what proves those.
 | ME-003 | Math engine | — | test | 4 | packages/math-engine/__tests__/generate.spec.ts<br>packages/math-engine/src/generate.ts<br>packages/math-engine/src/index.ts<br>…and 1 more |
 | ME-004 | Math engine | — | test | 3 | packages/math-engine/__tests__/generate.spec.ts<br>packages/math-engine/src/types.ts<br>packages/schemas/src/math.ts |
 | ME-005 | Math engine | — | code | 2 | packages/math-engine/src/operand.ts<br>packages/math-engine/src/types.ts |
-| ME-006 | Math engine | — | test | 4 | frontend/src/ts/test/test-logic.ts<br>packages/math-engine/__tests__/edge-cases.spec.ts<br>packages/math-engine/__tests__/generate.spec.ts<br>…and 1 more |
+| ME-006 | Math engine | — | test | 5 | frontend/__tests__/test/settings-snapshot.jsdom-spec.ts<br>frontend/src/ts/test/test-logic.ts<br>packages/math-engine/__tests__/edge-cases.spec.ts<br>…and 2 more |
 | ME-007 | Math engine | — | test | 3 | frontend/__tests__/root/config.spec.ts<br>frontend/src/ts/config/lifecycle.ts<br>packages/math-engine/__tests__/edge-cases.spec.ts |
 | ME-008 | Math engine | — | test | 5 | packages/math-engine/README.md<br>packages/math-engine/__tests__/api.spec.ts<br>packages/math-engine/__tests__/generate.spec.ts<br>…and 2 more |
 | ME-009 | Math engine | §2.31 | test | 4 | packages/math-engine/__tests__/settings.spec.ts<br>packages/math-engine/src/index.ts<br>packages/math-engine/src/settings.ts<br>…and 1 more |
@@ -863,7 +863,7 @@ deletion sweep DoD-04 is what proves those.
 | INV-094 | Inventory | — | none | 0 |  |
 | INV-095 | Inventory | — | none | 0 |  |
 | INV-096 | Inventory | §2.31 | none | 0 |  |
-| INV-097 | Inventory | — | code | 1 | .github/workflows/ci.yml |
+| INV-097 | Inventory | — | none | 0 |  |
 | INV-098 | Inventory | §2.31 | none | 0 |  |
 | INV-099 | Inventory | — | none | 0 |  |
 | INV-100 | Inventory | — | none | 0 |  |
@@ -882,14 +882,14 @@ deletion sweep DoD-04 is what proves those.
 | INV-113 | Inventory | — | none | 0 |  |
 | INV-114 | Inventory | §2.31 | code | 1 | frontend/src/ts/components/modals/Modals.tsx |
 | INV-115 | Inventory | — | code | 1 | frontend/src/ts/components/modals/Modals.tsx |
-| INV-116 | Inventory | — | code | 5 | frontend/src/html/pages/loading.html<br>frontend/src/styles/standalone.scss<br>frontend/src/ts/components/modals/Modals.tsx<br>…and 2 more |
+| INV-116 | Inventory | — | code | 6 | frontend/src/html/pages/loading.html<br>frontend/src/styles/standalone.scss<br>frontend/src/ts/components/modals/Modals.tsx<br>…and 3 more |
 | INV-117 | Inventory | §2.31 | code | 1 | frontend/src/ts/commandline/lists.ts |
-| INV-118 | Inventory | — | test | 12 | .github/workflows/ci.yml<br>frontend/__tests__/commandline/settings-commands.spec.ts<br>frontend/__tests__/utils/format.spec.ts<br>…and 9 more |
+| INV-118 | Inventory | — | test | 11 | frontend/__tests__/commandline/settings-commands.spec.ts<br>frontend/__tests__/utils/format.spec.ts<br>frontend/__tests__/utils/strings.spec.ts<br>…and 8 more |
 | INV-118a | Inventory | — | none | 0 |  |
 | INV-118b | Inventory | — | none | 0 |  |
 | INV-118c | Inventory | — | test | 6 | frontend/__tests__/utils/format.spec.ts<br>frontend/__tests__/utils/strings.spec.ts<br>frontend/src/ts/utils/format.ts<br>…and 3 more |
 | INV-118d | Inventory | — | code | 3 | frontend/src/ts/components/modals/CookiesModal.tsx<br>frontend/src/ts/cookies.ts<br>pnpm-workspace.yaml |
-| INV-118e | Inventory | — | test | 4 | .github/workflows/ci.yml<br>frontend/__tests__/commandline/settings-commands.spec.ts<br>frontend/src/ts/components/modals/CookiesModal.tsx<br>…and 1 more |
+| INV-118e | Inventory | — | test | 3 | frontend/__tests__/commandline/settings-commands.spec.ts<br>frontend/src/ts/components/modals/CookiesModal.tsx<br>frontend/src/ts/cookies.ts |
 | INV-118f | Inventory | — | none | 0 |  |
 | INV-118g | Inventory | — | none | 0 |  |
 | INV-118h | Inventory | — | code | 2 | frontend/src/ts/components/modals/CookiesModal.tsx<br>frontend/src/ts/cookies.ts |
@@ -983,7 +983,7 @@ deletion sweep DoD-04 is what proves those.
 | INV-203 | Inventory | — | none | 0 |  |
 | INV-204 | Inventory | — | none | 0 |  |
 | INV-205 | Inventory | — | none | 0 |  |
-| INV-206 | Inventory | — | none | 0 |  |
+| INV-206 | Inventory | — | code | 1 | scripts/requirement-coverage.mjs |
 | INV-207 | Inventory | — | none | 0 |  |
 | INV-208 | Inventory | — | none | 0 |  |
 | INF-001 | Infra and ops | — | none | 0 |  |
@@ -998,7 +998,7 @@ deletion sweep DoD-04 is what proves those.
 | INF-010 | Infra and ops | — | none | 0 |  |
 | INF-011 | Infra and ops | — | none | 0 |  |
 | INF-012 | Infra and ops | — | none | 0 |  |
-| INF-013 | Infra and ops | — | code | 5 | .github/workflows/ci.yml<br>.github/workflows/deploy-frontend.yml<br>frontend/src/html/head.html<br>…and 2 more |
+| INF-013 | Infra and ops | — | code | 6 | .github/workflows/ci.yml<br>.github/workflows/deploy-frontend.yml<br>frontend/src/html/head.html<br>…and 3 more |
 | INF-014 | Infra and ops | — | code | 2 | docker/BUILD.md<br>frontend/wrangler.jsonc |
 | INF-015 | Infra and ops | — | none | 0 |  |
 | INF-016 | Infra and ops | — | code | 1 | frontend/wrangler.jsonc |
@@ -1010,13 +1010,13 @@ deletion sweep DoD-04 is what proves those.
 | INF-022 | Infra and ops | — | code | 1 | frontend/static/_headers |
 | INF-023 | Infra and ops | — | none | 0 |  |
 | INF-024 | Infra and ops | §2.31 | none | 0 |  |
-| INF-025 | Infra and ops | §2.31 | code | 1 | frontend/src/html/head.html |
+| INF-025 | Infra and ops | §2.31 | code | 2 | frontend/src/html/head.html<br>frontend/vite-plugins/backend-preconnect.ts |
 | INF-026 | Infra and ops | — | code | 1 | frontend/wrangler.jsonc |
 | INF-027 | Infra and ops | — | code | 1 | .gitignore |
 | INF-028 | Infra and ops | — | none | 0 |  |
 | INF-029 | Infra and ops | — | none | 0 |  |
-| INF-030 | Infra and ops | §2.31 | code | 2 | frontend/src/html/head.html<br>frontend/vite.config.ts |
-| INF-031 | Infra and ops | — | code | 2 | frontend/src/html/head.html<br>frontend/vite.config.ts |
+| INF-030 | Infra and ops | §2.31 | code | 3 | frontend/src/html/head.html<br>frontend/vite-plugins/backend-preconnect.ts<br>frontend/vite.config.ts |
+| INF-031 | Infra and ops | — | code | 3 | frontend/src/html/head.html<br>frontend/vite-plugins/backend-preconnect.ts<br>frontend/vite.config.ts |
 | INF-032 | Infra and ops | — | code | 1 | docker/docker-compose.yml |
 | INF-033 | Infra and ops | — | code | 1 | infra/terraform/modules/container-app/main.tf |
 | INF-034 | Infra and ops | §2.31 | code | 1 | infra/terraform/prod/variables.tf |
@@ -1032,14 +1032,14 @@ deletion sweep DoD-04 is what proves those.
 | INF-044 | Infra and ops | — | code | 2 | .github/workflows/deploy-backend.yml<br>docker/BUILD.md |
 | INF-045 | Infra and ops | — | code | 1 | infra/terraform/modules/container-app/main.tf |
 | INF-046 | Infra and ops | — | code | 1 | infra/terraform/modules/container-app/main.tf |
-| INF-047 | Infra and ops | §2.31 | code | 1 | frontend/src/html/head.html |
+| INF-047 | Infra and ops | §2.31 | code | 2 | frontend/src/html/head.html<br>frontend/vite-plugins/backend-preconnect.ts |
 | INF-048 | Infra and ops | — | code | 1 | infra/terraform/modules/container-app/main.tf |
 | INF-049 | Infra and ops | — | code | 1 | infra/terraform/modules/container-app/main.tf |
 | INF-050 | Infra and ops | §2.31 | code | 3 | infra/terraform/modules/container-app/main.tf<br>infra/terraform/modules/key-vault/main.tf<br>infra/terraform/prod/variables.tf |
 | INF-051 | Infra and ops | — | code | 1 | infra/terraform/modules/container-app/main.tf |
 | INF-052 | Infra and ops | §2.31 | code | 2 | backend/src/app.ts<br>infra/terraform/prod/variables.tf |
-| INF-053 | Infra and ops | — | code | 4 | backend/src/api/controllers/admin.ts<br>backend/src/api/controllers/user.ts<br>docker/backend/Dockerfile<br>…and 1 more |
-| INF-053a | Infra and ops | — | code | 2 | backend/src/api/controllers/admin.ts<br>backend/src/api/controllers/user.ts |
+| INF-053 | Infra and ops | — | code | 5 | backend/src/api/controllers/admin.ts<br>backend/src/api/controllers/user.ts<br>docker/backend/Dockerfile<br>…and 2 more |
+| INF-053a | Infra and ops | §2.31 | code | 3 | backend/src/api/controllers/admin.ts<br>backend/src/api/controllers/user.ts<br>scripts/requirement-coverage.mjs |
 | INF-054 | Infra and ops | — | code | 1 | backend/src/app.ts |
 | INF-055 | Infra and ops | — | code | 1 | backend/src/app.ts |
 | INF-056 | Infra and ops | §2.31 | code | 1 | infra/terraform/modules/mongodb/main.tf |
@@ -1049,8 +1049,8 @@ deletion sweep DoD-04 is what proves those.
 | INF-059 | Infra and ops | §2.31 | code | 1 | infra/terraform/modules/mongodb/main.tf |
 | INF-060 | Infra and ops | §2.31 | code | 1 | infra/terraform/modules/mongodb/main.tf |
 | INF-061 | Infra and ops | §2.31 | code | 4 | .github/workflows/backup-db.yml<br>infra/terraform/bootstrap/main.tf<br>infra/terraform/bootstrap/variables.tf<br>…and 1 more |
-| INF-062 | Infra and ops | §2.31 | code | 5 | .github/workflows/backup-db.yml<br>infra/terraform/modules/mongodb/main.tf<br>infra/terraform/prod/outputs.tf<br>…and 2 more |
-| INF-062a | Infra and ops | §2.31 | none | 0 |  |
+| INF-062 | Infra and ops | §2.31 | code | 6 | .github/workflows/backup-db.yml<br>infra/terraform/modules/mongodb/main.tf<br>infra/terraform/prod/outputs.tf<br>…and 3 more |
+| INF-062a | Infra and ops | §2.31 | code | 1 | scripts/requirement-coverage.mjs |
 | INF-063 | Infra and ops | — | test | 8 | backend/__tests__/__integration__/jobs/job-lock.isolated.spec.ts<br>backend/src/jobs/daily-leaderboard-results.ts<br>backend/src/jobs/job-lock.ts<br>…and 5 more |
 | INF-064 | Infra and ops | — | code | 4 | backend/src/dal/leaderboards.ts<br>backend/src/services/weekly-xp-leaderboard.ts<br>backend/src/utils/daily-leaderboards.ts<br>…and 1 more |
 | INF-065 | Infra and ops | — | code | 3 | backend/src/jobs/daily-leaderboard-results.ts<br>backend/src/jobs/weekly-xp-leaderboard-results.ts<br>docker/backend/Dockerfile |

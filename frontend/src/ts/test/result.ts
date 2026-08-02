@@ -45,7 +45,7 @@ import { configMetadata } from "../config/metadata";
 import { setConfig } from "../config/setters";
 import * as ChartController from "../controllers/chart-controller";
 import { SnapshotResult } from "../constants/default-snapshot";
-import { CONTACT_EMAIL } from "../constants/links";
+import { SITE_DOMAIN } from "../constants/links";
 import * as DB from "../db";
 import { configEvent } from "../events/config";
 import { restartTestEvent } from "../events/test";
@@ -88,14 +88,13 @@ let minChartVal = 0;
 let maxChartVal = 0;
 
 /**
- * CP-129 — the screenshot watermark reads croco calc's domain, derived from the
- * one address constant the shell already ships. `slice` past the `@` rather
- * than `split(...)[1] ?? "crococalc.com"`: a fallback literal would be exactly
- * the second copy CP-129 says must not exist, and it would be the copy that
- * silently wins if the address ever changed shape. There is deliberately no
- * second literal here to drift (`constants/links.ts` is WP-08's).
+ * CP-129 — the screenshot watermark reads croco calc's domain. Re-exported from
+ * `constants/links.ts`, which now owns the single literal; the local derivation
+ * that used to live here (`CONTACT_EMAIL.slice(indexOf("@") + 1)`) was a second
+ * definition of the same value, which is precisely what CP-129 forbids.
+ * `test-screenshot.ts` imports it from here, so the re-export stays.
  */
-export const SITE_DOMAIN = CONTACT_EMAIL.slice(CONTACT_EMAIL.indexOf("@") + 1);
+export { SITE_DOMAIN };
 
 // #region metric rendering
 
