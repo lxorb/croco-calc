@@ -16,10 +16,17 @@
  *
  * Outcome is a decision, not a discussion (INF-058):
  *   exit 0 -> Atlas M0 stays.
- *   exit 1 -> set `mongodb_tier = "FLEX"` in prod/terraform.tfvars, update the
- *             cost table in docs/RUNBOOK.md (INF-058a), then apply. No third
- *             option is pre-approved; if Flex also fails, that is a hard stop
+ *   exit 1 -> a clause was genuinely REJECTED by the server. Set
+ *             `mongodb_tier = "FLEX"` in prod/terraform.tfvars, update the cost
+ *             table in docs/RUNBOOK.md (INF-058a), then apply. No third option
+ *             is pre-approved; if Flex also fails, that is a hard stop
  *             requiring human sign-off.
+ *
+ * Exit 1 costs $8–12/mo, so nothing else is allowed to produce it:
+ *   exit 2 -> DB_URI is not set. Configuration error, no verdict.
+ *   exit 3 -> the probe could not run at all (DNS, TLS, auth, timeout, a
+ *             permission error on a setup step). Infrastructure fault, NOT a
+ *             statement about M0 — fix it and re-run.
  *
  * Usage:
  *   DB_URI="mongodb+srv://…" DB_NAME=crococalc node infra/scripts/db-probe.ts
@@ -28,7 +35,21 @@
  * and a cluster exist. `terraform apply` MUST NOT run before it has.
  */
 
-import { MongoClient } from "mongodb";
+// `infra/` is not a pnpm workspace package (pnpm-workspace.yaml lists only
+// frontend, backend and packages/*), so Node's resolver — which walks up from
+// THIS FILE, not from the working directory — never reaches the only copy of
+// `mongodb` in the tree, which pnpm installs under backend/node_modules.
+// A bare `import { MongoClient } from "mongodb"` therefore dies with
+// ERR_MODULE_NOT_FOUND no matter where it is invoked from. Resolve it the way
+// the backend package would instead.
+import { createRequire } from "node:module";
+
+const requireFromBackend = createRequire(
+  new URL("../../backend/package.json", import.meta.url),
+);
+const { MongoClient } = requireFromBackend(
+  "mongodb",
+) as typeof import("mongodb");
 
 type Clause = {
   name: string;
@@ -55,7 +76,7 @@ const CLAUSES: Clause[] = [
       if (ranked.length !== 3) {
         throw new Error(`expected 3 ranked documents, got ${ranked.length}`);
       }
-      const ranks = ranked.map((doc) => doc["rank"]);
+      const ranks = ranked.map((doc): unknown => doc["rank"]);
       if (JSON.stringify(ranks) !== JSON.stringify([1, 2, 3])) {
         throw new Error(`unexpected ranks: ${JSON.stringify(ranks)}`);
       }
@@ -130,8 +151,15 @@ async function main(): Promise<void> {
   try {
     await client.connect();
     const db = client.db(dbName);
-    const build = await db.admin().serverStatus();
-    console.log(`connected to ${dbName}, server version ${build["version"]}`);
+
+    // Best effort only. serverStatus is restricted on Atlas shared tiers, and a
+    // banner line must never be the thing that decides an $8+/mo upgrade.
+    try {
+      const build = await db.admin().serverStatus();
+      console.log(`connected to ${dbName}, server version ${build["version"]}`);
+    } catch {
+      console.log(`connected to ${dbName} (serverStatus not permitted)`);
+    }
 
     await db.collection(`${prefix}_results`).insertMany([
       { uid: "u1", score: 300 },
@@ -182,4 +210,15 @@ async function main(): Promise<void> {
   process.exit(1);
 }
 
-await main();
+// Anything that escapes main() is an infrastructure fault, not a verdict on M0.
+// Exit 1 is reserved for "the server rejected a clause"; see the header.
+try {
+  await main();
+} catch (error) {
+  console.error(
+    `\nThe probe could not run: ${error instanceof Error ? error.message : String(error)}\n` +
+      "This is NOT an M0 incompatibility verdict (INF-058). Check connectivity, " +
+      "credentials and the database user's permissions, then run it again.",
+  );
+  process.exit(3);
+}
