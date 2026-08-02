@@ -84,7 +84,13 @@ jobs:
           TF_VAR_atlas_org_id: ${{ secrets.MONGODB_ATLAS_ORG_ID }}
           TF_VAR_firebase_service_account_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           TF_VAR_recaptcha_secret: ${{ secrets.RECAPTCHA_SECRET }}
-        run: terraform plan -input=false -no-color -out=tfplan | tee plan.txt
+        # No pipe. GitHub's default shell is `bash -e {0}` WITHOUT pipefail, so
+        # `terraform plan | tee plan.txt` would report the exit status of `tee`
+        # and a failed plan would sail through green with its error text posted
+        # to the PR as if it were a plan.
+        run: |
+          terraform plan -input=false -no-color -out=tfplan
+          terraform show -no-color tfplan > plan.txt
 
       - name: Upload plan
         uses: actions/upload-artifact@v4
@@ -125,12 +131,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # INF-156: the cost table is a gate, not a note. Refuse to apply while any
-      # row is still unverified.
-      - name: Assert the cost table is verified
+      # INF-156: the cost table is a gate, not a note. The authoritative INF-037
+      # table lives in docs/requirements/06-infra-and-ops.md, so that is the
+      # file this gate reads — checking anything else makes the gate vacuous.
+      # See docs/RUNBOOK.md section 1 for the verified rates and the citations
+      # that have to be transcribed into the `source` column to clear it.
+      - name: Assert the INF-037 cost table is verified
         run: |
-          if grep -q "UNVERIFIED" docs/RUNBOOK.md; then
-            echo "::error::docs/RUNBOOK.md still contains an UNVERIFIED cost row (INF-156)"
+          table=docs/requirements/06-infra-and-ops.md
+          rows=$(grep -c "UNVERIFIED" "$table" || true)
+          if [ "$rows" -ne 0 ]; then
+            echo "::error file=$table::$rows row(s) of the INF-037 cost table still read UNVERIFIED; terraform apply is blocked (INF-156). Transcribe the citations from docs/RUNBOOK.md section 1 into the source column first."
             exit 1
           fi
 
