@@ -1,5 +1,18 @@
+import {
+  CustomBackgroundSchema,
+  CustomBackgroundSizeSchema,
+  RandomThemeSchema,
+  ThemeName,
+} from "@croco-calc/schemas/configs";
 import { CustomTheme, CustomThemeNameSchema } from "@croco-calc/schemas/users";
-import { createMemo, createSignal, For, JSXElement, Show } from "solid-js";
+import {
+  createMemo,
+  createResource,
+  createSignal,
+  For,
+  JSXElement,
+  Show,
+} from "solid-js";
 import { debounce } from "throttle-debounce";
 import { z } from "zod";
 
@@ -13,6 +26,8 @@ import { setConfig } from "../../config/setters";
 import { getConfig } from "../../config/store";
 import { ColorName, ThemesList, ThemeWithName } from "../../constants/themes";
 import {
+  applyCustomBackground,
+  applyCustomBackgroundFilters,
   clearPreview,
   convertCustomColorsToTheme,
   convertThemeToCustomColors,
@@ -30,6 +45,7 @@ import { showSimpleModal } from "../../states/simple-modal";
 import { getTheme, setTheme, updateThemeColor } from "../../states/theme";
 import { cn } from "../../utils/cn";
 import { hexToHSL } from "../../utils/colors";
+import FileStorage from "../../utils/file-storage";
 import {
   normalizeName,
   replaceUnderscoresWithSpaces,
@@ -40,11 +56,13 @@ import { AnimeMatch } from "../common/anime/AnimeMatch";
 import { Button } from "../common/Button";
 import { Icon } from "../common/Icon";
 import { Separator } from "../common/Separator";
+import { Slider } from "../common/Slider";
+import SlimSelect from "../ui/SlimSelect";
 
 /**
  * The theme modal (C9, CP-164 … CP-177).
  *
- * monkeytype split its theme picker in two: a search-and-swatches list in the
+ * The upstream project split its theme picker in two: a search-and-swatches list in the
  * commandline dialog, and a larger grid on the settings page. The settings page
  * is deleted (INV-116), so C9 extracts `custom-setting/Theme.tsx` here — all of
  * CP-174's content survives, only its host changed. The modal is opened by the
@@ -434,8 +452,340 @@ export function ThemeModal(): JSXElement {
             <Customs />
           </AnimeMatch>
         </AnimeSwitch>
+        <Separator />
+        <ThemeExtras />
       </div>
     </AnimatedModal>
+  );
+}
+
+/**
+ * CP-177 / INV-116 — the theme-only settings that had no other home once the
+ * settings page was deleted.
+ *
+ * `AutoSwitchTheme.tsx`, `CustomBackground.tsx` and
+ * `CustomBackgroundFilters.tsx` were `SearchableSetting` rows on that page.
+ * They are folded in here because their config keys are retained and they are
+ * theme-only — they carry no upstream specificity of their own. The
+ * `SearchableSetting` wrapper is gone with the page (there is no settings
+ * search any more), so each one becomes a labelled row instead; the inputs and
+ * the setters they call are unchanged.
+ *
+ * The whole block is collapsed behind a disclosure so the theme list, which is
+ * what the modal is actually for, stays the first thing the user sees.
+ */
+function ThemeExtras(): JSXElement {
+  const [isOpen, setIsOpen] = createSignal(false);
+
+  const themeOptions = (): { text: string; value: string }[] =>
+    ThemesList.map((theme) => ({
+      text: replaceUnderscoresWithSpaces(theme.name),
+      value: theme.name,
+    }));
+
+  return (
+    <div class="grid gap-4">
+      <Button
+        variant="text"
+        class="justify-self-start"
+        text={isOpen() ? "hide extra options" : "show extra options"}
+        icon={{
+          icon: isOpen() ? "ph:caret-up-bold" : "ph:caret-down-bold",
+          fixedWidth: true,
+        }}
+        onClick={() => setIsOpen(!isOpen())}
+      />
+      <Show when={isOpen()}>
+        <div class="grid gap-6">
+          {/* CP-177 — auto switch theme, with its light/dark pair. */}
+          <ExtraRow
+            title="auto switch theme"
+            description="Automatically switch between the light and dark themes below when your system's colour scheme changes."
+          >
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] gap-2">
+              <Button
+                active={!getConfig.autoSwitchTheme}
+                onClick={() => {
+                  if (!getConfig.autoSwitchTheme) return;
+                  setConfig("autoSwitchTheme", false);
+                }}
+                text="off"
+              />
+              <Button
+                active={getConfig.autoSwitchTheme}
+                onClick={() => {
+                  if (getConfig.autoSwitchTheme) return;
+                  setConfig("autoSwitchTheme", true);
+                }}
+                text="on"
+              />
+            </div>
+          </ExtraRow>
+          <Show when={getConfig.autoSwitchTheme}>
+            <div class="grid grid-cols-1 gap-8 md:grid-cols-2">
+              <div class="grid grid-cols-[7rem_1fr] items-center gap-2">
+                <div>light</div>
+                <SlimSelect
+                  options={themeOptions()}
+                  selected={getConfig.themeLight}
+                  onChange={(value) =>
+                    setConfig("themeLight", value as ThemeName)
+                  }
+                />
+              </div>
+              <div class="grid grid-cols-[7rem_1fr] items-center gap-2">
+                <div>dark</div>
+                <SlimSelect
+                  options={themeOptions()}
+                  selected={getConfig.themeDark}
+                  onChange={(value) =>
+                    setConfig("themeDark", value as ThemeName)
+                  }
+                />
+              </div>
+            </div>
+          </Show>
+
+          <Separator />
+
+          {/* CP-177 — random theme. */}
+          <ExtraRow
+            title="random theme"
+            description="Pick a new theme after every test. `fav` draws from your favourites, `light` and `dark` from themes with a light or dark background, and `custom` from your saved custom themes."
+          >
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(4rem,1fr))] gap-2">
+              <For each={RandomThemeSchema.options}>
+                {(option) => (
+                  <Button
+                    active={getConfig.randomTheme === option}
+                    text={option}
+                    onClick={() => {
+                      if (getConfig.randomTheme === option) return;
+                      setConfig("randomTheme", option);
+                    }}
+                  />
+                )}
+              </For>
+            </div>
+          </ExtraRow>
+
+          <Separator />
+
+          <CustomBackgroundRow />
+
+          <Separator />
+
+          <CustomBackgroundFiltersRow />
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+/** The label + description + inputs shape `SearchableSetting` used to render. */
+function ExtraRow(props: {
+  title: string;
+  description: string;
+  children: JSXElement;
+}): JSXElement {
+  return (
+    <div class="grid grid-cols-1 gap-2 md:grid-cols-[2fr_1fr] md:gap-8">
+      <div>
+        <div class="text-text">{props.title}</div>
+        <div class="text-sub">{props.description}</div>
+      </div>
+      <div class="self-end">{props.children}</div>
+    </div>
+  );
+}
+
+/**
+ * CP-177 — the custom background URL, the local-image upload and the size
+ * buttons, lifted out of `custom-setting/CustomBackground.tsx`.
+ */
+function CustomBackgroundRow(): JSXElement {
+  const [hasLocalBackground] = createResource(
+    () => FileStorage.track("LocalBackgroundFile"),
+    async () => FileStorage.hasFile("LocalBackgroundFile"),
+  );
+
+  const readFileAsDataURL = async (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  return (
+    <ExtraRow
+      title="custom background"
+      description="A background image for the whole site. A local image is kept in this browser's storage and never uploaded, so it is lost if you clear that storage or switch browser."
+    >
+      <div class="grid gap-2 self-end">
+        <Show
+          when={!hasLocalBackground()}
+          fallback={
+            <Button
+              icon={{ icon: "ph:trash-bold", fixedWidth: true }}
+              text="remove local background"
+              onClick={() => {
+                void FileStorage.deleteFile("LocalBackgroundFile").then(() => {
+                  void applyCustomBackground();
+                });
+              }}
+            />
+          }
+        >
+          <>
+            <input
+              type="file"
+              id="themeModalCustomBackgroundUpload"
+              accept="image/*"
+              class="hidden"
+              onChange={async (e) => {
+                const fileInput = e.target;
+                const file = fileInput.files?.[0];
+                if (!file) return;
+
+                if (!/image\/(jpeg|jpg|png|gif|webp)/.exec(file.type)) {
+                  showNoticeNotification("Unsupported image format");
+                  fileInput.value = "";
+                  return;
+                }
+
+                const dataUrl = await readFileAsDataURL(file);
+                await FileStorage.storeFile("LocalBackgroundFile", dataUrl);
+                void applyCustomBackground();
+                fileInput.value = "";
+              }}
+            />
+            {/*
+              A `<label for>` rather than a `Button`, because a file input can
+              only be opened by a real user gesture on its own label.
+            */}
+            <label
+              // oxlint-disable-next-line react/no-unknown-property
+              for="themeModalCustomBackgroundUpload"
+              class="inline-flex w-full cursor-pointer items-center justify-center gap-[0.5em] rounded border-0 bg-sub-alt p-[0.5em] text-text transition-[color,background,opacity] duration-125 hover:bg-text hover:text-bg"
+            >
+              <Icon icon="ph:file-arrow-up-bold" fixedWidth />
+              use local image
+            </label>
+            <Separator text="or" />
+            <input
+              class="w-full"
+              type="text"
+              placeholder="image url"
+              value={getConfig.customBackground}
+              onChange={(e) => {
+                const value = e.currentTarget.value.trim();
+                if (value === getConfig.customBackground) return;
+                const parsed = CustomBackgroundSchema.safeParse(value);
+                if (!parsed.success) {
+                  showErrorNotification(
+                    "Background must be a URL ending in jpg, jpeg, png, gif or webp",
+                  );
+                  e.currentTarget.value = getConfig.customBackground;
+                  return;
+                }
+                setConfig("customBackground", parsed.data);
+              }}
+            />
+          </>
+        </Show>
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(4rem,1fr))] gap-2">
+          <For each={CustomBackgroundSizeSchema.options}>
+            {(option) => (
+              <Button
+                active={getConfig.customBackgroundSize === option}
+                text={option}
+                onClick={() => {
+                  if (getConfig.customBackgroundSize === option) return;
+                  setConfig("customBackgroundSize", option);
+                }}
+              />
+            )}
+          </For>
+        </div>
+      </div>
+    </ExtraRow>
+  );
+}
+
+/**
+ * CP-177 — the four background filter sliders, lifted out of
+ * `custom-setting/CustomBackgroundFilters.tsx`. `onEveryChange` repaints live
+ * while dragging; `onChange` is what actually persists.
+ */
+function CustomBackgroundFiltersRow(): JSXElement {
+  let refBlur: HTMLInputElement | undefined = undefined;
+  let refBrightness: HTMLInputElement | undefined = undefined;
+  let refSaturate: HTMLInputElement | undefined = undefined;
+  let refOpacity: HTMLInputElement | undefined = undefined;
+
+  const refValues = (): [number, number, number, number] | undefined => {
+    if (!refBlur || !refBrightness || !refSaturate || !refOpacity) {
+      return undefined;
+    }
+    return [
+      Number(refBlur.value),
+      Number(refBrightness.value),
+      Number(refSaturate.value),
+      Number(refOpacity.value),
+    ];
+  };
+
+  const commit = (index: 0 | 1 | 2 | 3, value: number): void => {
+    const current = getConfig.customBackgroundFilter;
+    if (value === current[index]) return;
+    const next: [number, number, number, number] = [
+      current[0],
+      current[1],
+      current[2],
+      current[3],
+    ];
+    next[index] = value;
+    setConfig("customBackgroundFilter", next);
+  };
+
+  const filters = [
+    { label: "blur", index: 0, min: 0, max: 5, step: 0.1 },
+    { label: "brightness", index: 1, min: 0, max: 2, step: 0.1 },
+    { label: "saturate", index: 2, min: 0, max: 2, step: 0.1 },
+    { label: "opacity", index: 3, min: 0, max: 1, step: 0.1 },
+  ] as const;
+
+  const refSetters = [
+    (el: HTMLInputElement) => (refBlur = el),
+    (el: HTMLInputElement) => (refBrightness = el),
+    (el: HTMLInputElement) => (refSaturate = el),
+    (el: HTMLInputElement) => (refOpacity = el),
+  ];
+
+  return (
+    <div class="grid gap-2">
+      <div class="text-text">custom background filters</div>
+      <div class="grid grid-cols-1 gap-8 md:grid-cols-2">
+        <For each={filters}>
+          {(filter) => (
+            <div class="grid grid-cols-[7rem_1fr] items-center gap-2">
+              <div>{filter.label}</div>
+              <Slider
+                ref={refSetters[filter.index]}
+                min={filter.min}
+                max={filter.max}
+                step={filter.step}
+                text={(value) => value.toFixed(1)}
+                value={getConfig.customBackgroundFilter[filter.index]}
+                onEveryChange={() => applyCustomBackgroundFilters(refValues())}
+                onChange={(value) => commit(filter.index, value)}
+              />
+            </div>
+          )}
+        </For>
+      </div>
+    </div>
   );
 }
 
