@@ -47,13 +47,16 @@ module "alerts" {
   action_group_id     = module.observability.action_group_id
 }
 
-module "mongodb_atlas" {
-  source = "../modules/mongodb-atlas"
+module "mongodb" {
+  source = "../modules/mongodb"
 
-  org_id  = var.atlas_org_id
-  tier    = var.mongodb_tier
-  region  = var.atlas_region
-  db_name = var.db_name
+  resource_group_name = data.azurerm_resource_group.prod.name
+  location            = var.mongodb_location
+  tags                = var.tags
+
+  tier               = var.mongodb_tier
+  storage_size_in_gb = var.mongodb_storage_gb
+  db_name            = var.db_name
 }
 
 module "key_vault" {
@@ -68,7 +71,7 @@ module "key_vault" {
   cicd_principal_id         = data.azurerm_user_assigned_identity.cicd.principal_id
   operator_principal_id     = data.azurerm_client_config.current.object_id
 
-  mongodb_uri                   = module.mongodb_atlas.connection_string
+  mongodb_uri                   = module.mongodb.connection_string
   firebase_service_account_json = var.firebase_service_account_json
   recaptcha_secret              = var.recaptcha_secret
 }

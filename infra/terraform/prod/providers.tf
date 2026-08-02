@@ -7,10 +7,6 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 4.65"
     }
-    mongodbatlas = {
-      source  = "mongodb/mongodbatlas"
-      version = "~> 2.15"
-    }
     random = {
       source  = "hashicorp/random"
       version = "~> 3.9"
@@ -39,8 +35,7 @@ provider "azurerm" {
   resource_provider_registrations = "none"
 }
 
-# Credentials come from MONGODB_ATLAS_PUBLIC_KEY / MONGODB_ATLAS_PRIVATE_KEY in
-# the environment (INF-076, INF-086) — never from a committed file.
-provider "mongodbatlas" {}
-
+# The database is an ordinary Azure resource now (Microsoft.DocumentDB/
+# mongoClusters), so it needs no provider or credentials of its own. Dropping
+# the `mongodbatlas` provider is what retires blocker BL-4.
 provider "random" {}

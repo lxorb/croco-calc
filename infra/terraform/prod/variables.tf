@@ -78,31 +78,38 @@ variable "db_name" {
 
 # --- database -------------------------------------------------------------
 
-variable "atlas_org_id" {
-  description = "MongoDB Atlas organisation id. BLOCKER BL-4: no Atlas org exists yet."
-  type        = string
-}
-
 variable "mongodb_tier" {
   description = <<-EOT
-    INF-057 / INF-058 / INF-062: the whole M0-vs-Flex decision is this one
-    variable. Leave it at "M0" unless `infra/scripts/db-probe.ts` fails, in
-    which case set it to "FLEX" (no other option is pre-approved) and update the
-    cost table before applying (INF-058a).
+    INF-057 / INF-062 (amended by user decision): Azure DocumentDB compute tier.
+    "M10" is the deployed default — ~$18.18/mo compute + ~$4.38/mo storage in
+    westeurope, with <=35-day backups included.
+    "Free" is the $0 lever, but Azure does not offer it in westeurope, so it
+    MUST be paired with mongodb_location = "northeurope" (the module enforces
+    this), and it has no backup/restore and no HA.
   EOT
   type        = string
-  default     = "M0"
+  default     = "M10"
 
   validation {
-    condition     = contains(["M0", "FLEX"], var.mongodb_tier)
-    error_message = "mongodb_tier must be \"M0\" or \"FLEX\" — INF-058 pre-approves no third option."
+    condition     = contains(["Free", "M10", "M20", "M25", "M30"], var.mongodb_tier)
+    error_message = "mongodb_tier must be one of Free, M10, M20, M25, M30."
   }
 }
 
-variable "atlas_region" {
-  description = "Atlas' name for Azure westeurope (INF-057)."
+variable "mongodb_location" {
+  description = <<-EOT
+    Region for the database only. Defaults to `location` (INF-005 wants one
+    region for everything); the sole reason to diverge is mongodb_tier = "Free",
+    which is not offered in westeurope.
+  EOT
   type        = string
-  default     = "EUROPE_WEST"
+  default     = "westeurope"
+}
+
+variable "mongodb_storage_gb" {
+  description = "Storage can only ever be increased. 32 GiB is the free-tier size and is far above croco calc's needs."
+  type        = number
+  default     = 32
 }
 
 # --- secrets (TF_VAR_* only, never a committed tfvars — INF-076) ----------

@@ -1,38 +1,61 @@
 /**
- * INF-058 — MongoDB compatibility probe.
+ * INF-058 — MongoDB aggregation compatibility probe.
  *
- * The whole M0-vs-Flex decision hangs on three aggregation features croco calc
- * inherits from monkeytype's DAL:
+ * AMENDED 2026-08-02 by user decision ("just host mongodb via azure"). This
+ * script no longer decides anything: the old M0-vs-Atlas-Flex fork is gone
+ * along with the `mongodbatlas` provider. What it does now is *verify on the
+ * live cluster* that Azure DocumentDB (Azure Cosmos DB for MongoDB **vCore**)
+ * really executes the aggregation stages croco calc's DAL depends on, rather
+ * than trusting a compatibility table.
  *
- *   (a) `$setWindowFields` — ranking, used by the all-time leaderboard and by
- *       the MongoDB re-implementation of the daily/weekly leaderboards
- *       (INF-064).
- *   (b) `$merge`          — writing a rank snapshot into another collection.
- *                           This is the clause most likely to fail: `$merge`
- *                           is a documented restriction area on Atlas free and
- *                           shared tiers, which makes the Flex fallback the
- *                           expected path rather than a remote contingency.
- *   (c) `$lookup` with a sub-pipeline — used by the connections DAL.
+ * That distinction matters because the vCore engine is a re-implementation of
+ * the MongoDB wire protocol, not the MongoDB server — Microsoft states 99.03%
+ * compatibility, and the missing 0.97% is exactly the kind of thing that takes
+ * leaderboards down in production. The documentation says all five clauses
+ * below are supported (see docs/requirements/06-infra-and-ops.md §3 for the
+ * citations); this proves it.
  *
- * Outcome is a decision, not a discussion (INF-058):
- *   exit 0 -> Atlas M0 stays.
- *   exit 1 -> a clause was genuinely REJECTED by the server. Set
- *             `mongodb_tier = "FLEX"` in prod/terraform.tfvars, update the cost
- *             table in docs/RUNBOOK.md (INF-058a), then apply. No third option
- *             is pre-approved; if Flex also fails, that is a hard stop
- *             requiring human sign-off.
+ * The clauses, and where each one is load-bearing:
  *
- * Exit 1 costs $8–12/mo, so nothing else is allowed to produce it:
- *   exit 2 -> DB_URI is not set. Configuration error, no verdict.
- *   exit 3 -> the probe could not run at all (DNS, TLS, auth, timeout, a
- *             permission error on a setup step). Infrastructure fault, NOT a
- *             statement about M0 — fix it and re-run.
+ *   (a) `$setWindowFields` + `$documentNumber` / `$denseRank`
+ *         backend/src/dal/leaderboards.ts (all-time board),
+ *         backend/src/utils/daily-leaderboards.ts,
+ *         backend/src/services/weekly-xp-leaderboard.ts.
+ *         This is the single most load-bearing stage in the app: INF-064 moved
+ *         the daily and weekly-XP boards off Redis onto it.
+ *   (b) `$out`
+ *         backend/src/dal/leaderboards.ts:251 — atomically replaces the board
+ *         collection, which is what makes the rebuild idempotent (INF-153).
+ *   (c) `$lookup` with `let` + a sub-pipeline
+ *         backend/src/dal/connections.ts:314 via `includeMetaData`
+ *         (backend/src/dal/user.ts:800). The RU-based Cosmos API rejects this
+ *         form outright, which is one of the reasons vCore was chosen.
+ *   (d) `$bucket`
+ *         backend/src/dal/leaderboards.ts — the score histogram. Also
+ *         unsupported on the RU API.
+ *   (e) `$merge`
+ *         NOT used by any production code path any more. The only remaining
+ *         caller is backend/src/api/controllers/dev.ts:418, which sits behind
+ *         `onlyAvailableOnDev()`. It is probed anyway so that a regression in
+ *         support shows up here rather than in a dev tool, but a failure of
+ *         this clause alone is a WARNING, not a failure — see EXIT CODES.
+ *
+ * EXIT CODES
+ *   0 -> every required clause ran. The cluster is fit for purpose.
+ *   1 -> a REQUIRED clause (a-d) was rejected by the server. Do not deploy;
+ *        the leaderboards will break. Escalate — no fallback tier is
+ *        pre-approved, and switching engines is a design change.
+ *   2 -> DB_URI is not set. Configuration error, no verdict.
+ *   3 -> the probe could not run at all (DNS, TLS, auth, timeout, a permission
+ *        error on a setup step). Infrastructure fault, NOT a statement about
+ *        the engine — fix it and re-run.
  *
  * Usage:
  *   DB_URI="mongodb+srv://…" DB_NAME=crococalc node infra/scripts/db-probe.ts
  *
- * BLOCKER BL-4: this cannot be run until an Atlas organisation, an API key pair
- * and a cluster exist. `terraform apply` MUST NOT run before it has.
+ * The URI is the Key Vault secret `mongodb-uri`, which Terraform writes. Note
+ * that a vCore URI must carry `retrywrites=false`; the Node driver's default
+ * retryable writes are rejected by the server.
  */
 
 // `infra/` is not a pnpm workspace package (pnpm-workspace.yaml lists only
@@ -53,26 +76,33 @@ const { MongoClient } = requireFromBackend(
 
 type Clause = {
   name: string;
+  /** Clauses no production code path depends on downgrade to a warning. */
+  required: boolean;
   run: (db: import("mongodb").Db, prefix: string) => Promise<void>;
 };
 
 const CLAUSES: Clause[] = [
   {
-    name: "(a) $setWindowFields rank pipeline",
+    name: "(a) $setWindowFields ranking",
+    required: true,
     run: async (db, prefix) => {
-      const results = db.collection(`${prefix}_results`);
-      const ranked = await results
+      const ranked = await db
+        .collection(`${prefix}_results`)
         .aggregate([
-          { $match: {} },
+          { $sort: { score: -1 } },
           {
             $setWindowFields: {
               sortBy: { score: -1 },
-              output: { rank: { $denseRank: {} } },
+              output: {
+                rank: { $documentNumber: {} },
+                denseRank: { $denseRank: {} },
+              },
             },
           },
           { $sort: { rank: 1 } },
         ])
         .toArray();
+
       if (ranked.length !== 3) {
         throw new Error(`expected 3 ranked documents, got ${ranked.length}`);
       }
@@ -80,35 +110,42 @@ const CLAUSES: Clause[] = [
       if (JSON.stringify(ranks) !== JSON.stringify([1, 2, 3])) {
         throw new Error(`unexpected ranks: ${JSON.stringify(ranks)}`);
       }
-    },
-  },
-  {
-    name: "(b) $merge into a second collection",
-    run: async (db, prefix) => {
-      await db
-        .collection(`${prefix}_results`)
-        .aggregate([
-          { $project: { _id: 1, uid: 1, score: 1 } },
-          {
-            $merge: {
-              into: `${prefix}_snapshots`,
-              on: "_id",
-              whenMatched: "replace",
-              whenNotMatched: "insert",
-            },
-          },
-        ])
-        .toArray();
-      const merged = await db
-        .collection(`${prefix}_snapshots`)
-        .countDocuments({});
-      if (merged !== 3) {
-        throw new Error(`expected 3 merged documents, got ${merged}`);
+      const dense = ranked.map((doc): unknown => doc["denseRank"]);
+      if (JSON.stringify(dense) !== JSON.stringify([1, 2, 3])) {
+        throw new Error(`unexpected dense ranks: ${JSON.stringify(dense)}`);
       }
     },
   },
   {
-    name: "(c) $lookup with a sub-pipeline",
+    name: "(b) $out replacing a collection",
+    required: true,
+    run: async (db, prefix) => {
+      const target = `${prefix}_board`;
+
+      // Run it twice: $out's whole value to INF-153 is that the second run
+      // replaces rather than appends, which is what makes the leaderboard
+      // rebuild idempotent. A $out that appended would still "work" here.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await db
+          .collection(`${prefix}_results`)
+          .aggregate([
+            { $project: { _id: 1, uid: 1, score: 1 } },
+            { $out: target },
+          ])
+          .toArray();
+      }
+
+      const count = await db.collection(target).countDocuments({});
+      if (count !== 3) {
+        throw new Error(
+          `expected 3 documents after two $out runs, got ${count} — $out is appending, not replacing`,
+        );
+      }
+    },
+  },
+  {
+    name: "(c) $lookup with let + sub-pipeline",
+    required: true,
     run: async (db, prefix) => {
       const joined = await db
         .collection(`${prefix}_results`)
@@ -127,8 +164,59 @@ const CLAUSES: Clause[] = [
           { $match: { "user.0": { $exists: true } } },
         ])
         .toArray();
+
       if (joined.length !== 3) {
         throw new Error(`expected 3 joined documents, got ${joined.length}`);
+      }
+    },
+  },
+  {
+    name: "(d) $bucket score histogram",
+    required: true,
+    run: async (db, prefix) => {
+      const buckets = await db
+        .collection(`${prefix}_results`)
+        .aggregate([
+          {
+            $bucket: {
+              groupBy: "$score",
+              boundaries: [0, 150, 300, 450],
+              default: "other",
+              output: { count: { $sum: 1 } },
+            },
+          },
+        ])
+        .toArray();
+
+      if (buckets.length === 0) {
+        throw new Error("expected at least one bucket, got none");
+      }
+    },
+  },
+  {
+    name: "(e) $merge into a second collection (dev-only path)",
+    required: false,
+    run: async (db, prefix) => {
+      await db
+        .collection(`${prefix}_results`)
+        .aggregate([
+          { $project: { _id: 1, uid: 1, score: 1 } },
+          {
+            $merge: {
+              into: `${prefix}_snapshots`,
+              on: "_id",
+              whenMatched: "replace",
+              whenNotMatched: "insert",
+            },
+          },
+        ])
+        .toArray();
+
+      const merged = await db
+        .collection(`${prefix}_snapshots`)
+        .countDocuments({});
+      if (merged !== 3) {
+        throw new Error(`expected 3 merged documents, got ${merged}`);
       }
     },
   },
@@ -139,26 +227,37 @@ async function main(): Promise<void> {
   const dbName = process.env["DB_NAME"] ?? "crococalc";
   if (uri === undefined || uri === "") {
     console.error(
-      "DB_URI is not set. Read it from Key Vault secret mongodb-uri.",
+      "DB_URI is not set. Read it from Key Vault secret mongodb-uri:\n" +
+        "  az keyvault secret show --vault-name kv-crococalc-prod --name mongodb-uri --query value -o tsv",
     );
     process.exit(2);
   }
 
+  // vCore rejects the driver's default retryable writes. Terraform emits a URI
+  // that already disables them; a hand-assembled one may not.
+  if (!/retrywrites=false/i.test(uri)) {
+    console.warn(
+      "WARNING: DB_URI does not contain retrywrites=false. Azure DocumentDB " +
+        "(vCore) rejects retryable writes, so writes may fail.",
+    );
+  }
+
   const prefix = `__probe_${Date.now()}`;
   const client = new MongoClient(uri, { serverSelectionTimeoutMS: 20_000 });
-  const failed: string[] = [];
+  const failedRequired: string[] = [];
+  const failedOptional: string[] = [];
 
   try {
     await client.connect();
     const db = client.db(dbName);
 
-    // Best effort only. serverStatus is restricted on Atlas shared tiers, and a
-    // banner line must never be the thing that decides an $8+/mo upgrade.
+    // Best effort only. serverStatus is documented as unsupported on vCore, and
+    // a banner line must never be the thing that decides a deployment.
     try {
-      const build = await db.admin().serverStatus();
+      const build = await db.command({ buildInfo: 1 });
       console.log(`connected to ${dbName}, server version ${build["version"]}`);
     } catch {
-      console.log(`connected to ${dbName} (serverStatus not permitted)`);
+      console.log(`connected to ${dbName} (buildInfo not permitted)`);
     }
 
     await db.collection(`${prefix}_results`).insertMany([
@@ -177,14 +276,18 @@ async function main(): Promise<void> {
         await clause.run(db, prefix);
         console.log(`PASS ${clause.name}`);
       } catch (error) {
-        failed.push(clause.name);
-        console.error(
-          `FAIL ${clause.name}: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        const message = error instanceof Error ? error.message : String(error);
+        if (clause.required) {
+          failedRequired.push(clause.name);
+          console.error(`FAIL ${clause.name}: ${message}`);
+        } else {
+          failedOptional.push(clause.name);
+          console.warn(`WARN ${clause.name}: ${message}`);
+        }
       }
     }
 
-    for (const suffix of ["results", "users", "snapshots"]) {
+    for (const suffix of ["results", "users", "board", "snapshots"]) {
       await db
         .collection(`${prefix}_${suffix}`)
         .drop()
@@ -194,31 +297,39 @@ async function main(): Promise<void> {
     await client.close();
   }
 
-  if (failed.length === 0) {
+  if (failedOptional.length > 0) {
+    console.warn(
+      `\n${failedOptional.length} optional clause(s) failed: ${failedOptional.join(", ")}\n` +
+        "No production code path depends on these, so this is not a deployment " +
+        "blocker — but backend/src/api/controllers/dev.ts will not work.",
+    );
+  }
+
+  if (failedRequired.length === 0) {
     console.log(
-      "\nAll three clauses passed -> Atlas M0 is the database (INF-057).",
+      "\nEvery required clause ran. Azure DocumentDB is fit for croco calc's DAL.",
     );
     process.exit(0);
   }
 
   console.error(
-    `\n${failed.length} clause(s) failed: ${failed.join(", ")}\n` +
-      'Decision (INF-058): set mongodb_tier = "FLEX" in ' +
-      "infra/terraform/prod/terraform.tfvars, update the cost table in " +
-      "docs/RUNBOOK.md (INF-058a), then apply.",
+    `\n${failedRequired.length} REQUIRED clause(s) failed: ${failedRequired.join(", ")}\n` +
+      "Do NOT deploy: the leaderboards depend on these. No fallback tier is " +
+      "pre-approved and no other engine is pre-approved — moving off Azure " +
+      "DocumentDB is a design change needing human sign-off.",
   );
   process.exit(1);
 }
 
-// Anything that escapes main() is an infrastructure fault, not a verdict on M0.
-// Exit 1 is reserved for "the server rejected a clause"; see the header.
+// Anything that escapes main() is an infrastructure fault, not a verdict on the
+// engine. Exit 1 is reserved for "the server rejected a clause"; see the header.
 try {
   await main();
 } catch (error) {
   console.error(
     `\nThe probe could not run: ${error instanceof Error ? error.message : String(error)}\n` +
-      "This is NOT an M0 incompatibility verdict (INF-058). Check connectivity, " +
-      "credentials and the database user's permissions, then run it again.",
+      "This is NOT an incompatibility verdict. Check connectivity, credentials " +
+      "and the database user's permissions, then run it again.",
   );
   process.exit(3);
 }

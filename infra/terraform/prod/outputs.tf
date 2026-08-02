@@ -21,12 +21,17 @@ output "log_analytics_workspace_id" {
 }
 
 output "mongodb_uri" {
-  description = "Full Atlas SRV URI. Also written to Key Vault as mongodb-uri."
-  value       = module.mongodb_atlas.connection_string
+  description = "Full Azure DocumentDB SRV URI. Also written to Key Vault as mongodb-uri."
+  value       = module.mongodb.connection_string
   sensitive   = true
 }
 
 output "mongodb_tier" {
-  description = "Which side of the INF-058 probe decision is deployed."
-  value       = module.mongodb_atlas.tier
+  description = "Deployed Azure DocumentDB compute tier (INF-062)."
+  value       = module.mongodb.tier
+}
+
+output "mongodb_location" {
+  description = "Region the database landed in. Differs from var.location only on the Free tier."
+  value       = module.mongodb.location
 }

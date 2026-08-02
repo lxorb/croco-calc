@@ -1,20 +1,27 @@
-# Non-secret prod values. INF-076: no secret may appear here. The three
-# sensitive variables are supplied as environment variables only:
+# Non-secret prod values. INF-076: no secret may appear here. The two sensitive
+# variables are supplied as environment variables only:
 #
-#   TF_VAR_atlas_org_id                    (BL-4 — no Atlas org exists yet)
 #   TF_VAR_firebase_service_account_json
 #   TF_VAR_recaptcha_secret
 #
-# plus MONGODB_ATLAS_PUBLIC_KEY / MONGODB_ATLAS_PRIVATE_KEY for the provider.
+# The database needs no credentials of its own any more — it is an Azure
+# resource created with the same azurerm identity as everything else, which is
+# what retired blocker BL-4.
 
 location     = "westeurope"
 frontend_url = "https://crococalc.com"
 db_name      = "crococalc"
 
-# INF-058: flip to "FLEX" only if infra/scripts/db-probe.ts fails, and update
-# the cost table in docs/RUNBOOK.md before applying (INF-058a).
-mongodb_tier = "M0"
-atlas_region = "EUROPE_WEST"
+# Azure DocumentDB (Cosmos DB for MongoDB vCore). INF-062: the cost lever is
+# these two lines. "M10" costs ~$22.56/mo all-in and keeps the database beside
+# the Container App. Switching to the $0 free tier means BOTH:
+#     mongodb_tier     = "Free"
+#     mongodb_location = "northeurope"
+# because Azure does not offer the free tier in westeurope. The free tier also
+# has no backup/restore and no HA — see docs/requirements/06-infra-and-ops.md §3.
+mongodb_tier       = "M10"
+mongodb_location   = "westeurope"
+mongodb_storage_gb = 32
 
 container_cpu       = 0.5
 container_memory    = "1Gi"

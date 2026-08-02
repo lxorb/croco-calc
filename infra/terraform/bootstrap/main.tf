@@ -188,8 +188,9 @@ resource "azurerm_role_assignment" "cicd_self_reader" {
   principal_id         = azurerm_user_assigned_identity.cicd.principal_id
 }
 
-# INF-077: remote state holds the Atlas connection string, so only the operator
-# and the CI identity may read the tfstate container.
+# INF-077: remote state holds the database connection string and its generated
+# password, so only the operator and the CI identity may read the tfstate
+# container.
 resource "azurerm_role_assignment" "cicd_state_blob" {
   scope                = azurerm_storage_account.tfstate.id
   role_definition_name = "Storage Blob Data Contributor"

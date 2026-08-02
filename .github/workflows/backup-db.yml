@@ -1,9 +1,15 @@
 name: backup-db
 
-# INF-061, INF-126. Atlas M0 has no automated backups, so this is the only
-# backup that exists. Weekly `mongodump` into the `backups` container of
+# INF-061, INF-126. Weekly `mongodump` into the `backups` container of
 # stcrococalctfstate; a storage lifecycle rule (bootstrap/main.tf) deletes
 # archives older than 30 days.
+#
+# Amended 2026-08-02 (user decision: MongoDB on Azure). On the deployed M10 tier
+# Azure DocumentDB already takes its own backups and retains them up to 35 days
+# at no extra charge, so this workflow is now defence in depth rather than the
+# only copy — it gives an off-service, restorable-anywhere archive that survives
+# the cluster being deleted. It becomes load-bearing again if the free tier is
+# ever selected (INF-062), because the free tier has no backup/restore at all.
 #
 # INF-086a chose the credential source: the connection string is read from Key
 # Vault with the CI managed identity, NOT stored as a `DB_URI` repository
