@@ -12,7 +12,7 @@
  * each keystroke straight to the engine, so the textarea is a pure focus target.
  */
 
-const el = document.querySelector("#tasksInput") as HTMLTextAreaElement | null;
+const el = document.querySelector<HTMLTextAreaElement>("#tasksInput");
 
 if (el === null) {
   throw new Error("Tasks input element not found");
