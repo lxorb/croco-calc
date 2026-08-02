@@ -479,6 +479,20 @@ describe("result controller test", () => {
       expect(resultAddMock).not.toHaveBeenCalled();
     });
 
+    it("AC-025/C5 — rejects a consistency that disagrees with the task log", async () => {
+      // `consistency` is persisted and rendered in the CP-096 morestats row, but
+      // it is not a PB, leaderboard, CSV or XP input (C5) — so nothing
+      // downstream would have caught a forged value. It was the one metric of
+      // the six the anti-cheat layer did not re-derive.
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({ result: buildCompletedEvent({ consistency: 12.34 }) })
+        .expect(463);
+
+      expect(resultAddMock).not.toHaveBeenCalled();
+    });
+
     it("C37 — rejects idle time longer than the test itself", async () => {
       // Unbounded above in the schema. Left unchecked it makes `calculateXp`
       // produce a negative base, which AC-034 turns into a client-triggerable
@@ -660,7 +674,15 @@ function buildCompletedEvent(result?: Partial<CompletedEvent>): CompletedEvent {
     acc: 100,
     tpm: correct / (TEST_DURATION / 60),
     spm: correct / (TEST_DURATION / 60),
-    consistency: 90,
+    // Derived like every other metric. `honestTaskLog` gives every task the same
+    // response time, so the coefficient of variation is 0 and kogasa reports
+    // 100 (ME-165 / C5). The literal that used to sit here was only accepted
+    // because `assertMetricsMatchTaskLog` never re-derived `consistency` — which
+    // is the hole this fixture must not paper over again.
+    consistency:
+      taskLog === "toolong"
+        ? 90
+        : computeMetrics(taskLog, TEST_DURATION).consistency,
     mode: "time",
     mode2: `${SETTINGS_TIME}`,
     timestamp: Date.now() - 1000,

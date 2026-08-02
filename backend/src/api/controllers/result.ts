@@ -533,7 +533,18 @@ function assertMetricsMatchTaskLog(completedEvent: CompletedEvent): void {
     }
   }
 
-  const rounded: (keyof typeof expected)[] = ["acc", "tpm", "spm"];
+  // `consistency` is re-verified here even though it feeds no PB, leaderboard,
+  // CSV or XP path (C5) — it is persisted on the result and rendered in the
+  // CP-096 `morestats` row, so an unchecked value would be a client-authored
+  // number the server vouches for. `consistencyOf` is deterministic over the
+  // same `taskLog` and both sides `roundTo2` the kogasa output, so the existing
+  // tolerance covers it.
+  const rounded: (keyof typeof expected)[] = [
+    "acc",
+    "tpm",
+    "spm",
+    "consistency",
+  ];
   for (const field of rounded) {
     if (Math.abs(completedEvent[field] - expected[field]) > METRIC_TOLERANCE) {
       throw new CrocoError(
