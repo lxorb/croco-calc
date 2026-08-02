@@ -1,10 +1,38 @@
-import { JSXElement } from "solid-js";
+import { For, JSXElement, Show } from "solid-js";
 
-import { setCommandlineSubgroup } from "../../states/core";
-import { showModal } from "../../states/modals";
+import { COMING_SOON_TOOLTIP, SUPPORT_LINKS } from "../../constants/links";
 import { AnimatedModal } from "../common/AnimatedModal";
+import { Balloon } from "../common/Balloon";
 import { Button } from "../common/Button";
-import { Fa } from "../common/Fa";
+import { Icon } from "../common/Icon";
+
+/**
+ * CP-157 … CP-163.
+ *
+ * monkeytype's `Buy Merch` button is gone (CP-159), leaving three buttons in a
+ * three-column grid (CP-161). Ads, ko-fi and patreon are all deferred, so each
+ * button reads its target from `SUPPORT_LINKS` and renders disabled with a
+ * `coming soon` tooltip while that target is `null`/`false` (CP-162, CP-163).
+ * The tooltip sits on a wrapper because a disabled button sets
+ * `pointer-events: none` and would never see the hover itself.
+ */
+const BUTTONS: { label: string; icon: string; href: () => string | null }[] = [
+  {
+    label: "Enable Ads",
+    icon: "ph:megaphone-bold",
+    href: () => null,
+  },
+  {
+    label: "Donate",
+    icon: "ph:hand-heart-bold",
+    href: () => SUPPORT_LINKS.kofi,
+  },
+  {
+    label: "Join Patreon",
+    icon: "ph:patreon-logo-bold",
+    href: () => SUPPORT_LINKS.patreon,
+  },
+];
 
 export function SupportModal(): JSXElement {
   const buttonClass =
@@ -14,63 +42,51 @@ export function SupportModal(): JSXElement {
   return (
     <AnimatedModal
       id="Support"
-      title="Support Monkeytype"
+      title="Support croco calc"
       modalClass="max-w-4xl"
     >
       <div>
         Thank you so much for thinking about supporting this project. It would
         not be possible without you and your continued support.{" "}
-        <Fa icon="fa-heart" />
+        <Icon icon="ph:heart-fill" />
       </div>
-      <div class="grid grid-cols-1 gap-4 xs:grid-cols-2 md:grid-cols-4">
-        <Button
-          variant="button"
-          onClick={() => {
-            setCommandlineSubgroup("ads");
-            showModal("Commandline");
-          }}
-          fa={{
-            icon: "fa-ad",
-            fixedWidth: true,
-            size: iconScale,
-          }}
-          text="Enable Ads"
-          class={buttonClass}
-        />
-        <Button
-          variant="button"
-          href="https://ko-fi.com/monkeytype"
-          fa={{
-            icon: "fa-donate",
-            fixedWidth: true,
-            size: iconScale,
-          }}
-          text="Donate"
-          class={buttonClass}
-        />
-        <Button
-          variant="button"
-          href="https://www.patreon.com/monkeytype"
-          fa={{
-            variant: "brand",
-            icon: "fa-patreon",
-            fixedWidth: true,
-            size: iconScale,
-          }}
-          text="Join Patreon"
-          class={buttonClass}
-        />
-        <Button
-          variant="button"
-          href="https://monkeytype.store"
-          fa={{
-            icon: "fa-tshirt",
-            fixedWidth: true,
-            size: iconScale,
-          }}
-          text="Buy Merch"
-          class={buttonClass}
-        />
+      <div class="grid grid-cols-1 gap-4 xs:grid-cols-2 md:grid-cols-3">
+        <For each={BUTTONS}>
+          {(button) => (
+            <Show
+              when={button.href()}
+              fallback={
+                <Balloon text={COMING_SOON_TOOLTIP} position="up">
+                  <Button
+                    variant="button"
+                    disabled
+                    icon={{
+                      icon: button.icon,
+                      fixedWidth: true,
+                      size: iconScale,
+                    }}
+                    text={button.label}
+                    class={`${buttonClass} w-full`}
+                  />
+                </Balloon>
+              }
+            >
+              {(href) => (
+                <Button
+                  variant="button"
+                  href={href()}
+                  icon={{
+                    icon: button.icon,
+                    fixedWidth: true,
+                    size: iconScale,
+                  }}
+                  text={button.label}
+                  class={buttonClass}
+                />
+              )}
+            </Show>
+          )}
+        </For>
       </div>
     </AnimatedModal>
   );

@@ -5,6 +5,12 @@ export type ModalId =
   | "Contact"
   | "Support"
   | "Commandline"
+  /**
+   * The theme picker (C9, CP-164 … CP-177). The monkeytype settings page is
+   * deleted, so `custom-setting/Theme.tsx` was extracted into a modal of its
+   * own, opened by the `settings` nav item and by the footer theme indicator.
+   */
+  | "Theme"
   | "DevOptions"
   | "DevInboxPicker"
   | "EventLogViewer"
