@@ -1,0 +1,14 @@
+A minimalist flat vector app icon: a stylised crocodile head in profile, facing right,
+enclosed by a thick rounded-rectangle outline frame that touches the edges of the canvas.
+Single solid colour on a fully transparent background. No gradients, no shading, no second
+colour, no outline strokes in another colour, no text, no letters, no background shape fill,
+no drop shadow, no 3D.
+
+Even, chunky line weights. Large simple geometric forms: a long blocky snout, one round eye
+cut out of the head as negative space, and a row of a few big triangular teeth or back scutes.
+Generous internal padding between the crocodile and the frame. Strictly centred, perfectly
+symmetrical framing.
+
+The mark must stay legible when scaled down to 16x16 pixels, so use very few shapes and keep
+every gap wide. Style reference: modern monoline logo marks with rounded corners, in the
+spirit of a single-colour glyph enclosed by a rounded-rectangle border.

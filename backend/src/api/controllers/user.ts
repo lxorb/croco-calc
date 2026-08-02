@@ -25,7 +25,6 @@ import { purgeUserFromXpLeaderboards } from "../../services/weekly-xp-leaderboar
 import { v4 as uuidv4 } from "uuid";
 import { ObjectId } from "mongodb";
 import * as ReportDAL from "../../dal/report";
-import emailQueue from "../../queues/email-queue";
 import FirebaseAdmin from "../../init/firebase-admin";
 import * as AuthUtil from "../../utils/auth";
 import * as Dates from "date-fns";
@@ -41,7 +40,6 @@ import {
   UserProfileDetails,
 } from "@croco-calc/schemas/users";
 import { addImportantLog, addLog, deleteUserLogs } from "../../dal/logs";
-import { sendForgotPasswordEmail as authSendForgotPasswordEmail } from "../../utils/auth";
 import {
   AddCustomThemeRequest,
   AddCustomThemeResponse,
@@ -139,122 +137,6 @@ export async function createNewUser(
     await firebaseDeleteUserIgnoreError(uid);
     throw e;
   }
-}
-
-export async function sendVerificationEmail(
-  req: MonkeyRequest,
-): Promise<MonkeyResponse> {
-  const { email, uid } = req.ctx.decodedToken;
-  const isVerified = (
-    await FirebaseAdmin()
-      .auth()
-      .getUser(uid)
-      .catch((e: unknown) => {
-        throw new MonkeyError(
-          500, // this should never happen, but it does. it mightve been caused by auth token cache, will see if disabling cache fixes it
-          "Auth user not found, even though the token got decoded",
-          JSON.stringify({
-            uid,
-            email,
-            stack: e instanceof Error ? e.stack : JSON.stringify(e),
-          }),
-          uid,
-        );
-      })
-  ).emailVerified;
-  if (isVerified) {
-    throw new MonkeyError(400, "Email already verified");
-  }
-
-  const userInfo = await UserDAL.getPartialUser(
-    uid,
-    "request verification email",
-    ["uid", "name", "email"],
-  );
-
-  if (userInfo.email !== email) {
-    throw new MonkeyError(
-      400,
-      "Authenticated email does not match the email found in the database. This might happen if you recently changed your email. Please refresh and try again.",
-    );
-  }
-
-  const { data: link, error } = await tryCatch(
-    FirebaseAdmin()
-      .auth()
-      .generateEmailVerificationLink(email, { url: getFrontendUrl() }),
-  );
-
-  if (error) {
-    if (isFirebaseError(error)) {
-      if (error.errorInfo.code === "auth/user-not-found") {
-        throw new MonkeyError(
-          500,
-          "Auth user not found when the user was found in the database. Contact support with this error message and your email",
-          JSON.stringify({
-            decodedTokenEmail: email,
-            userInfoEmail: userInfo.email,
-          }),
-          userInfo.uid,
-        );
-      } else if (error.errorInfo.code === "auth/too-many-requests") {
-        throw new MonkeyError(429, "Too many requests. Please try again later");
-      } else if (
-        error.errorInfo.code === "auth/internal-error" &&
-        error.errorInfo.message.toLowerCase().includes("too_many_attempts")
-      ) {
-        throw new MonkeyError(
-          429,
-          "Too many Firebase requests. Please try again later",
-        );
-      } else {
-        throw new MonkeyError(
-          500,
-          `Firebase failed to generate an email verification link: ${
-            error.errorInfo.message
-          }`,
-          JSON.stringify(error),
-        );
-      }
-    } else {
-      const message = getErrorMessage(error);
-      if (message === undefined) {
-        throw new MonkeyError(
-          500,
-          "Failed to generate an email verification link. Unknown error occured",
-        );
-      } else {
-        if (message.toLowerCase().includes("too_many_attempts")) {
-          throw new MonkeyError(
-            429,
-            "Too many requests. Please try again later",
-          );
-        } else {
-          throw new MonkeyError(
-            500,
-            `Failed to generate an email verification link: ${message}`,
-            error.stack,
-          );
-        }
-      }
-    }
-  }
-
-  await emailQueue.sendVerificationEmail(email, userInfo.name, link);
-
-  return new MonkeyResponse("Email sent", null);
-}
-
-export async function sendForgotPasswordEmail(
-  req: MonkeyRequest<undefined, ForgotPasswordEmailRequest>,
-): Promise<MonkeyResponse> {
-  const { email, captcha } = req.body;
-  await verifyCaptcha(captcha);
-  await authSendForgotPasswordEmail(email);
-  return new MonkeyResponse(
-    "Password reset request received. If the email is valid, you will receive an email shortly.",
-    null,
-  );
 }
 
 export async function deleteUser(req: MonkeyRequest): Promise<MonkeyResponse> {
