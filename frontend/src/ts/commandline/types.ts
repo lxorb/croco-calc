@@ -17,8 +17,8 @@ export type Command = {
   subgroup?: CommandsSubgroup;
   found?: boolean;
   /** C30 — an iconify id (`ph:*` / `tabler:*`). monkeytype's companion
-   * `iconType: "regular" | "solid"` picked between `fa-regular` and `fa-solid`
-   * and is deleted with the rest of font awesome. */
+   * `iconType: "regular" | "solid"` selected a font awesome style variant and
+   * is deleted along with the rest of that icon set. */
   icon?: string;
   sticky?: boolean;
   alias?: string;

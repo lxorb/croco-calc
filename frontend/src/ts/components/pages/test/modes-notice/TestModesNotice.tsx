@@ -47,7 +47,9 @@ function Repeated() {
     <Notice
       when={isRepeated()}
       class="text-error"
-      icon="ph:arrows-clockwise-bold"
+      // SB-061 / C10 — the notice strip sits under the bar and may not mix icon
+      // collections, so it draws from SB-060's tabler set like the bar itself.
+      icon="tabler:refresh"
       text="repeated"
     />
   );
