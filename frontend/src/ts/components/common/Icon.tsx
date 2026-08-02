@@ -8,7 +8,7 @@ import { cn } from "../../utils/cn";
  * Icons are Iconify ids written as auditable `set:name` literals (CP-002).
  * Bodies are generated into the block at the bottom of this file by
  * `frontend/vite-plugins/icons.ts`, so the browser never requests
- * `api.iconify.design` — the app works offline and behind a strict CSP
+ * the iconify HTTP API — the app works offline and behind a strict CSP
  * (SB-063, AC-021).
  *
  * The rendered `<svg>` is `1em` tall and filled with `currentColor`, so it
@@ -148,7 +148,7 @@ export function Icon(props: IconProps): JSXElement {
 
 // #region GENERATED ICON BUNDLE
 // Regenerate with `npx tsx ./vite-plugins/icons.ts` — see frontend/vite-plugins/icons.ts.
-// Bodies are inlined so the runtime never requests api.iconify.design
+// Bodies are inlined so the runtime never requests the iconify HTTP API
 // (SB-063, AC-021).
 
 const ICON_BODIES: Record<string, string> = {
