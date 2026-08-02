@@ -5,7 +5,6 @@ import {
   createTestSeed,
   generateSequence,
   generateTask,
-  generateTaskAt,
   generateTasks,
 } from "../src/generate";
 import {
@@ -305,10 +304,73 @@ describe("determinism (ME-008, ME-169 … ME-172)", () => {
     }
   });
 
-  it("ME-170: a task does not depend on how many tasks were generated before it", () => {
+  it("ME-170: a task's PRNG sub-stream does not depend on how many came before", () => {
     const direct = generateTask(SEED, 500, DEFAULT_MATH_SETTINGS);
     const viaBatch = generateTasks(SEED, DEFAULT_MATH_SETTINGS, 500, 1)[0];
     expect(viaBatch?.taskSeed).toBe(direct.taskSeed);
+    expect(viaBatch).toEqual(direct);
+  });
+
+  /**
+   * ME-008 + ME-125. The dedup rule chains task `i` to task `i-1`, so an entry
+   * point that skips the chain returns a *different* task at the same index —
+   * and the backend's ME-174 revalidation would reject the resulting log. Every
+   * published entry point must therefore agree with `generateSequence`.
+   *
+   * The three settings below are the ones where divergence is most likely: a
+   * small task pool means frequent duplicate prompts and therefore frequent
+   * regeneration. `multiplication: "12"` has only 121 distinct prompt shapes.
+   */
+  it("ME-008/ME-125: every entry point agrees with the canonical sequence", () => {
+    const cases: MathSettings[] = [
+      DEFAULT_MATH_SETTINGS,
+      settings({ addition: "100" }),
+      settings({
+        addition: "off",
+        multiplication: "12",
+        division: "off",
+        fractionAddition: "off",
+        fractionMultiplication: false,
+        decimals: false,
+        negatives: false,
+      }),
+      settings({
+        addition: "off",
+        multiplication: "off",
+        division: "off",
+        fractionAddition: "12",
+        fractionMultiplication: false,
+        decimals: false,
+        negatives: false,
+      }),
+    ];
+
+    for (const s of cases) {
+      const sequence = generateSequence(SEED, s, 620);
+      for (let index = 0; index < 600; index += 13) {
+        expect(generateTask(SEED, index, s), `index ${index}`).toEqual(
+          sequence[index],
+        );
+      }
+      for (const from of [0, 1, 59, 200, 599]) {
+        expect(generateTasks(SEED, s, from, 5), `from ${from}`).toEqual(
+          sequence.slice(from, from + 5),
+        );
+      }
+      const batcher = createTaskBatcher(SEED, s);
+      for (let i = 0; i < 300; i++) expect(batcher.take()).toEqual(sequence[i]);
+    }
+  });
+
+  it("rejects a task index that is not a non-negative integer", () => {
+    for (const bad of [-1, 1.5, Number.NaN]) {
+      expect(() => generateTask(SEED, bad, DEFAULT_MATH_SETTINGS)).toThrow(
+        MathGenError,
+      );
+      expect(() => generateTasks(SEED, DEFAULT_MATH_SETTINGS, bad, 5)).toThrow(
+        MathGenError,
+      );
+    }
   });
 
   it("ME-171: the whole sequence is recomputable from (seed, settings)", () => {
@@ -343,10 +405,10 @@ describe("determinism (ME-008, ME-169 … ME-172)", () => {
     expect(a).toEqual(b);
   });
 
-  it("generateTaskAt reproduces the sequence exactly (ME-174/ME-176 support)", () => {
+  it("generateTask reproduces the sequence exactly (ME-174/ME-176 support)", () => {
     const sequence = generateSequence(SEED, DEFAULT_MATH_SETTINGS, 400);
     for (const index of [0, 1, 2, 13, 99, 250, 399]) {
-      expect(generateTaskAt(SEED, DEFAULT_MATH_SETTINGS, index)).toEqual(
+      expect(generateTask(SEED, index, DEFAULT_MATH_SETTINGS)).toEqual(
         sequence[index],
       );
     }

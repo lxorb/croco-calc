@@ -11,12 +11,14 @@ import {
   cycleSetting,
   enabledGeneratorCount,
   getEnabledKinds,
-  isDefaultTaskSettings,
-  isLeaderboardEligible,
   nextSettingValue,
   wouldBeAllOff,
 } from "../src/settings";
+import * as settingsModule from "../src/settings";
+import * as engine from "../src/index";
 import { MathGenError } from "../src/errors";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { MathSettings } from "../src/types";
 
 const D = DEFAULT_MATH_SETTINGS;
@@ -448,37 +450,61 @@ describe("cycling (ME-010, ME-015, SB-102)", () => {
   });
 });
 
-describe("leaderboard eligibility (ME-017, ME-018)", () => {
-  it("ME-017: time is excluded from the default-settings check", () => {
-    expect(isDefaultTaskSettings(D)).toBe(true);
+/**
+ * C4 / SB-174 — the leaderboard baseline is a **frozen literal** owned by
+ * `packages/schemas` (`LEADERBOARD_SETTINGS_ID`), never a comparison against the
+ * product defaults. A defaults-derived predicate silently re-scopes every
+ * historical entry the day a default changes, which is exactly what SB-174
+ * exists to prevent. This engine therefore ships no such predicate at all, and
+ * these tests are the regression guard.
+ */
+describe("leaderboard eligibility stays out of the engine (C4, SB-174)", () => {
+  const BANNED = /leaderboard|eligib|defaultsettings|defaulttasksettings/i;
+
+  it("the settings module exports no eligibility predicate", () => {
+    const offenders = Object.keys(settingsModule).filter((key) =>
+      BANNED.test(key),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("the published API surface exports no eligibility predicate", () => {
+    const offenders = Object.keys(engine).filter((key) => BANNED.test(key));
+    expect(offenders).toEqual([]);
+  });
+
+  it("no source file compares a settings snapshot against the defaults", () => {
+    // `DEFAULT_MATH_SETTINGS[` is how such a predicate is necessarily written.
+    const source = readFileSync(
+      fileURLToPath(new URL("../src/settings.ts", import.meta.url)),
+      "utf8",
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(source).not.toMatch(/DEFAULT_MATH_SETTINGS\s*\[/);
+  });
+
+  /**
+   * SB-171: the shipped defaults currently *coincide* with the frozen baseline.
+   * That is a fact about today's defaults, not a derivation — if this fails,
+   * ME-011's defaults were changed and moving the leaderboard baseline to match
+   * is a separate, deliberately reviewed act (SB-174), not an automatic one.
+   */
+  it("SB-171: the defaults still spell out the frozen baseline literal", () => {
+    const signature = [
+      D.addition,
+      D.multiplication,
+      D.division,
+      D.fractionAddition,
+      D.fractionMultiplication ? "1" : "0",
+      D.decimals ? "1" : "0",
+      D.negatives ? "1" : "0",
+    ].join(":");
+    expect(signature).toBe("1000:100:threeByTwo:99:1:1:1");
+  });
+
+  it("ME-013 / SB-172: `time` is not part of that signature", () => {
     for (const time of TIME_VALUES) {
-      expect(isDefaultTaskSettings(settings({ time }))).toBe(true);
+      expect(settings({ time }).time).toBe(time);
     }
-  });
-
-  it("ME-017: any non-default task control breaks it", () => {
-    expect(isDefaultTaskSettings(settings({ addition: "100" }))).toBe(false);
-    expect(isDefaultTaskSettings(settings({ multiplication: "20" }))).toBe(
-      false,
-    );
-    expect(isDefaultTaskSettings(settings({ division: "tables" }))).toBe(false);
-    expect(isDefaultTaskSettings(settings({ fractionAddition: "12" }))).toBe(
-      false,
-    );
-    expect(
-      isDefaultTaskSettings(settings({ fractionMultiplication: false })),
-    ).toBe(false);
-    expect(isDefaultTaskSettings(settings({ decimals: false }))).toBe(false);
-    expect(isDefaultTaskSettings(settings({ negatives: false }))).toBe(false);
-  });
-
-  it("ME-018: eligible only at time 4 or 8", () => {
-    expect(isLeaderboardEligible(settings({ time: 8 }))).toBe(true);
-    expect(isLeaderboardEligible(settings({ time: 4 }))).toBe(true);
-    expect(isLeaderboardEligible(settings({ time: 2 }))).toBe(false);
-    expect(isLeaderboardEligible(settings({ time: 1 }))).toBe(false);
-    expect(isLeaderboardEligible(settings({ time: 8, negatives: false }))).toBe(
-      false,
-    );
+    expect(SETTING_KEYS.slice(0, 7)).not.toContain("time");
   });
 });

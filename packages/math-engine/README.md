@@ -34,6 +34,7 @@ the code cannot live under `frontend/src` (C26). The frontend's
 ```ts
 import {
   generateTask,        // ME-008 — pure (seed, index, settings) -> Task
+  generateTasks,       // (seed, settings, from, count) -> the matching slice
   generateSequence,    // the canonical 0..n-1 sequence (server revalidation)
   createTaskBatcher,   // ME-158 — the rolling 60/30/15 batch
   isAnswerCorrect,     // ME-147 — exact rational judging
@@ -44,10 +45,43 @@ import {
 } from "@croco-calc/math-engine";
 ```
 
+**All four generation entry points return exactly the same tasks.** ME-125 chains
+task `i` to task `i-1` (a repeated prompt is regenerated), so a task index is only
+meaningful relative to the whole prefix. There is deliberately no `previousPrompt`
+parameter on the public surface: an optional one would let a caller write the
+documented `generateTask(seed, index, settings)` and get a task that is *not* the
+one at that index, which the backend's ME-174 revalidation then rejects on a
+legitimate run. `generateTask` and `generateTasks` walk the chain themselves
+(O(index), a few hundred tasks per run); `createTaskBatcher` owns its own tail and
+is the one to use in the live test loop.
+
 `src/index.ts` is the full surface; the settings model (`DEFAULT_MATH_SETTINGS`,
 `applyCoupling`, `cycleSetting`, `wouldBeAllOff`) is consumed by the settings bar,
 and the anti-cheat surface (`checkPlausibility`, `revalidateResult`,
 `checkEngineVersion`) by the backend.
+
+Leaderboard eligibility is **not** here. C4/SB-174 make
+`LEADERBOARD_SETTINGS_ID` a frozen literal in `packages/schemas`, precisely so a
+change to the product defaults cannot silently re-scope historical results; use
+`isDefaultSettingsId` / `isLeaderboardEligible` from `@croco-calc/schemas`.
+
+## Running the golden vectors in the frontend and backend (ME-178, DoD-18)
+
+The fixture must execute under **both** vitest projects. Those projects are owned
+by WP-06 and WP-10, so this package ships the suite with the runner injected. Each
+side adds one spec file, verbatim:
+
+```ts
+// frontend/__tests__/math/golden-vectors.spec.ts
+// backend/__tests__/math/golden-vectors.spec.ts
+import { describe, it } from "vitest";
+import { runGoldenVectorSuite } from "@croco-calc/math-engine";
+
+runGoldenVectorSuite({ describe, it });
+```
+
+plus `"@croco-calc/math-engine": "workspace:*"` in that package's
+`devDependencies`. The suite imports no test framework, so ME-002 still holds.
 
 ## Bumping the version
 

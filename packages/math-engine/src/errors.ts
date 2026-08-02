@@ -17,7 +17,13 @@ export type MathGenErrorCode =
    */
   | "fraction-multiplication-without-multiplication"
   /** A rejection-sampling or resampling loop could not be satisfied. */
-  | "sampling-exhausted";
+  | "sampling-exhausted"
+  /**
+   * A task index was not a non-negative integer. Indices address positions in
+   * the canonical sequence (ME-171), so a fractional or negative one has no
+   * meaning and must not be coerced.
+   */
+  | "invalid-task-index";
 
 export class MathGenError extends Error {
   public readonly code: MathGenErrorCode;

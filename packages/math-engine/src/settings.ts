@@ -58,7 +58,15 @@ export const MATH_SETTING_VALUES = {
   time: TIME_VALUES,
 } as const satisfies { [K in MathSettingKey]: readonly MathSettings[K][] };
 
-/** ME-011 — the shipped defaults, and what "reset settings" restores. */
+/**
+ * ME-011 — the shipped defaults, and what "reset settings" restores.
+ *
+ * SB-110 makes `frontend/src/ts/constants/default-config.ts` the app-level
+ * single source of truth; its eight math keys MUST be these values (WP-05
+ * imports them from here rather than restating them). This is a product
+ * default, **not** a leaderboard baseline: SB-174 keeps those two apart on
+ * purpose — see the note at the bottom of this file.
+ */
 export const DEFAULT_MATH_SETTINGS: MathSettings = {
   addition: "1000",
   multiplication: "100",
@@ -231,25 +239,23 @@ export function cycleSetting(
   return applyCoupling(current, key, nextSettingValue(current, key));
 }
 
-/**
- * ME-017 as amended by C4 — the seven task controls equal the defaults.
- * `time` is deliberately **excluded**: the brief allows both a 4- and an
- * 8-minute leaderboard while the default time is 8.
+/*
+ * ME-017 / ME-018 (leaderboard eligibility) are deliberately **not implemented
+ * here**, and this package must never grow such a predicate.
  *
- * The persisted leaderboard key is `settingsId` (SB-170, owned by
- * `packages/schemas`); this predicate is its value-level equivalent and must
- * only ever be evaluated on the server (ME-019).
+ * C4 rules that the leaderboard key is the persisted `settingsId` and that
+ * `LEADERBOARD_SETTINGS_ID` is a frozen literal (SB-173/SB-174), precisely so
+ * that changing a product default cannot silently re-scope every historical
+ * entry. A predicate that compares a settings snapshot against
+ * `DEFAULT_MATH_SETTINGS` is exactly the derivation SB-174 forbids, whatever it
+ * is named.
+ *
+ * The single implementation lives in `packages/schemas/src/math.ts`:
+ *   LEADERBOARD_SETTINGS_ID   — the frozen literal "1000:100:threeByTwo:99:1:1:1"
+ *   buildSettingsId(settings) — SB-170's `:`-joined signature
+ *   isDefaultSettingsId(id)   — ME-017, server-side only (ME-019)
+ *   isLeaderboardEligible(id, mode2) — SB-175 / C31
+ *
+ * `__tests__/settings.spec.ts` asserts that this module exports no eligibility
+ * predicate, so the violation cannot come back by accident.
  */
-export function isDefaultTaskSettings(settings: MathSettings): boolean {
-  return SETTING_KEYS.every(
-    (key) => key === "time" || settings[key] === DEFAULT_MATH_SETTINGS[key],
-  );
-}
-
-/** ME-018 — default task settings **and** `time` of 4 or 8 minutes. */
-export function isLeaderboardEligible(settings: MathSettings): boolean {
-  return (
-    isDefaultTaskSettings(settings) &&
-    (settings.time === 4 || settings.time === 8)
-  );
-}

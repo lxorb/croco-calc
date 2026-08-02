@@ -70,7 +70,11 @@ export {
 } from "./prng";
 export type { Prng } from "./prng";
 
-// -- settings, coupling and guards (ME-009 … ME-018, ME-082 … ME-089) --------
+// -- settings, coupling and guards (ME-009 … ME-016, ME-082 … ME-089) --------
+//
+// ME-017/ME-018 (leaderboard eligibility) are **not** here: C4/SB-174 put the
+// frozen `LEADERBOARD_SETTINGS_ID` and its predicates in `packages/schemas`, so
+// that a change to the product defaults cannot move the historical baseline.
 export {
   BATCH_EXTENSION_SIZE,
   BATCH_REFILL_THRESHOLD,
@@ -87,9 +91,7 @@ export {
   enabledGeneratorCount,
   getDecimalBaseKinds,
   getEnabledKinds,
-  isDefaultTaskSettings,
   isGeneratorEnabled,
-  isLeaderboardEligible,
   nextSettingValue,
   wouldBeAllOff,
 } from "./settings";
@@ -117,13 +119,16 @@ export {
 } from "./render";
 
 // -- generation (ME-003 … ME-008, ME-109 … ME-126, ME-158) -------------------
+//
+// All four entry points agree with `generateSequence` by construction — there is
+// no `previousPrompt` parameter to omit and no second, subtly different task at
+// a given index. See the note on `drawTask` in `./generate`.
 export {
   DUPLICATE_PROMPT_ATTEMPT_CAP,
   createTaskBatcher,
   createTestSeed,
   generateSequence,
   generateTask,
-  generateTaskAt,
   generateTasks,
 } from "./generate";
 export type { TaskBatcher } from "./generate";
@@ -234,5 +239,11 @@ export {
 export type { EngineVersionStatus } from "./version";
 
 // -- golden vectors (ME-178) -------------------------------------------------
+//
+// `runGoldenVectorSuite` is the drop-in the frontend and backend vitest projects
+// register so the fixture executes in both runtimes (DoD-18). See the file
+// header of `./golden-vector-suite` for the three lines each side needs.
 export { GOLDEN_VECTORS, verifyGoldenVectors } from "./golden-vectors";
 export type { GoldenVector } from "./golden-vectors";
+export { runGoldenVectorSuite } from "./golden-vector-suite";
+export type { TestRunner } from "./golden-vector-suite";

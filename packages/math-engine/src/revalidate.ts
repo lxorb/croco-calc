@@ -10,7 +10,7 @@
  * replace them.
  */
 
-import { generateSequence, generateTask } from "./generate";
+import { generateSequence } from "./generate";
 import { judgeAnswer } from "./judge";
 import type { MathSettings, TaskLogEntry } from "./types";
 import { checkEngineVersion } from "./version";
@@ -211,17 +211,35 @@ function revalidateSampled(
 ): RevalidationResult {
   const count = input.committedCount ?? 0;
   const indices = sampleIndices(count);
+  if (indices.length === 0) {
+    return { ok: failures.length === 0, failures, checked: 0, sampled: true };
+  }
+
+  // ME-125 chains task `i` to task `i-1`, so the canonical task at a sampled
+  // index is only defined relative to the whole prefix. Regenerate the prefix
+  // once rather than walking it again per sampled index.
+  let regenerated;
+  try {
+    regenerated = generateSequence(input.mathSeed, input.mathSettings, count);
+  } catch (error) {
+    failures.push({
+      code: "regeneration-failed",
+      index: -1,
+      message: `could not regenerate the sequence: ${String(error)}`,
+    });
+    return { ok: false, failures, checked: 0, sampled: true };
+  }
+
   for (const index of indices) {
-    try {
-      generateTask(input.mathSeed, index, input.mathSettings);
-    } catch (error) {
+    if (regenerated[index] === undefined) {
       failures.push({
         code: "regeneration-failed",
         index,
-        message: `could not regenerate task ${index}: ${String(error)}`,
+        message: `no task was regenerated at sampled index ${index}`,
       });
     }
   }
+
   return {
     ok: failures.length === 0,
     failures,

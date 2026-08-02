@@ -201,24 +201,10 @@ function drawOnce(
 }
 
 /**
- * ME-008 — the single generation entry point. Pure: the same
- * `(seed, index, settings, previousPrompt)` always produces the identical Task.
- *
- * `previousPrompt` implements ME-125's "no two consecutive tasks with an
- * identical prompt string". It is an explicit parameter rather than hidden state
- * so that purity (ME-170) survives: omit it and you get the un-deduplicated draw
- * for that index, which is what `index === 0` always is.
- *
- * Regeneration keeps drawing from the task's own sub-stream and never reseeds
- * (ME-172), so the retry count is itself deterministic and is recorded on the
- * Task as `attempts`.
+ * Resolves (and validates) the enabled-kind set once per call chain, so walking
+ * a sequence does not re-derive it per task.
  */
-export function generateTask(
-  seed: number,
-  index: number,
-  settings: MathSettings,
-  previousPrompt?: string,
-): Task {
+function resolveEnabled(settings: MathSettings): TaskKind[] {
   assertGeneratable(settings);
   const enabled = getEnabledKinds(settings);
   if (enabled.length === 0) {
@@ -227,7 +213,31 @@ export function generateTask(
       "at least one task type must be enabled (ME-016)",
     );
   }
+  return enabled;
+}
 
+/**
+ * One link of the canonical chain. **Deliberately not exported.**
+ *
+ * `previousPrompt` implements ME-125's "no two consecutive tasks with an
+ * identical prompt string", which makes task `i` depend on task `i-1`. Exposing
+ * it as an optional public parameter would let a caller follow ME-008's
+ * documented `generateTask(seed, index, settings)` shape and silently get a task
+ * that is *not* the one at that index of the canonical sequence — the backend's
+ * ME-174 revalidation would then reject a legitimate run. So the only public
+ * entry points are the ones that walk the chain themselves.
+ *
+ * Regeneration keeps drawing from the task's own sub-stream and never reseeds
+ * (ME-172), so the retry count is itself deterministic and is recorded on the
+ * Task as `attempts`.
+ */
+function drawTask(
+  seed: number,
+  index: number,
+  settings: MathSettings,
+  enabled: readonly TaskKind[],
+  previousPrompt: string | undefined,
+): Task {
   const taskSeed = deriveTaskSeed(seed, index);
   const rng = createPrng(taskSeed);
 
@@ -244,20 +254,20 @@ export function generateTask(
 }
 
 /**
- * ME-158 / ME-174 — generates `count` tasks starting at `from`, threading each
- * task's prompt into the next so the ME-125 guarantee holds across the batch.
+ * The canonical sequence `0 … count-1`. This is what the backend regenerates to
+ * revalidate a submitted result (ME-174), and it is the definition every other
+ * entry point here agrees with by construction.
  */
-export function generateTasks(
+export function generateSequence(
   seed: number,
   settings: MathSettings,
-  from: number,
   count: number,
-  previousPrompt?: string,
 ): Task[] {
+  const enabled = resolveEnabled(settings);
   const tasks: Task[] = [];
-  let previous = previousPrompt;
+  let previous: string | undefined;
   for (let i = 0; i < count; i++) {
-    const task = generateTask(seed, from + i, settings, previous);
+    const task = drawTask(seed, i, settings, enabled, previous);
     tasks.push(task);
     previous = task.prompt;
   }
@@ -265,37 +275,60 @@ export function generateTasks(
 }
 
 /**
- * The canonical sequence `0 … count-1`. This is what the backend regenerates to
- * revalidate a submitted result (ME-174).
- */
-export function generateSequence(
-  seed: number,
-  settings: MathSettings,
-  count: number,
-): Task[] {
-  return generateTasks(seed, settings, 0, count);
-}
-
-/**
- * Exact random access to one index of the canonical sequence.
+ * ME-008 — the single generation entry point, of exactly the shape the spec
+ * names. Pure: the same `(seed, index, settings)` always produces the identical
+ * Task, and that Task is always `generateSequence(seed, settings, n)[index]`.
  *
- * ME-125's dedup makes task `i` depend on task `i-1`'s final prompt, so this
- * walks the chain from 0. That is O(index) — cheap at croco calc's scale (an
- * 8-minute run is a few hundred tasks) and exact, which matters for ME-176's
- * sampled revalidation. Prefer `generateSequence` when you need many indices.
+ * ME-125's dedup makes task `i` depend on task `i-1`, so this walks the chain
+ * from 0. That is O(index) — cheap at croco calc's scale (an 8-minute run is a
+ * few hundred tasks) and, crucially, exact. Use `createTaskBatcher` for the live
+ * test loop and `generateSequence` when you need many indices.
  */
-export function generateTaskAt(
+export function generateTask(
   seed: number,
-  settings: MathSettings,
   index: number,
+  settings: MathSettings,
 ): Task {
-  let previous: string | undefined;
+  if (!Number.isInteger(index) || index < 0) {
+    throw new MathGenError(
+      "invalid-task-index",
+      `task index must be a non-negative integer, got ${String(index)}`,
+    );
+  }
+  const enabled = resolveEnabled(settings);
   let task: Task | undefined;
+  let previous: string | undefined;
   for (let i = 0; i <= index; i++) {
-    task = generateTask(seed, i, settings, previous);
+    task = drawTask(seed, i, settings, enabled, previous);
     previous = task.prompt;
   }
   return task as Task;
+}
+
+/**
+ * ME-158 / ME-174 — tasks `from … from+count-1` of the canonical sequence.
+ *
+ * Like `generateTask` this walks from 0, so the window it returns is always the
+ * matching slice of `generateSequence`. There is no `previousPrompt` escape
+ * hatch for the same reason.
+ */
+export function generateTasks(
+  seed: number,
+  settings: MathSettings,
+  from: number,
+  count: number,
+): Task[] {
+  if (!Number.isInteger(from) || from < 0) {
+    throw new MathGenError(
+      "invalid-task-index",
+      `task index must be a non-negative integer, got ${String(from)}`,
+    );
+  }
+  if (count <= 0) {
+    resolveEnabled(settings);
+    return [];
+  }
+  return generateSequence(seed, settings, from + count).slice(from);
 }
 
 /**
@@ -338,21 +371,27 @@ export function createTaskBatcher(
   seed: number,
   settings: MathSettings,
 ): TaskBatcher {
-  const tasks: Task[] = generateTasks(seed, settings, 0, INITIAL_BATCH_SIZE);
+  // The batcher is the one place that may extend the chain incrementally: it
+  // owns the tail prompt, so it stays on the canonical sequence by construction
+  // and does not pay `generateTask`'s O(index) walk on every refill.
+  const enabled = resolveEnabled(settings);
+  const tasks: Task[] = [];
   let consumed = 0;
+
+  function extend(count: number): void {
+    let previous = tasks[tasks.length - 1]?.prompt;
+    for (let i = 0; i < count; i++) {
+      const task = drawTask(seed, tasks.length, settings, enabled, previous);
+      tasks.push(task);
+      previous = task.prompt;
+    }
+  }
+
+  extend(INITIAL_BATCH_SIZE);
 
   function refill(): void {
     while (tasks.length - consumed < BATCH_REFILL_THRESHOLD) {
-      const previous = tasks[tasks.length - 1]?.prompt;
-      tasks.push(
-        ...generateTasks(
-          seed,
-          settings,
-          tasks.length,
-          BATCH_EXTENSION_SIZE,
-          previous,
-        ),
-      );
+      extend(BATCH_EXTENSION_SIZE);
     }
   }
 

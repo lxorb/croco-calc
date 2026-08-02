@@ -22,8 +22,20 @@ describe("the five interfaces WP-05/WP-06 depend on", () => {
     expect(typeof api.generateTask).toBe("function");
     expect(typeof api.generateTasks).toBe("function");
     expect(typeof api.generateSequence).toBe("function");
-    expect(typeof api.generateTaskAt).toBe("function");
     expect(typeof api.createTaskBatcher).toBe("function");
+  });
+
+  /**
+   * ME-008 names the entry point `generateTask(seed, index, settings)`. A
+   * consumer that types out exactly that signature must get exactly the task at
+   * that index of the canonical sequence — no optional fourth argument whose
+   * omission silently yields a different task the backend would then reject
+   * (ME-174).
+   */
+  it("generateTask takes exactly (seed, index, settings)", () => {
+    expect(api.generateTask.length).toBe(3);
+    expect(api.generateTasks.length).toBe(4);
+    expect(api.generateSequence.length).toBe(3);
   });
 
   it("publishes isAnswerCorrect", () => {
@@ -48,7 +60,33 @@ describe("the five interfaces WP-05/WP-06 depend on", () => {
 
   it("publishes the golden-vector fixture", () => {
     expect(Array.isArray(api.GOLDEN_VECTORS)).toBe(true);
+    expect(api.GOLDEN_VECTORS.length).toBeGreaterThanOrEqual(10);
     expect(api.verifyGoldenVectors()).toEqual([]);
+  });
+
+  /**
+   * ME-178 / DoD-18 — the fixture has to execute under the frontend *and* the
+   * backend vitest projects. Those projects belong to WP-06/WP-10, so this
+   * package ships the suite runner-agnostically and each side registers it.
+   */
+  it("publishes a runner-agnostic golden-vector suite for both projects", () => {
+    expect(typeof api.runGoldenVectorSuite).toBe("function");
+
+    const registered: string[] = [];
+    const bodies: (() => void)[] = [];
+    api.runGoldenVectorSuite({
+      describe: (_name, body) => body(),
+      it: (name, body) => {
+        registered.push(name);
+        bodies.push(body);
+      },
+    });
+
+    expect(registered.length).toBe(api.GOLDEN_VECTORS.length + 2);
+    for (const vector of api.GOLDEN_VECTORS) {
+      expect(registered).toContain(`reproduces ${vector.id}`);
+    }
+    for (const body of bodies) expect(() => body()).not.toThrow();
   });
 });
 
