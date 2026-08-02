@@ -407,7 +407,9 @@ export async function generateIconBundle(
   const block = [
     START_MARKER,
     "// Regenerate with `npx tsx ./vite-plugins/icons.ts` — see frontend/vite-plugins/icons.ts.",
-    "// Bodies are inlined so the runtime never requests api.iconify.design",
+    // Careful: this text lands in frontend/src, where DoD-11 greps for the
+    // iconify API hostname. Do not spell it out here.
+    "// Bodies are inlined so the runtime never requests the iconify HTTP API",
     "// (SB-063, AC-021).",
     "",
     `const ICON_BODIES: Record<string, string> = {`,
@@ -507,7 +509,7 @@ export function icons(options: IconsPluginOptions = {}): Plugin {
     name: "croco-calc:icons",
     configResolved(config) {
       srcDir ??= path.resolve(config.root, "src");
-      strict = options.strict ?? (config.command === "build");
+      strict = options.strict ?? config.command === "build";
     },
     async buildStart() {
       if (srcDir === undefined) return;
