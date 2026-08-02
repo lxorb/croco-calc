@@ -1,11 +1,18 @@
+/**
+ * The share image (INV-092, CP-123 item 5, CP-129).
+ *
+ * Kept from upstream in full; what went is everything the results screen no
+ * longer has — the replay block (CP-124), the funbox global-CSS hooks
+ * (INV-093), the per-keystroke highlight overlays (CP-036) and the ad wrappers
+ * (CP-006, CP-125). The watermark reads croco calc's domain (CP-129).
+ */
+
 import { showLoaderBar, hideLoaderBar } from "../states/loader-bar";
-import * as Replay from "./replay-ui";
 import {
   getActivePage,
   isAuthenticated,
   setIsScreenshotting,
 } from "../states/core";
-import { getActiveFunboxesWithFunction } from "./funbox/list";
 import * as DB from "../db";
 import { format } from "date-fns/format";
 import { getHtmlByUserFlags } from "../controllers/user-flag-controller";
@@ -15,34 +22,25 @@ import {
   showSuccessNotification,
 } from "../states/notifications";
 import { convertRemToPixels } from "../utils/numbers";
-import { qs, qsa } from "../utils/dom";
+import { qs } from "../utils/dom";
 import { getTheme } from "../states/theme";
 import { download as downloadFile } from "../utils/misc";
 import { getResultVisible } from "../states/test";
-
-let revealReplay = false;
+import { SITE_DOMAIN } from "./result";
 
 function revert(): void {
   setIsScreenshotting(false);
   hideLoaderBar();
-  qs("#ad-result-wrapper")?.show();
-  qs("#ad-result-small-wrapper")?.show();
   qs(".pageTest .ssWatermark")?.hide();
-  qs(".pageTest .ssWatermark")?.setText("monkeytype.com"); // Reset watermark text
+  qs(".pageTest .ssWatermark")?.setText(SITE_DOMAIN);
   qs(".pageTest .buttons")?.show();
   qs("noscript")?.show();
   qs("#nocss")?.show();
   qs("#result")?.removeClass("noBalloons");
-  qs(".wordInputHighlight")?.show();
-  qsa(".highlightContainer")?.show();
-  if (revealReplay) qs("#resultReplay")?.show();
   if (!isAuthenticated()) {
     qs(".pageTest .loginTip")?.show();
   }
   qs("html")?.setStyle({ scrollBehavior: "smooth" });
-  for (const fb of getActiveFunboxesWithFunction("applyGlobalCSS")) {
-    fb.functions.applyGlobalCSS();
-  }
 }
 
 let firefoxClipboardNotificationShown = false;
@@ -56,18 +54,12 @@ async function generateCanvas(): Promise<HTMLCanvasElement | null> {
   const { domToCanvas } = await import("modern-screenshot");
   showLoaderBar(true);
 
-  if (!qs("#resultReplay")?.hasClass("hidden")) {
-    revealReplay = true;
-    Replay.pauseReplay();
-  }
-
   // --- UI Preparation ---
   const dateNow = new Date(Date.now());
-  qs("#resultReplay")?.hide();
   qs(".pageTest .ssWatermark")?.show();
 
   const snapshot = DB.getSnapshot();
-  const ssWatermark = [format(dateNow, "dd MMM yyyy HH:mm"), "monkeytype.com"];
+  const ssWatermark = [format(dateNow, "dd MMM yyyy HH:mm"), SITE_DOMAIN];
   if (snapshot?.name !== undefined) {
     const userText = `${snapshot?.name}${getHtmlByUserFlags(snapshot, {
       iconsOnly: true,
@@ -85,15 +77,7 @@ async function generateCanvas(): Promise<HTMLCanvasElement | null> {
   qs(".pageTest .loginTip")?.hide();
   qs("noscript")?.hide();
   qs("#nocss")?.hide();
-  qs("#ad-result-wrapper")?.hide();
-  qs("#ad-result-small-wrapper")?.hide();
   qs("#result")?.addClass("noBalloons");
-  qs(".wordInputHighlight")?.hide();
-  qsa(".highlightContainer")?.hide();
-
-  for (const fb of getActiveFunboxesWithFunction("clearGlobal")) {
-    fb.functions.clearGlobal();
-  }
 
   (document.querySelector("html") as HTMLElement).style.scrollBehavior = "auto";
   window.scrollTo({ top: 0, behavior: "auto" });
@@ -157,13 +141,13 @@ async function generateCanvas(): Promise<HTMLCanvasElement | null> {
             // for the inner image scales
             const img = el.querySelector("img");
             if (img) {
-              // (<= 720px viewport width) wpm & acc text wrapper!!
+              // (<= 720px viewport width) the headline stat wrapper!!
               if (window.innerWidth <= 720) {
                 img.style.transform = "translateY(20vh)";
                 img.style.height = "100%";
               } else {
                 img.style.width = "100%"; // safety nothing more
-                img.style.height = "100%"; // for image fit full screen even when words history is opened with many lines
+                img.style.height = "100%"; // fits full screen even with the task history open over many lines
               }
             }
           }
@@ -318,7 +302,7 @@ export async function download(): Promise<void> {
       return;
     }
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = `monkeytype-result-${timestamp}.png`;
+    const filename = `croco-calc-result-${timestamp}.png`;
 
     downloadFile({ data, filename });
 
@@ -329,31 +313,33 @@ export async function download(): Promise<void> {
   }
 }
 
+/**
+ * CP-123 item 5 — the button swaps between the two icons already mounted in
+ * `test-result.html` rather than mutating classes on a single one, because the
+ * Iconify component renders its geometry from the id (C10).
+ */
+function setShiftIcon(shift: boolean): void {
+  qs("#result #saveScreenshotButton .idle")?.toggleClass("hidden", shift);
+  qs("#result #saveScreenshotButton .shift")?.toggleClass("hidden", !shift);
+}
+
 qs(".pageTest")?.onChild("click", "#saveScreenshotButton", (event) => {
   if (event.shiftKey) {
     void download();
   } else {
     void copyToClipboard();
   }
-
-  // reset save screenshot button icon
-  qs("#saveScreenshotButton i")
-    ?.removeClass(["fas", "fa-download"])
-    ?.addClass(["far", "fa-image"]);
+  setShiftIcon(false);
 });
 
 document.addEventListener("keydown", (event) => {
   if (!(getResultVisible() && getActivePage() === "test")) return;
   if (event.key !== "Shift") return;
-  qs("#result #saveScreenshotButton i")
-    ?.removeClass(["far", "fa-image"])
-    ?.addClass(["fas", "fa-download"]);
+  setShiftIcon(true);
 });
 
 document.addEventListener("keyup", (event) => {
   if (!(getResultVisible() && getActivePage() === "test")) return;
   if (event.key !== "Shift") return;
-  qs("#result #saveScreenshotButton i")
-    ?.removeClass(["fas", "fa-download"])
-    ?.addClass(["far", "fa-image"]);
+  setShiftIcon(false);
 });
