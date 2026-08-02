@@ -31,7 +31,10 @@ describe("ScrollToTop", () => {
 
     expect(container).toHaveClass("content-grid", "ScrollToTop");
     expect(button).toHaveClass("breakout");
-    expect(button.querySelector("i")).toHaveClass("fas", "fa-angle-double-up");
+    expect(button.querySelector("svg.icon")).toHaveAttribute(
+      "data-icon",
+      "ph:caret-double-up-bold",
+    );
   });
 
   it("renders invisible when scrollY is 0", () => {

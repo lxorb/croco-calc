@@ -27,12 +27,9 @@ describe("AsyncContent", () => {
 
       const preloader = container.querySelector(".preloader");
       expect(preloader).toBeInTheDocument();
-      expect(preloader?.querySelector("i")).toHaveClass(
-        "fas",
-        "fa-fw",
-        "fa-spin",
-        "fa-circle-notch",
-      );
+      const icon = preloader?.querySelector("svg.icon");
+      expect(icon).toHaveAttribute("data-icon", "ph:circle-notch-bold");
+      expect(icon).toHaveClass("icon-fw", "icon-spin");
     });
 
     it("renders custom loader while pending", () => {
@@ -198,12 +195,9 @@ describe("AsyncContent", () => {
 
       const preloader = container.querySelector(".preloader");
       expect(preloader).toBeInTheDocument();
-      expect(preloader?.querySelector("i")).toHaveClass(
-        "fas",
-        "fa-fw",
-        "fa-spin",
-        "fa-circle-notch",
-      );
+      const icon = preloader?.querySelector("svg.icon");
+      expect(icon).toHaveAttribute("data-icon", "ph:circle-notch-bold");
+      expect(icon).toHaveClass("icon-fw", "icon-spin");
     });
 
     it("renders custom loader while pending", () => {

@@ -76,7 +76,7 @@ describe("Checkbox", () => {
     const field = makeField("opt", true);
     const { container } = render(() => <Checkbox field={() => field} />);
 
-    const icon = container.querySelector(".fa-check");
+    const icon = container.querySelector('[data-icon="ph:check-bold"]');
     expect(icon).toBeInTheDocument();
     expect(icon).toHaveClass("text-main");
   });
@@ -85,7 +85,7 @@ describe("Checkbox", () => {
     const field = makeField("opt", false);
     const { container } = render(() => <Checkbox field={() => field} />);
 
-    const icon = container.querySelector(".fa-check");
+    const icon = container.querySelector('[data-icon="ph:check-bold"]');
     expect(icon).toBeInTheDocument();
     expect(icon).toHaveClass("text-transparent");
   });

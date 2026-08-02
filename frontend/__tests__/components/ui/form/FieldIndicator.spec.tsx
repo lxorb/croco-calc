@@ -35,7 +35,9 @@ describe("FieldIndicator", () => {
     const { container } = render(() => (
       <FieldIndicator field={makeField({ isValidating: true })} />
     ));
-    expect(container.querySelector(".fa-circle-notch")).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-icon="ph:circle-notch-bold"]'),
+    ).toBeInTheDocument();
   });
 
   it("shows error icon when touched and invalid", () => {
@@ -48,7 +50,9 @@ describe("FieldIndicator", () => {
         })}
       />
     ));
-    expect(container.querySelector(".fa-times")).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-icon="ph:x-bold"]'),
+    ).toBeInTheDocument();
   });
 
   it("shows warning icon when has warning", () => {
@@ -61,7 +65,7 @@ describe("FieldIndicator", () => {
       />
     ));
     expect(
-      container.querySelector(".fa-exclamation-triangle"),
+      container.querySelector('[data-icon="ph:warning-bold"]'),
     ).toBeInTheDocument();
   });
 
@@ -75,15 +79,23 @@ describe("FieldIndicator", () => {
         })}
       />
     ));
-    expect(container.querySelector(".fa-check")).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-icon="ph:check-bold"]'),
+    ).toBeInTheDocument();
   });
 
   it("shows nothing when untouched and not validating", () => {
     const { container } = render(() => (
       <FieldIndicator field={makeField({})} />
     ));
-    expect(container.querySelector(".fa-times")).not.toBeInTheDocument();
-    expect(container.querySelector(".fa-check")).not.toBeInTheDocument();
-    expect(container.querySelector(".fa-circle-notch")).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-icon="ph:x-bold"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-icon="ph:check-bold"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-icon="ph:circle-notch-bold"]'),
+    ).not.toBeInTheDocument();
   });
 });

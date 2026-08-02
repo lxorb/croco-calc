@@ -112,14 +112,18 @@ describe("InputField", () => {
     field.state.meta.isValidating = true;
     const { container } = render(() => <InputField field={() => field} />);
 
-    expect(container.querySelector(".fa-circle-notch")).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-icon="ph:circle-notch-bold"]'),
+    ).toBeInTheDocument();
   });
 
   it("hides FieldIndicator by default", () => {
     const field = makeField("name");
     const { container } = render(() => <InputField field={() => field} />);
 
-    expect(container.querySelector(".fa-circle-notch")).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-icon="ph:circle-notch-bold"]'),
+    ).not.toBeInTheDocument();
   });
 
   it("resets to default value on blur when empty for type number", async () => {

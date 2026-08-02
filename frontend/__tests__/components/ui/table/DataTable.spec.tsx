@@ -94,16 +94,21 @@ describe("DataTable", () => {
 
     // Initial
     expect(ageHeaderCell).toHaveAttribute("aria-sort", "none");
-    expect(ageHeaderCell?.querySelector("i")).toHaveClass("fa-fw");
+    // Unsorted keeps a fixed-width caret in the flow but invisible, so the
+    // header never jumps sideways when a column becomes sorted.
+    expect(ageHeaderCell?.querySelector("svg.icon")).toHaveClass(
+      "icon-fw",
+      "opacity-0",
+    );
 
     // Descending
     fireEvent.click(ageHeaderButton);
     expect(ageHeaderCell).toHaveAttribute("aria-sort", "descending");
-    expect(ageHeaderCell?.querySelector("i")).toHaveClass(
-      "fa-sort-down",
-      "fas",
-      "fa-fw",
+    expect(ageHeaderCell?.querySelector("svg.icon")).toHaveAttribute(
+      "data-icon",
+      "ph:caret-down-bold",
     );
+    expect(ageHeaderCell?.querySelector("svg.icon")).toHaveClass("icon-fw");
     expect(localStorage()).toEqual([
       {
         desc: true,
@@ -118,10 +123,13 @@ describe("DataTable", () => {
     // Ascending
     fireEvent.click(ageHeaderButton);
     expect(ageHeaderCell).toHaveAttribute("aria-sort", "ascending");
-    expect(ageHeaderCell?.querySelector("i")).toHaveClass(
-      "fa-sort-up",
-      "fas",
-      "fa-fw",
+    expect(ageHeaderCell?.querySelector("svg.icon")).toHaveAttribute(
+      "data-icon",
+      "ph:caret-up-bold",
+    );
+    expect(ageHeaderCell?.querySelector("svg.icon")).toHaveClass("icon-fw");
+    expect(ageHeaderCell?.querySelector("svg.icon")).not.toHaveClass(
+      "opacity-0",
     );
     expect(localStorage()).toEqual([
       {

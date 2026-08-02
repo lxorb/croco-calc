@@ -3,7 +3,6 @@ import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Button } from "../../../src/ts/components/common/Button";
-import { FaSolidIcon } from "../../../src/ts/types/font-awesome";
 
 describe("Button component", () => {
   afterEach(() => {
@@ -57,74 +56,72 @@ describe("Button component", () => {
         onClick={() => {
           //
         }}
-        fa={{
-          icon: "fa-keyboard",
+        icon={{
+          icon: "ph:calculator-bold",
         }}
       />
     ));
 
-    const icon = container.querySelector("i");
+    const icon = container.querySelector("svg.icon");
     expect(icon).toBeTruthy();
-    expect(icon).toHaveClass("fas");
-    expect(icon).toHaveClass("fa-keyboard");
+    expect(icon).toHaveAttribute("data-icon", "ph:calculator-bold");
   });
 
   it("renders icon when icon prop has changed", () => {
-    const [icon, setIcon] = createSignal<FaSolidIcon>("fa-keyboard");
+    const [icon, setIcon] = createSignal("ph:calculator-bold");
     const { container } = render(() => (
       <Button
         onClick={() => {
           //
         }}
-        fa={{
+        icon={{
           icon: icon(),
           class: "test",
         }}
       />
     ));
 
-    setIcon("fa-backward");
+    setIcon("ph:gear-bold");
 
-    const i = container.querySelector("i");
-    expect(i).toBeTruthy();
-    expect(i).toHaveClass("fas");
-    expect(i).toHaveClass("fa-backward");
-    expect(i).toHaveClass("test");
+    const svg = container.querySelector("svg.icon");
+    expect(svg).toBeTruthy();
+    expect(svg).toHaveAttribute("data-icon", "ph:gear-bold");
+    expect(svg).toHaveClass("test");
   });
 
-  it("applies fa-fw class when fixedWidthIcon is true", () => {
+  it("applies icon-fw class when fixedWidth is true", () => {
     const { container } = render(() => (
       <Button
         onClick={() => {
           //
         }}
-        fa={{
+        icon={{
           fixedWidth: true,
-          icon: "fa-keyboard",
+          icon: "ph:calculator-bold",
         }}
         text="Hello"
       />
     ));
 
-    const icon = container.querySelector("i");
-    expect(icon).toHaveClass("fa-fw");
+    const icon = container.querySelector("svg.icon");
+    expect(icon).toHaveClass("icon-fw");
   });
 
-  it("does not apply fa-fw when text is present and fixedWidthIcon is false", () => {
+  it("does not apply icon-fw when text is present and fixedWidth is false", () => {
     const { container } = render(() => (
       <Button
         onClick={() => {
           //
         }}
-        fa={{
-          icon: "fa-keyboard",
+        icon={{
+          icon: "ph:calculator-bold",
         }}
         text="Hello"
       />
     ));
 
-    const icon = container.querySelector("i");
-    expect(icon).not.toHaveClass("fa-fw");
+    const icon = container.querySelector("svg.icon");
+    expect(icon).not.toHaveClass("icon-fw");
   });
 
   it("applies default button class", () => {
