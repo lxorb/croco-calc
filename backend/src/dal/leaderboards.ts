@@ -71,9 +71,13 @@ function isQueryPlanKilled(e: unknown): boolean {
  * restriction. Verified against `mongo:5.0.13`, the version the integration
  * harness runs: identical ranks, multi-key sort accepted.
  *
- * Nothing here needs `$function`, `$accumulator`, `$merge` or server-side JS, so
- * it still runs on Atlas M0 (the constraint that removed monkeytype's
- * `row_number` closure in the first place).
+ * Nothing here needs `$function`, `$accumulator` or server-side JS. That is no
+ * longer an Atlas M0 concern — R3 moved the database to Azure DocumentDB
+ * (Cosmos DB for MongoDB vCore) M10, where `$merge`, `$out`, `$setWindowFields`
+ * and `$lookup`-with-sub-pipeline are all supported — but `$function` still is
+ * not: it carries no support marker in any server version on DocumentDB's MQL
+ * compatibility matrix, which is exactly why monkeytype's `row_number` closure
+ * had to go and must not come back.
  *
  * The caller MUST have already `$sort`ed by `sortOrder`, or must `$sort` on
  * `rank` afterwards: `$setWindowFields` computes the number in sort order but
@@ -224,16 +228,18 @@ export async function getRank(
 /**
  * Rebuild one all-time board (AC-119).
  *
- * Two deliberate divergences from monkeytype, both forced by MongoDB Atlas M0:
+ * Two deliberate divergences from monkeytype:
  *
  *  * the rank was assigned by a `$function` stage holding a mutable `row_number`
- *    in server-side JavaScript. Server-side JS is **disabled** on M0 and on
- *    Atlas Flex, so it is replaced with the `$setWindowFields` row number INF-064
- *    mandates — see `rowNumberStage` for why it is spelled `$sum` and not
- *    `$documentNumber`.
+ *    in server-side JavaScript. `$function` is unavailable on the target server
+ *    (originally Atlas M0, which disables server-side JS; still true after R3
+ *    moved the database to Azure DocumentDB M10, whose compatibility matrix
+ *    gives `$function` no support marker in any version). It is replaced with
+ *    the `$setWindowFields` row number INF-064 mandates — see `rowNumberStage`
+ *    for why it is spelled `$sum` and not `$documentNumber`.
  *  * the score histogram was written with `$merge`. It is now read back and
- *    written with an ordinary upsert, so the whole pipeline needs nothing beyond
- *    `$out` — see the note on `updateScoreHistogram` below.
+ *    written with an ordinary upsert — see the note on `updateScoreHistogram`
+ *    below.
  *
  * The rebuild is idempotent: `$out` atomically replaces the target collection,
  * so running the job twice over the same period leaves identical state
@@ -339,11 +345,12 @@ export const SCORE_HISTOGRAM_BUCKET_SIZE = 10;
  * The site-wide score histogram behind `GET /public/scoreHistogram`.
  *
  * monkeytype folded this into the leaderboard pipeline with `$merge` into the
- * `public` collection. `$merge` is one of the stages whose availability on the
- * shared Atlas tiers is not guaranteed, and it buys nothing here — the result is
- * a single small document — so the buckets are read back and upserted normally.
- * Nothing in this file now depends on `$merge`, `$function`, `$accumulator`,
- * `$where` or mapReduce.
+ * `public` collection. The buckets are read back and upserted normally instead:
+ * the result is a single small document, so `$merge` bought nothing even before
+ * it was in doubt. (R3 has since settled that question — Azure DocumentDB M10
+ * does support `$merge` — so this is now a simplicity choice, not a
+ * compatibility one.) Nothing in this file depends on `$function`,
+ * `$accumulator`, `$where` or mapReduce, which DocumentDB does *not* support.
  *
  * **The bucket range is deliberately unbounded above.** monkeytype used a fixed
  * `$bucket` with 32 boundaries of 10 (0 … 310) plus a `default: "other"` bin,

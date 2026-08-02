@@ -12,7 +12,6 @@ import { flattenObjectDeep, isPlainObject, WithObjectId } from "../utils/misc";
 import { getDayOfYear } from "date-fns";
 import { UTCDate } from "@date-fns/utc";
 import {
-  AllRewards,
   CrocoMail,
   CustomTheme,
   UserProfileDetails,
@@ -674,67 +673,153 @@ export async function updateInbox(
     (it) => !deleteSet.includes(it),
   );
 
+  // The mail whose rewards this call claims: unread, and named by either list.
+  // `readSet` and `deleteSet` are disjoint by construction above, so this is
+  // exactly upstream's `[...toBeRead, ...toBeDeleted].filter(it => !it.read)`
+  // — and it cannot double-count an id that appears in both.
+  const claimable = {
+    $filter: {
+      input: { $ifNull: ["$inbox", []] },
+      as: "mail",
+      cond: {
+        $and: [
+          { $ne: ["$$mail.read", true] },
+          {
+            $or: [
+              { $in: ["$$mail.id", { $literal: readSet }] },
+              { $in: ["$$mail.id", { $literal: deleteSet }] },
+            ],
+          },
+        ],
+      },
+    },
+  };
+
+  // This was one `$function` stage carrying the whole claim/read/delete routine
+  // as server-side JS. `$function` is not implemented on Azure DocumentDB
+  // (Cosmos DB for MongoDB vCore): its MQL compatibility matrix gives `$function`
+  // (like `$accumulator` and `$where`) no support marker in any server version,
+  // where `$merge`, `$out` and `$setWindowFields` are "Yes" throughout. The same
+  // work is expressed below with ordinary aggregation operators, all of which
+  // predate MongoDB 4.0, so it also runs on the 5.0.13 image the integration
+  // containers pin.
+  //
+  // It deliberately stays a *single* update pipeline. Reading the inbox into
+  // Node, computing there and writing it back would open a lost-update window in
+  // which two concurrent claims each award the same XP.
   const update = await getUsersCollection().updateOne({ uid }, [
     {
-      $addFields: {
-        tmp: {
-          $function: {
-            lang: "js",
-            args: ["$inbox", "$xp", deleteSet, readSet],
-            body: function (
-              inbox: CrocoMail[],
-              xp: number,
-              deletedIds: string[],
-              readIds: string[],
-            ): Pick<DBUser, "xp" | "inbox"> {
-              const toBeDeleted = inbox.filter((it) =>
-                deletedIds.includes(it.id),
-              );
-
-              const toBeRead = inbox.filter(
-                (it) => readIds.includes(it.id) && !it.read,
-              );
-
-              //flatMap rewards
-              const rewards: AllRewards[] = [...toBeRead, ...toBeDeleted]
-                .filter((it) => !it.read)
-
-                .reduce((arr: AllRewards[], current) => {
-                  return arr.concat(current.rewards);
-                }, []);
-
-              const xpGain = rewards
-                .filter((it) => it.type === "xp")
-                .map((it) => it.item)
-                .reduce((s, a) => s + a, 0);
-
-              //remove deleted mail from inbox, sort by timestamp descending
-              const inboxUpdate = inbox
-                .filter((it) => !deletedIds.includes(it.id))
-                .sort((a, b) => b.timestamp - a.timestamp);
-
-              //mark read mail as read, remove rewards
-              toBeRead.forEach((it) => {
-                it.read = true;
-                it.rewards = [];
-              });
-
-              return {
-                xp: xp + xpGain,
-                inbox: inboxUpdate,
-              };
-            }.toString(),
+      // Both expressions are evaluated against the stage's *input* document, so
+      // `inbox` below still sees the pre-update array.
+      $set: {
+        xp: {
+          $add: [
+            { $ifNull: ["$xp", 0] },
+            {
+              // Sum every `xp` reward across the claimable mail. The inner
+              // `$reduce` rebinds `$$this`/`$$value`; its `input` is evaluated in
+              // the outer scope, so `$$this.rewards` there is the mail.
+              $reduce: {
+                input: claimable,
+                initialValue: 0,
+                in: {
+                  $add: [
+                    "$$value",
+                    {
+                      $reduce: {
+                        input: {
+                          $filter: {
+                            input: { $ifNull: ["$$this.rewards", []] },
+                            as: "reward",
+                            cond: { $eq: ["$$reward.type", "xp"] },
+                          },
+                        },
+                        initialValue: 0,
+                        in: { $add: ["$$value", "$$this.item"] },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        // Delete, mark-as-read, then re-sort newest first — the same three steps
+        // and the same order the JS body did.
+        inbox: {
+          // Insertion sort by `timestamp` descending. `$sortArray` would say
+          // this in one line but it is MongoDB 5.2+, above the 5.0.13 the
+          // integration containers pin, and an update pipeline may not use the
+          // `$sort` *stage*. Splicing each element into an already-sorted
+          // accumulator is O(n²), which is irrelevant at `inbox.maxMail`
+          // entries, and it is stable: equal timestamps keep their input order.
+          $reduce: {
+            input: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: { $ifNull: ["$inbox", []] },
+                    as: "mail",
+                    cond: {
+                      $not: [{ $in: ["$$mail.id", { $literal: deleteSet }] }],
+                    },
+                  },
+                },
+                as: "mail",
+                in: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $ne: ["$$mail.read", true] },
+                        { $in: ["$$mail.id", { $literal: readSet }] },
+                      ],
+                    },
+                    // Claimed: mark read and drop the rewards so a second call
+                    // cannot award them again. Mail that is *already* read keeps
+                    // its rewards untouched, as upstream did.
+                    {
+                      $mergeObjects: ["$$mail", { read: true, rewards: [] }],
+                    },
+                    "$$mail",
+                  ],
+                },
+              },
+            },
+            initialValue: [],
+            in: {
+              // Bound to named variables so neither `$filter` below can shadow
+              // the reduce's `$$this`/`$$value`.
+              $let: {
+                vars: { mail: "$$this", sorted: "$$value" },
+                in: {
+                  $concatArrays: [
+                    {
+                      $filter: {
+                        input: "$$sorted",
+                        as: "seen",
+                        cond: {
+                          $gte: ["$$seen.timestamp", "$$mail.timestamp"],
+                        },
+                      },
+                    },
+                    ["$$mail"],
+                    {
+                      $filter: {
+                        input: "$$sorted",
+                        as: "seen",
+                        cond: {
+                          $lt: ["$$seen.timestamp", "$$mail.timestamp"],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
           },
         },
       },
     },
-    {
-      $set: {
-        xp: "$tmp.xp",
-        inbox: "$tmp.inbox",
-      },
-    },
-    { $unset: "tmp" },
   ]);
 
   if (update.matchedCount !== 1) {

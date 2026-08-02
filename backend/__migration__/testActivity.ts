@@ -171,26 +171,54 @@ async function migrateUsers(uids: string[]): Promise<void> {
             },
           },
         },
+        // R3: was a `$function` stage. `$function` is not implemented on Azure
+        // DocumentDB (Cosmos DB for MongoDB vCore), so it is rebuilt from plain
+        // operators — same shape as `updateTestActivity` in
+        // `src/api/controllers/dev.ts`.
         {
           $replaceWith: {
             uid: "$_id.uid",
             days: {
-              $function: {
-                lang: "js",
-                args: ["$days", "$_id.year"],
-                body: `function (days, year) {
-                                var max = Math.max(
-                                    ...days.map((it) => it.day)
-                                )-1;
-                                var arr = new Array(max).fill(null);
-                                for (day of days) {
-                                    arr[day.day-1] = day.tests;
-                                }
-                                let result = {};
-                                result[year] = arr;
-                                return result;
-                            }`,
-              },
+              $arrayToObject: [
+                [
+                  {
+                    k: { $toString: "$_id.year" },
+                    v: {
+                      $map: {
+                        input: {
+                          $range: [1, { $add: [{ $max: "$days.day" }, 1] }],
+                        },
+                        as: "dayOfYear",
+                        in: {
+                          $ifNull: [
+                            {
+                              $arrayElemAt: [
+                                {
+                                  $map: {
+                                    input: {
+                                      $filter: {
+                                        input: "$days",
+                                        as: "entry",
+                                        cond: {
+                                          $eq: ["$$entry.day", "$$dayOfYear"],
+                                        },
+                                      },
+                                    },
+                                    as: "entry",
+                                    in: "$$entry.tests",
+                                  },
+                                },
+                                0,
+                              ],
+                            },
+                            null,
+                          ],
+                        },
+                      },
+                    },
+                  },
+                ],
+              ],
             },
           },
         },

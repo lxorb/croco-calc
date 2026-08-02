@@ -229,11 +229,13 @@ async function updateUser(uid: string): Promise<void> {
   );
 
   //update PBs
+  // `LbPersonalBests["time"]` is a Partial<Record<LeaderboardMode2, PersonalBest>>,
+  // so the 4/8 slots are optional and are filled in below only for the modes the
+  // generated results actually cover. Seeding them with `{}` placeholders both
+  // fails the type check and persists empty personal bests that the leaderboard
+  // update would then read back as real entries.
   const lbPersonalBests: LbPersonalBests = {
-    time: {
-      4: {},
-      8: {},
-    },
+    time: {},
   };
 
   const personalBests: PersonalBests = {
@@ -258,9 +260,7 @@ async function updateUser(uid: string): Promise<void> {
     )) as DBResult;
 
     personalBests[mode.mode] ??= {};
-    if (personalBests[mode.mode][mode.mode2] === undefined) {
-      personalBests[mode.mode][mode.mode2] = [];
-    }
+    personalBests[mode.mode][mode.mode2] ??= [];
 
     const entry: PersonalBest = {
       score: best.score,
@@ -373,26 +373,62 @@ async function updateTestActivity(uid: string): Promise<void> {
             },
           },
         },
+        // `{ [year]: [testsOnDay1, null, testsOnDay3, …] }`, the dense
+        // day-of-year array `CountByYearAndDay` expects, truncated at the last
+        // day that actually has results.
+        //
+        // R3: this was a `$function` stage. `$function` is not implemented on
+        // Azure DocumentDB (Cosmos DB for MongoDB vCore) — its MQL compatibility
+        // matrix carries no support marker for it in any server version, unlike
+        // `$merge`/`$out`/`$setWindowFields` below, which are supported. The
+        // rewrite uses only operators that predate MongoDB 4.0, so it also runs
+        // on the 5.0.13 image the integration containers pin.
         {
           $replaceWith: {
             uid: "$_id.uid",
             days: {
-              $function: {
-                lang: "js",
-                args: ["$days", "$_id.year"],
-                body: `function (days, year) {
-                                var max = Math.max(
-                                    ...days.map((it) => it.day)
-                                )-1;
-                                var arr = new Array(max).fill(null);
-                                for (day of days) {
-                                    arr[day.day-1] = day.tests;
-                                }
-                                let result = {};
-                                result[year] = arr;
-                                return result;
-                            }`,
-              },
+              $arrayToObject: [
+                [
+                  {
+                    k: { $toString: "$_id.year" },
+                    // Walk day 1 … max(day) and pull the count for each, or
+                    // `null` where the user did not train.
+                    v: {
+                      $map: {
+                        input: {
+                          $range: [1, { $add: [{ $max: "$days.day" }, 1] }],
+                        },
+                        as: "dayOfYear",
+                        in: {
+                          $ifNull: [
+                            {
+                              $arrayElemAt: [
+                                {
+                                  $map: {
+                                    input: {
+                                      $filter: {
+                                        input: "$days",
+                                        as: "entry",
+                                        cond: {
+                                          $eq: ["$$entry.day", "$$dayOfYear"],
+                                        },
+                                      },
+                                    },
+                                    as: "entry",
+                                    in: "$$entry.tests",
+                                  },
+                                },
+                                0,
+                              ],
+                            },
+                            null,
+                          ],
+                        },
+                      },
+                    },
+                  },
+                ],
+              ],
             },
           },
         },
