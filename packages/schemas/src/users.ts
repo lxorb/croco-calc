@@ -18,12 +18,20 @@ import { ConnectionSchema } from "./connections";
 
 export const ResultFilterPresetNameSchema = slug().max(16);
 
-const OnOffFilterSchema = z
+/**
+ * AC-081 as amended by master C2: the keys of a boolean filter group are the
+ * **stored** literals `"true"` / `"false"`, i.e. `String(storedValue)` — never the
+ * `on`/`off` or `yes`/`no` labels the buttons render (those are AC-078's third
+ * column and belong to presentation only). This is what lets a consumer write
+ * `filters.decimals[String(result.settings.decimals)]` and have it match.
+ */
+export const BooleanFilterSchema = z
   .object({
-    on: z.boolean(),
-    off: z.boolean(),
+    true: z.boolean(),
+    false: z.boolean(),
   })
   .strict();
+export type BooleanFilter = z.infer<typeof BooleanFilterSchema>;
 
 /**
  * AC-078 / AC-081: the filter dimensions are the croco calc settings plus `time`,
@@ -34,20 +42,15 @@ const OnOffFilterSchema = z
 export const ResultFiltersSchema = z.object({
   _id: IdSchema,
   name: ResultFilterPresetNameSchema,
-  pb: z
-    .object({
-      no: z.boolean(),
-      yes: z.boolean(),
-    })
-    .strict(),
+  pb: BooleanFilterSchema,
   time: z.record(Mode2Schema, z.boolean()),
   addition: z.record(AdditionSchema, z.boolean()),
   multiplication: z.record(MultiplicationSchema, z.boolean()),
   division: z.record(DivisionSchema, z.boolean()),
   fractionAddition: z.record(FractionAdditionSchema, z.boolean()),
-  fractionMultiplication: OnOffFilterSchema,
-  decimals: OnOffFilterSchema,
-  negatives: OnOffFilterSchema,
+  fractionMultiplication: BooleanFilterSchema,
+  decimals: BooleanFilterSchema,
+  negatives: BooleanFilterSchema,
   date: z
     .object({
       last_day: z.boolean(),
@@ -208,13 +211,17 @@ export type ResultFiltersGroup = keyof ResultFilters;
 export type ResultFiltersGroupItem<T extends ResultFiltersGroup> =
   keyof ResultFilters[T];
 
-/** monkeytype's `TypingStatsSchema`, renamed with the AC-014 vocabulary. */
-export const TestStatsSchema = z.object({
+/**
+ * AC-014: monkeytype's `TypingStatsSchema`, renamed to `SolveStatsSchema` with
+ * `timeTyping` → `timeSpent` (AC-013). AC-014 names the identifier explicitly, so
+ * it wins over INV-034's looser "rename to test stats".
+ */
+export const SolveStatsSchema = z.object({
   completedTests: z.number().int().nonnegative().optional(),
   startedTests: z.number().int().nonnegative().optional(),
   timeSpent: z.number().int().nonnegative().optional(),
 });
-export type TestStats = z.infer<typeof TestStatsSchema>;
+export type SolveStats = z.infer<typeof SolveStatsSchema>;
 
 export const UserProfileSchema = UserSchema.pick({
   uid: true,
@@ -227,7 +234,10 @@ export const UserProfileSchema = UserSchema.pick({
   testActivity: true,
 })
   .extend({
-    testStats: TestStatsSchema,
+    // monkeytype's `typingStats` payload key. AC-014 governs the schema identifier
+    // and the `timeSpent` field; the wire key only has to shed the "typing"
+    // vocabulary (DoD-07), which `testStats` does.
+    testStats: SolveStatsSchema,
     personalBests: PersonalBestsSchema.pick({ time: true }),
     details: UserProfileDetailsSchema,
   })
