@@ -39,6 +39,13 @@ import { setVersion } from "./states/core";
 import { loadFromLocalStorage } from "./config/lifecycle";
 
 import "./input/hotkeys";
+// Side-effect import, load-bearing, exactly like `./test/result` above. The
+// command palette (C8, CP-167, SB-150 … SB-160) is not a mounted component: it
+// drives the static `#commandLine` dialog in `popups.html` from a top-level
+// effect on the modal store. Nothing else on the boot path imports it, so
+// without this line `showModal("Commandline")` flips a store flag that no code
+// is listening to and Escape / Mod+Shift+P do nothing at all.
+import "./commandline/commandline";
 import { showModal } from "./states/modals";
 import { buildEventLog } from "./test/events/data";
 
