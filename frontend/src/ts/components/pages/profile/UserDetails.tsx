@@ -16,7 +16,7 @@ import { setUserToReport } from "../../../states/user-report";
 import { cn } from "../../../utils/cn";
 import { secondsToString } from "../../../utils/date-and-time";
 import { formatXp, getXpDetails } from "../../../utils/levels";
-import { formatTypingStatsRatio } from "../../../utils/misc";
+import { formatTestStatsRatio } from "../../../utils/misc";
 import { AutoShrink } from "../../common/AutoShrink";
 import { Balloon, BalloonProps } from "../../common/Balloon";
 import { Bar } from "../../common/Bar";
@@ -304,7 +304,7 @@ function SolveStats(props: {
   stats: SolveStatsType;
   variant: Variant;
 }): JSXElement {
-  const ratios = () => formatTypingStatsRatio(props.stats);
+  const ratios = () => formatTestStatsRatio(props.stats);
 
   return (
     <>

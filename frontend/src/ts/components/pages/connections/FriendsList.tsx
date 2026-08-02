@@ -20,7 +20,7 @@ import { getSnapshot } from "../../../states/snapshot";
 import { formatAge, secondsToString } from "../../../utils/date-and-time";
 import { Formatting } from "../../../utils/format";
 import { formatXp, getXpDetails } from "../../../utils/levels";
-import { formatTypingStatsRatio } from "../../../utils/misc";
+import { formatTestStatsRatio } from "../../../utils/misc";
 import { remoteValidation } from "../../../utils/remote-validation";
 import AsyncContent from "../../common/AsyncContent";
 import { Button } from "../../common/Button";
@@ -181,7 +181,7 @@ function getColumns({
       meta: {
         breakpoint: "lg",
         cellMeta: ({ row }) => {
-          const testStats = formatTypingStatsRatio(row);
+          const testStats = formatTestStatsRatio(row);
 
           return {
             "data-balloon-pos": "up",
