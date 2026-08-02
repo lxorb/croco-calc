@@ -1,30 +1,97 @@
-import { ComponentProps, For, JSXElement, Show } from "solid-js";
+import { For, JSXElement, createMemo, createSignal } from "solid-js";
 
+import {
+  getBarLabel,
+  getBarTooltip,
+  isBarValueOff,
+  BAR_PILLS,
+} from "../../../config/bar-controls";
+import { BarKey, isDecimalsDisabled } from "../../../config/coupling";
 import { configMetadata } from "../../../config/metadata";
-import { setConfig, setQuoteLengthAll } from "../../../config/setters";
+import { cycleSetting } from "../../../config/setters";
 import { getConfig } from "../../../config/store";
+import { configEvent } from "../../../events/config";
 import { restartTestEvent } from "../../../events/test";
 import { createEffectOn } from "../../../hooks/effects";
 import { useRefWithUtils } from "../../../hooks/useRefWithUtils";
-import { isAuthenticated } from "../../../states/core";
 import { showModal } from "../../../states/modals";
 import { getResultVisible, getFocus } from "../../../states/test";
-import { FaObject } from "../../../types/font-awesome";
-import { areUnsortedArraysEqual } from "../../../utils/arrays";
 import { cn } from "../../../utils/cn";
-import { Anime, AnimeShow } from "../../common/anime";
+import { applyReducedMotion } from "../../../utils/misc";
+import { buildBalloonHtmlProperties } from "../../common/Balloon";
 import { Button } from "../../common/Button";
+import { Icon } from "../../common/Icon";
 
+/**
+ * The croco calc settings bar (SB-001 … SB-089).
+ *
+ * Structurally identical to monkeytype's `TestConfig`: a
+ * `grid-cols-[1fr_auto_1fr]` of three pill cards, with the same responsive
+ * custom properties, the same card class, the same 250 ms width animation and
+ * the same mobile fallback button. Only the contents change — eight controls,
+ * each a **single** button that cycles through its own states (SB-020).
+ */
+
+// SB-081 — copied verbatim from monkeytype's TestConfig.tsx:18–23.
 const variables = cn(
   "[--card-gap:0.25em] [--font-size:0.5em] [--horizontal-padding:0.4em] [--vertical-padding:0.5rem]",
   "md:[--card-gap:1em] md:[--font-size:0.6em] md:[--horizontal-padding:0.45em] md:[--vertical-padding:0.75rem]",
   "lg:[--card-gap:1em] lg:[--font-size:0.75em] lg:[--horizontal-padding:0.5em] lg:[--vertical-padding:0.75rem]",
   "xl:[--card-gap:2em] xl:[--font-size:0.75em] xl:[--horizontal-padding:1em] xl:[--vertical-padding:0.75rem]",
 );
+// SB-083
 const buttonClass = "px-(--horizontal-padding) py-(--vertical-padding)";
+// SB-082
 const cardClass =
   "card rounded-(--roundness) bg-sub-alt px-(--horizontal-padding)";
 const durationMs = 250;
+
+/**
+ * SB-070 … SB-076 — monkeytype's `Button` `getClasses()` for `variant="text"`,
+ * reproduced verbatim (Button.tsx:57–89).
+ *
+ * The bar cannot use `components/common/Button` itself because SB-051 needs a
+ * `contextmenu` handler and SB-096 needs an element ref, neither of which that
+ * component exposes; everything else — base classes, focus ring, active/hover
+ * custom properties, the 0.33 disabled opacity — is byte-identical.
+ */
+const textButtonClass = cn(
+  "inline-flex h-min cursor-pointer appearance-none items-center justify-center gap-[0.5em] rounded border-0 p-[0.5em] text-center leading-[1.25] text-text transition-[color,background,opacity] duration-125 ease-in-out select-none",
+  "focus-visible:shadow-[0_0_0_0.1rem_var(--bg-color),_0_0_0_0.2rem_var(--text-color)] focus-visible:outline-none",
+  "bg-(--themable-button-bg) text-(--themable-button-text) hover:bg-(--themable-button-hover-bg) hover:text-(--themable-button-hover-text)",
+  "[--themable-button-active:var(--main-color)]",
+  "[--themable-button-bg:transparent] [--themable-button-hover-bg:transparent] [--themable-button-hover-text:var(--text-color)] [--themable-button-text:var(--sub-color)] active:text-sub",
+);
+// SB-073/SB-074 — the active declaration re-declares `--themable-button-hover-text`
+// as itself, producing a cyclic custom property and therefore no hover change.
+const textButtonActiveClass =
+  "[--themable-button-hover-text:var(--themable-button-hover-text)] [--themable-button-text:var(--themable-button-active)]";
+// SB-077
+const disabledClass = "pointer-events-none opacity-[0.33]";
+
+/**
+ * The control the user last activated. SB-096: when a coupling rule changes a
+ * control the user did *not* click, that control pulses for 250 ms so the
+ * change is visible — and never raises a notification, which would be far too
+ * noisy for a two-click interaction.
+ */
+const [getLastInteracted, setLastInteracted] = createSignal<
+  BarKey | undefined
+>();
+
+/**
+ * SB-192 — a whole-config apply (the server config at login, an imported JSON,
+ * a shared-settings URL) repaints the bar reactively but MUST NOT animate.
+ * Only a user interaction animates.
+ */
+const [getProgrammaticChange, setProgrammaticChange] = createSignal(false);
+
+configEvent.subscribe((data) => {
+  if (data.key === "fullConfigChange") setProgrammaticChange(true);
+  if (data.key === "fullConfigChangeFinished") {
+    queueMicrotask(() => setProgrammaticChange(false));
+  }
+});
 
 export function TestConfig(): JSXElement {
   return (
@@ -34,16 +101,18 @@ export function TestConfig(): JSXElement {
           variables,
           "group relative mb-8 hidden w-max grid-cols-[1fr_auto_1fr] justify-center place-self-center [font-size:var(--font-size)] md:grid",
           "mx-auto transition-opacity duration-125",
+          // SB-078
           getFocus() || getResultVisible()
             ? "pointer-events-none opacity-0"
             : "",
         )}
         data-ui-element="testConfig"
       >
-        <PuncAndNum />
-        <Mode />
-        <Mode2 />
+        <Modifiers />
+        <Generators />
+        <TestLength />
       </div>
+      {/* SB-165 — below `md` the bar is replaced by one button (C20: tabler). */}
       <Button
         class={cn(
           "mx-auto flex place-self-center px-4 py-2 text-sub md:hidden",
@@ -52,320 +121,212 @@ export function TestConfig(): JSXElement {
         onClick={() => {
           showModal("MobileTestConfig");
         }}
-        text="test settings"
-        fa={{
-          icon: "fa-cog",
-        }}
-      />
+      >
+        <Icon icon="tabler:settings" fixedWidth />
+        test settings
+      </Button>
     </>
   );
 }
 
-function TCButton(props: {
-  class?: string;
-  fa?: FaObject;
-  text?: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}): JSXElement {
-  return (
-    <Button
-      variant="text"
-      class={cn(buttonClass, props.class)}
-      fa={props.fa ? { ...props.fa, fixedWidth: true } : undefined}
-      text={props.text}
-      active={props.active}
-      onClick={props.onClick}
-      disabled={getFocus() || getResultVisible() || props.disabled}
-    />
-  );
-}
+/**
+ * One control = one `<button>` that cycles (SB-020, SB-050 … SB-052).
+ *
+ * SB-140: a native `<button type="button">` with `tabIndex={0}`, never a `div`
+ * with a click handler. `Enter` and `Space` therefore cycle forward for free,
+ * and the synthesized click carries `shiftKey`, which is what makes
+ * `Shift`+`Enter` / `Shift`+`Space` cycle backward (SB-142).
+ */
+function BarControl(props: { configKey: BarKey }): JSXElement {
+  const [ref, element] = useRefWithUtils<HTMLButtonElement>();
 
-function PuncAndNum(): JSXElement {
-  const buttons = ["punctuation", "numbers"] as const;
+  const value = () => getConfig[props.configKey];
+  const isOff = () => isBarValueOff(props.configKey, value());
+  const label = () => getBarLabel(props.configKey, value());
+  const tooltip = () => getBarTooltip(props.configKey, value(), getConfig);
 
-  return (
-    <Anime
-      class="mr-(--card-gap) w-max place-self-end"
-      animation={{
-        opacity: getConfig.mode === "zen" ? 0 : 1,
-        // marginRight: getConfig.mode === "zen" ? "0" : "var(--card-gap)",
-        duration: durationMs,
-      }}
-    >
-      <AnimeShow when={getConfig.mode !== "zen"} duration={durationMs}>
-        <div class={cardClass}>
-          <For each={buttons}>
-            {(configKey) => (
-              <TCButton
-                fa={configMetadata[configKey].fa}
-                text={configMetadata[configKey].displayString ?? configKey}
-                active={getConfig[configKey]}
-                disabled={
-                  getConfig.mode === "zen" || getConfig.mode === "quote"
-                }
-                onClick={() => {
-                  setConfig(configKey, !getConfig[configKey]);
-                  restartTestEvent.dispatch();
-                }}
-              />
-            )}
-          </For>
-        </div>
-      </AnimeShow>
-    </Anime>
-  );
-}
+  // SB-105 — decimals is disabled (but keeps its stored value) while addition,
+  // multiplication and division are all off, and becomes interactive again as
+  // soon as one of the three comes back on.
+  const isSettingDisabled = () =>
+    props.configKey === "decimals" && isDecimalsDisabled(getConfig);
+  const isDisabled = () =>
+    getFocus() || getResultVisible() || isSettingDisabled();
 
-function Mode(): JSXElement {
-  const modeOptions = ["time", "words", "quote", "zen", "custom"] as const;
+  // SB-096 — pulse when the coupling moved this control instead of the user.
+  createEffectOn(value, (next, previous) => {
+    if (previous === undefined || next === previous) return;
+    if (getLastInteracted() === props.configKey) return;
+    if (getProgrammaticChange()) return;
+    void element()?.promiseAnimate({
+      opacity: [1, 0.25, 1],
+      duration: applyReducedMotion(durationMs),
+    });
+  });
 
-  return (
-    <div class={cn("z-2", cardClass)}>
-      <For each={modeOptions}>
-        {(modeOption) => (
-          <TCButton
-            fa={
-              configMetadata.mode.optionsMetadata?.[modeOption]?.fa ??
-              configMetadata.mode.fa
-            }
-            text={
-              configMetadata.mode.optionsMetadata?.[modeOption]
-                ?.displayString ?? modeOption
-            }
-            active={getConfig.mode === modeOption}
-            onClick={() => {
-              setConfig("mode", modeOption);
-              restartTestEvent.dispatch();
-            }}
-          />
-        )}
-      </For>
-    </div>
-  );
-}
-
-function Mode2(): JSXElement {
-  const [wrapperRef, wrapperElement] = useRefWithUtils();
-  const [timeRef, timeElement] = useRefWithUtils();
-  const [wordsRef, wordsElement] = useRefWithUtils();
-  const [quoteRef, quoteElement] = useRefWithUtils();
-  const [customRef, customElement] = useRefWithUtils();
-
-  const sClass =
-    "z-2 col-start-1 row-start-1 grid w-max place-self-start grid-flow-col ml-(--card-gap)";
-
-  const getElements = () => {
-    const time = timeElement();
-    const words = wordsElement();
-    const quote = quoteElement();
-    const custom = customElement();
-    if (!time || !words || !quote || !custom) return undefined;
-    return { time, words, quote, custom };
+  const cycle = (direction: 1 | -1): void => {
+    setLastInteracted(props.configKey);
+    const changed = cycleSetting(props.configKey, direction);
+    // SB-054 — every state change restarts the test, so a fresh first task is
+    // generated and re-blurred. SB-056: each click advances exactly one step
+    // and each restart supersedes the previous one, so nothing queues.
+    if (changed) restartTestEvent.dispatch();
+    queueMicrotask(() => setLastInteracted(undefined));
   };
 
+  return (
+    <button
+      ref={ref}
+      type="button"
+      tabIndex={0}
+      class={cn(textButtonClass, buttonClass, {
+        // SB-073 — an ON control uses the active text-button colour.
+        [textButtonActiveClass]: !isOff(),
+        [disabledClass]: isDisabled(),
+      })}
+      // SB-077/SB-146 — the real `disabled` attribute, so the control also
+      // leaves the tab order; never `pointer-events: none` alone.
+      disabled={isDisabled()}
+      data-ui-element="button"
+      data-ui-variant="text"
+      // SB-148 — end-to-end test hooks.
+      data-setting={props.configKey}
+      data-value={String(value())}
+      // SB-144/SB-145 — `aria-label` === tooltip, always naming the control,
+      // because `4.2`, `-` and `/` are not self-describing on their own.
+      {...buildBalloonHtmlProperties({ text: tooltip(), position: "up" })}
+      onClick={(e) => cycle(e.shiftKey ? -1 : 1)}
+      // SB-051 — the context-menu event steps backwards and is swallowed.
+      onContextMenu={(e) => {
+        e.preventDefault();
+        cycle(-1);
+      }}
+    >
+      {/* SB-021 — icon first, then the 0.5em gap from the button base class,
+          then the label. The icon is present in every state, OFF included. */}
+      <Icon icon={configMetadata[props.configKey].icon} fixedWidth />
+      <span
+        // SB-072 — croco calc's rendering of the brief's `~x~` notation, on
+        // the label span only and never on the `<svg>` (SB-210).
+        classList={{
+          "[text-decoration-color:currentColor] [text-decoration-thickness:0.1em] line-through":
+            isOff(),
+        }}
+      >
+        {label()}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * SB-087 — a card animates its width over 250 ms when its content width
+ * changes (`12x12` → `100x100`), and never jumps. SB-088: the duration goes
+ * through `applyReducedMotion`, so it collapses to 0 ms under
+ * `prefers-reduced-motion`.
+ */
+function AnimatedCard(props: {
+  class?: string;
+  keys: readonly BarKey[];
+  children: JSXElement;
+}): JSXElement {
+  const [ref, element] = useRefWithUtils<HTMLDivElement>();
+  let previousWidth: number | undefined;
+
+  // Every label that contributes to this card's rendered width.
+  const signature = createMemo(() =>
+    props.keys
+      .map((key) => getBarLabel(key, getConfig[key] as never))
+      .join(" "),
+  );
+
   createEffectOn(
-    () => getConfig.mode,
-    (mode, previousMode) => {
-      const wrapperEl = wrapperElement();
-      const el = getElements();
-      if (!wrapperEl || !el) return;
+    () => signature(),
+    () => {
+      const el = element();
+      if (el === undefined) return;
 
-      type Mode2Key = "time" | "words" | "quote" | "custom";
-      const prev = el[previousMode as Mode2Key];
-      const next = el[mode as Mode2Key];
+      const newWidth = el.getOuterWidth();
+      const from = previousWidth;
+      previousWidth = newWidth;
 
-      if (previousMode === undefined) {
-        for (const e of Object.values(el)) {
-          e.hide();
-        }
-        next?.show();
-        return;
-      }
+      if (from === undefined || from === newWidth) return;
+      // SB-192 — the first programmatic (server/import) repaint does not animate.
+      if (getProgrammaticChange()) return;
 
-      prev?.show();
-      const previousWidth = prev?.getOuterWidth() ?? 0;
-
-      next?.show();
-      const newWidth = next?.getOuterWidth() ?? 0;
-
-      void wrapperEl.promiseAnimate({
-        width: [`${previousWidth}px`, `${newWidth}px`],
-        duration: durationMs,
+      void el.promiseAnimate({
+        width: [`${from}px`, `${newWidth}px`],
+        duration: applyReducedMotion(durationMs),
         onComplete: () => {
-          wrapperEl.setStyle({
-            width: "",
-          });
+          el.setStyle({ width: "" });
         },
-      });
-
-      prev?.show()?.animate({
-        opacity: [1, 0],
-        duration: durationMs,
-        onComplete: () => prev?.hide(),
-      });
-
-      next?.show()?.animate({
-        opacity: [0, 1],
-        duration: durationMs,
       });
     },
   );
 
   return (
-    <div class="relative grid w-max" ref={wrapperRef}>
-      <Anime
-        class="grid"
-        animation={{
-          opacity: getConfig.mode === "zen" ? 0 : 1,
-          // marginLeft:
-          // getConfig.mode === "zen" ? "calc(-1*var(--card-gap))" : "0",
-          duration: durationMs,
-        }}
+    <div ref={ref} class={props.class}>
+      {props.children}
+    </div>
+  );
+}
+
+/** Left pill — the two on/off modifiers (SB-084, SB-086). */
+function Modifiers(): JSXElement {
+  return (
+    <AnimatedCard
+      class={cn(cardClass, "mr-(--card-gap) w-max place-self-end")}
+      keys={BAR_PILLS.left}
+    >
+      <For each={BAR_PILLS.left}>
+        {(configKey) => <BarControl configKey={configKey} />}
+      </For>
+    </AnimatedCard>
+  );
+}
+
+/** Centre pill — the five generator controls, in brief order 1→5 (SB-086). */
+function Generators(): JSXElement {
+  return (
+    <AnimatedCard class={cn("z-2 w-max", cardClass)} keys={BAR_PILLS.centre}>
+      <For each={BAR_PILLS.centre}>
+        {(configKey) => <BarControl configKey={configKey} />}
+      </For>
+    </AnimatedCard>
+  );
+}
+
+/** Right pill — the single test-length parameter, plus the share button. */
+function TestLength(): JSXElement {
+  return (
+    <div class="relative grid w-max">
+      <AnimatedCard
+        class={cn(
+          cardClass,
+          "z-2 col-start-1 row-start-1 ml-(--card-gap) grid w-max grid-flow-col place-self-start",
+        )}
+        keys={BAR_PILLS.right}
       >
-        <Mode2Time class={cn(cardClass, sClass)} ref={timeRef} />
-        <Mode2Words class={cn(cardClass, sClass)} ref={wordsRef} />
-        <Mode2Quote class={cn(cardClass, sClass)} ref={quoteRef} />
-        <Mode2Custom class={cn(cardClass, sClass)} ref={customRef} />
-      </Anime>
-      <TCButton
-        class={
-          "pointer-events-none absolute right-0 self-center px-(--horizontal-padding) opacity-0 transition-[margin-right,background-color,opacity] duration-125 group-hover:pointer-events-auto group-hover:mr-[calc((1.25em+(var(--horizontal-padding)*2))*-1)] group-hover:opacity-100 hover:mr-[calc((1.25em+(var(--horizontal-padding)*2))*-1)] hover:opacity-100"
-        }
-        fa={{ icon: "fa-share" }}
+        <For each={BAR_PILLS.right}>
+          {(configKey) => <BarControl configKey={configKey} />}
+        </For>
+      </AnimatedCard>
+      {/* SB-089 — kept exactly as monkeytype renders it: hidden at opacity-0,
+          revealed on group-hover, sliding out to the right of the card. */}
+      <button
+        type="button"
+        class={cn(
+          textButtonClass,
+          "pointer-events-none absolute right-0 self-center px-(--horizontal-padding) opacity-0 transition-[margin-right,background-color,opacity] duration-125 group-hover:pointer-events-auto group-hover:mr-[calc((1.25em+(var(--horizontal-padding)*2))*-1)] group-hover:opacity-100 hover:mr-[calc((1.25em+(var(--horizontal-padding)*2))*-1)] hover:opacity-100",
+        )}
+        {...buildBalloonHtmlProperties({
+          text: "share test settings",
+          position: "up",
+        })}
         onClick={() => showModal("ShareTestSettings")}
-      />
-    </div>
-  );
-}
-
-function Mode2Time(props: ComponentProps<"div">): JSXElement {
-  const times = [15, 30, 60, 120] as const;
-
-  return (
-    <div {...props}>
-      <For each={times}>
-        {(time) => (
-          <TCButton
-            text={`${time}`}
-            active={getConfig.time === time}
-            onClick={() => {
-              setConfig("time", time);
-              restartTestEvent.dispatch();
-            }}
-          />
-        )}
-      </For>
-      <TCButton
-        active={!times.includes(getConfig.time as (typeof times)[number])}
-        fa={{
-          icon: "fa-tools",
-        }}
-        onClick={() => {
-          showModal("TestDuration");
-        }}
-      />
-    </div>
-  );
-}
-
-function Mode2Words(props: ComponentProps<"div">): JSXElement {
-  const wordCounts = [10, 25, 50, 100] as const;
-
-  return (
-    <div {...props}>
-      <For each={wordCounts}>
-        {(count) => (
-          <TCButton
-            text={`${count}`}
-            active={getConfig.words === count}
-            onClick={() => {
-              setConfig("words", count);
-              restartTestEvent.dispatch();
-            }}
-          />
-        )}
-      </For>
-      <TCButton
-        active={
-          !wordCounts.includes(getConfig.words as (typeof wordCounts)[number])
-        }
-        fa={{
-          icon: "fa-tools",
-        }}
-        onClick={() => {
-          showModal("CustomWordAmount");
-        }}
-      />
-    </div>
-  );
-}
-
-function Mode2Quote(props: ComponentProps<"div">): JSXElement {
-  const quoteLengths = [
-    { text: "short", length: 0 },
-    { text: "medium", length: 1 },
-    { text: "long", length: 2 },
-    { text: "thicc", length: 3 },
-  ] as const;
-
-  return (
-    <div {...props}>
-      <TCButton
-        text="all"
-        active={areUnsortedArraysEqual(getConfig.quoteLength, [0, 1, 2, 3])}
-        onClick={() => {
-          setQuoteLengthAll();
-          restartTestEvent.dispatch();
-        }}
-      />
-      <For each={quoteLengths}>
-        {({ text, length }) => (
-          <TCButton
-            text={text}
-            active={areUnsortedArraysEqual(getConfig.quoteLength, [length])}
-            onClick={() => {
-              setConfig("quoteLength", [length]);
-              restartTestEvent.dispatch();
-            }}
-          />
-        )}
-      </For>
-      <Show when={isAuthenticated()}>
-        <TCButton
-          fa={{
-            icon: "fa-heart",
-          }}
-          active={areUnsortedArraysEqual(getConfig.quoteLength, [-3])}
-          onClick={() => {
-            setConfig("quoteLength", [-3]);
-            restartTestEvent.dispatch();
-          }}
-        />
-      </Show>
-      <TCButton
-        fa={{
-          icon: "fa-search",
-        }}
-        active={areUnsortedArraysEqual(getConfig.quoteLength, [-2])}
-        onClick={() => {
-          showModal("QuoteSearch");
-        }}
-      />
-    </div>
-  );
-}
-
-function Mode2Custom(props: ComponentProps<"div">): JSXElement {
-  return (
-    <div {...props}>
-      <TCButton
-        text="change"
-        onClick={() => {
-          showModal("CustomText");
-        }}
-      />
+      >
+        <Icon icon="tabler:share" fixedWidth />
+      </button>
     </div>
   );
 }

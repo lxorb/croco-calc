@@ -1,52 +1,44 @@
+import { buildSettingsId } from "@croco-calc/schemas/math";
 import { createMemo } from "solid-js";
 
 import { getConfig } from "../../../../config/store";
 import { getLocalPB } from "../../../../db";
-import { getFormatting, isAuthenticated } from "../../../../states/core";
+import { isAuthenticated } from "../../../../states/core";
 import { getSnapshot } from "../../../../states/snapshot";
-import { getCurrentQuote } from "../../../../states/test";
-import { getActiveFunboxes } from "../../../../test/funbox/list";
-import { getMode2 } from "../../../../utils/misc";
 import { Notice } from "./Notice";
 
+/**
+ * The personal best for the current `(mode2, settingsId)` pair — the key that
+ * master C31 reduces CP-110, AC-065 and assumption A-12 to.
+ */
 export function PbNotice() {
   const displayText = createMemo(() => {
     if (!isAuthenticated()) return "";
-    const format = getFormatting();
 
-    //react on config.funbox
-    const _funbox = getConfig.funbox;
-    //react on new localPB
+    //react on a new localPB
     const _snapshot = getSnapshot();
 
-    const mode2 = getMode2(getConfig, getCurrentQuote());
-    const pb = getLocalPB(
-      getConfig.mode,
-      mode2,
-      getConfig.punctuation,
-      getConfig.numbers,
-      getConfig.language,
-      getConfig.difficulty,
-      getConfig.lazyMode,
-      getActiveFunboxes(),
-    );
+    const settingsId = buildSettingsId({
+      addition: getConfig.addition,
+      multiplication: getConfig.multiplication,
+      division: getConfig.division,
+      fractionAddition: getConfig.fractionAddition,
+      fractionMultiplication: getConfig.fractionMultiplication,
+      decimals: getConfig.decimals,
+      negatives: getConfig.negatives,
+    });
+
+    const pb = getLocalPB(`${getConfig.time}`, settingsId);
 
     if (pb === undefined) return "no pb";
 
-    const speed = format.typingSpeed(pb.wpm, {
-      showDecimalPlaces: true,
-      suffix: ` ${getConfig.typingSpeedUnit}`,
-    });
-
-    const acc = format.accuracy(pb.acc, { suffix: ` acc` });
-
-    return `${speed} ${acc}`;
+    return `${Math.round(pb.score)} ${Math.round(pb.acc)}% acc`;
   });
 
   return (
     <Notice
       when={isAuthenticated() && getConfig.showPb}
-      icon="fa-crown"
+      icon="ph:crown-bold"
       openCommandline="showPb"
       text={displayText()}
     />

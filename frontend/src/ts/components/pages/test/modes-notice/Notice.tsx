@@ -2,15 +2,22 @@ import { ParentProps, Show } from "solid-js";
 
 import { CommandlineSubgroupKey } from "../../../../commandline/types";
 import { showCommandLineForConfig } from "../../../../states/core";
-import { FaSolidIcon } from "../../../../types/font-awesome";
 import { cn } from "../../../../utils/cn";
 import { OneOf } from "../../../../utils/types";
 import { Button } from "../../../common/Button";
-import { Fa } from "../../../common/Fa";
+import { Icon } from "../../../common/Icon";
+
+/**
+ * One entry in the strip under the settings bar. Either a plain `div` or —
+ * when `onClick`/`openCommandline` is supplied — a clickable text button that
+ * opens the command palette on the relevant subgroup (SB-181).
+ *
+ * `icon` is an iconify id (master C10), not a font awesome class.
+ */
 export function Notice(
   props: {
     when: boolean | undefined;
-    icon?: FaSolidIcon;
+    icon?: string;
     class?: string;
   } & OneOf<{ children: ParentProps["children"]; text: string | undefined }> &
     Partial<
@@ -31,8 +38,10 @@ export function Notice(
             props.openCommandline as CommandlineSubgroupKey,
           ))
       }
-      fa={props.icon !== undefined ? { icon: props.icon } : undefined}
     >
+      <Show when={props.icon !== undefined}>
+        <Icon icon={props.icon as string} />
+      </Show>
       {props.children ?? props.text}
     </Button>
   );
@@ -40,7 +49,7 @@ export function Notice(
   const DivNotice = () => (
     <div class={cn("flex items-center gap-2", props.class)}>
       <Show when={props.icon !== undefined}>
-        <Fa icon={props.icon as FaSolidIcon} />
+        <Icon icon={props.icon as string} />
       </Show>
       {props.children ?? props.text}
     </div>

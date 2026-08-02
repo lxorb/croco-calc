@@ -2,40 +2,40 @@ import { createMemo, JSXElement } from "solid-js";
 
 import { useUserAverage10LiveQuery } from "../../../../collections/results";
 import { getConfig } from "../../../../config/store";
-import { getFormatting, isAuthenticated } from "../../../../states/core";
+import { isAuthenticated } from "../../../../states/core";
 import { Notice } from "./Notice";
 
+/**
+ * The rolling average of the last ten results for the current settings.
+ * croco calc's headline metric is `score`, not wpm (master C40), so the
+ * readout reads `<score> avg <acc>% acc`.
+ */
 export function AverageNotice(): JSXElement {
   const last10 = useUserAverage10LiveQuery({
     isEnabled: () => isAuthenticated() && getConfig.showAverage !== "off",
   });
 
   const displayText = createMemo(() => {
-    if (last10() === undefined) return "no average";
+    const average = last10();
+    if (average === undefined) return "no average";
 
-    const format = getFormatting();
-    let speed = undefined;
-    let acc = undefined;
+    const parts: string[] = [];
 
     if (getConfig.showAverage === "both" || getConfig.showAverage === "speed") {
-      speed = format.typingSpeed(last10()?.wpm ?? 0, {
-        suffix: ` ${getConfig.typingSpeedUnit}`,
-      });
+      parts.push(`${Math.round(average.score ?? 0)} avg`);
     }
 
     if (getConfig.showAverage === "both" || getConfig.showAverage === "acc") {
-      acc = format.accuracy(last10()?.acc ?? 0, {
-        suffix: " acc",
-      });
+      parts.push(`${Math.round(average.acc ?? 0)}% acc`);
     }
 
-    return [speed, acc].filter((it) => it !== undefined).join(" ");
+    return parts.join(" ");
   });
 
   return (
     <Notice
       when={isAuthenticated() && getConfig.showAverage !== "off"}
-      icon="fa-chart-bar"
+      icon="ph:chart-bar-bold"
       openCommandline="showAverage"
       text={displayText()}
     />
