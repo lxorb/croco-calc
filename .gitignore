@@ -30,6 +30,8 @@ lib-cov
 
 # Coverage directory used by tools like istanbul
 coverage
+# …but `docs/coverage/` is the DoD-02 / DoD-51 evidence, not test output.
+!docs/coverage/
 
 # nyc test coverage
 .nyc_output
