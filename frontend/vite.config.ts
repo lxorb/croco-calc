@@ -22,7 +22,6 @@ import { injectPreload } from "./vite-plugins/inject-preload";
 import Inspect from "vite-plugin-inspect";
 import { ViteMinifyPlugin } from "vite-plugin-minify";
 import { VitePWA } from "vite-plugin-pwa";
-import { KnownFontName } from "@croco-calc/schemas/fonts";
 import solidPlugin from "vite-plugin-solid";
 import devtools from "solid-devtools/vite";
 import tailwindcss from "@tailwindcss/vite";
@@ -34,7 +33,10 @@ function getFontsConfig(): string {
   return `\n${Object.keys(Fonts)
     .sort()
     .map((name: string) => {
-      const config = Fonts[name as KnownFontName];
+      // Keyed off `Fonts` itself. The old `KnownFontName` came from
+      // @croco-calc/schemas/fonts, which no longer exists now that the font
+      // list is cut down to the two croco calc ships (INV-063).
+      const config = Fonts[name as keyof typeof Fonts];
       if (config.systemFont === true) return "";
       return `"${name.replaceAll("_", " ")}": (
         "src": "${config.fileName}",
@@ -99,6 +101,31 @@ function requireBackendUrl(env: Record<string, string>, mode: string): string {
     );
   }
   return backendUrl;
+}
+
+/**
+ * INF-105: a production build without a site key ships an unusable captcha.
+ * INF-107: Google's published test key must not reach production either — it
+ * validates every response, so it is worse than no captcha at all.
+ */
+function requireRecaptchaSiteKey(
+  env: Record<string, string>,
+  mode: string,
+): string {
+  const siteKey = env["RECAPTCHA_SITE_KEY"];
+  // loadEnv returns "" for a variable that is set but empty, so `=== undefined`
+  // alone would let `RECAPTCHA_SITE_KEY=` through.
+  if (siteKey === undefined || siteKey.trim() === "") {
+    throw new Error(
+      `${mode}: RECAPTCHA_SITE_KEY is not defined. Register a v2 site at https://www.google.com/recaptcha/admin.`,
+    );
+  }
+  if (siteKey.startsWith("6LeIxAcTAAAA")) {
+    throw new Error(
+      `${mode}: RECAPTCHA_SITE_KEY is Google's public test key, which accepts every response (INF-107).`,
+    );
+  }
+  return siteKey;
 }
 
 /** Hostname of the API, so the service worker never caches API responses (INF-031). */
@@ -329,9 +356,7 @@ export default defineConfig(({ mode }): UserConfig => {
 
   if (!isDevelopment) {
     requireBackendUrl(env, mode);
-    if (env["RECAPTCHA_SITE_KEY"] === undefined) {
-      throw new Error(`${mode}: RECAPTCHA_SITE_KEY is not defined`);
-    }
+    requireRecaptchaSiteKey(env, mode);
   }
 
   return {
