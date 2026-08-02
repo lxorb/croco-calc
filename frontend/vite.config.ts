@@ -18,6 +18,7 @@ import { firebaseConfig } from "./vite-plugins/firebase-config";
 import { minifyJson } from "./vite-plugins/minify-json";
 import { versionFile } from "./vite-plugins/version-file";
 import { oxlintChecker } from "./vite-plugins/oxlint-checker";
+import { backendPreconnect } from "./vite-plugins/backend-preconnect";
 import { injectPreload } from "./vite-plugins/inject-preload";
 import Inspect from "vite-plugin-inspect";
 import { ViteMinifyPlugin } from "vite-plugin-minify";
@@ -156,6 +157,8 @@ function getPlugins({
     icons({ srcDir: path.resolve(__dirname, "src") }),
     envConfig({ isDevelopment, clientVersion, env }),
     injectHTML() as PluginOption,
+    // INF-030 — runs after `injectHTML` has pulled `head.html` in.
+    backendPreconnect(env),
     tailwindcss(),
 
     solidPlugin(),

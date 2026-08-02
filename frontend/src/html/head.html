@@ -1,10 +1,12 @@
 <head>
   <!--
-    INF-030. The API lives on its own origin; preconnecting saves a round trip
-    on the first call. The Azure Container App is fronted by api.crococalc.com,
-    which is what `BACKEND_URL` resolves to in production.
+    INF-030. The API preconnect is NOT written here: the Container App's FQDN
+    contains an environment hash Azure only assigns at create time (INF-047),
+    and no custom API domain is provisioned for v1 (INF-025, §5.2). It is
+    generated from `BACKEND_URL` at build time by
+    `vite-plugins/backend-preconnect.ts`, the same value INF-013 guards and
+    INF-031 uses for the service worker.
   -->
-  <link rel="preconnect" href="https://api.crococalc.com" />
   <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
   <link rel="preconnect" href="https://www.google.com" />
   <link rel="preconnect" href="https://www.gstatic.com" />
