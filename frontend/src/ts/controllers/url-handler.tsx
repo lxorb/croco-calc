@@ -1,4 +1,3 @@
-import { getChallenges } from "@monkeytype/challenges";
 import {
   CustomBackgroundFilter,
   CustomBackgroundFilterSchema,
@@ -18,6 +17,7 @@ import {
 } from "@croco-calc/schemas/shared";
 import { parseWithSchema as parseJsonWithSchema } from "@croco-calc/util/json";
 import { tryCatchSync } from "@croco-calc/util/trycatch";
+import { getChallenges } from "@monkeytype/challenges";
 import { decompressFromURI } from "lz-ts";
 import { z } from "zod";
 
