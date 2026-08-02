@@ -8,10 +8,14 @@ export const ScoreHistogramSchema = z.record(
 );
 export type ScoreHistogram = z.infer<typeof ScoreHistogramSchema>;
 
-/** monkeytype's site-wide `TypingStats`, renamed with the AC-014 vocabulary. */
-export const SiteStatsSchema = z.object({
-  timeSpent: z.number().nonnegative(),
+/**
+ * CP-135: monkeytype's site-wide `TypingStats`, renamed with the AC-014
+ * vocabulary. The wire field is `timeTraining` (seconds); the Mongo document in
+ * the `public` collection may keep storing it as `timeSpent`.
+ */
+export const TrainingStatsSchema = z.object({
+  timeTraining: z.number().nonnegative(),
   testsCompleted: z.number().int().nonnegative(),
   testsStarted: z.number().int().nonnegative(),
 });
-export type SiteStats = z.infer<typeof SiteStatsSchema>;
+export type TrainingStats = z.infer<typeof TrainingStatsSchema>;

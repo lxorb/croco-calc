@@ -3,15 +3,18 @@ import { z } from "zod";
 import { CommonResponses, meta, responseWithData } from "./util/api";
 import {
   ScoreHistogramSchema,
-  SiteStatsSchema,
+  TrainingStatsSchema,
 } from "@croco-calc/schemas/public";
-import { ModeSchema } from "@croco-calc/schemas/shared";
-import { LeaderboardMode2Schema } from "@croco-calc/schemas/math";
 
+/**
+ * CP-137: the histogram is keyed by the leaderboard duration alone — `mode` is
+ * always `time` and language was removed from the leaderboard entirely, so the
+ * query collapses to the two `LEADERBOARD_TIMES` (SB-176). The router runs with
+ * `jsonQuery: true`, so `?time=8` arrives JSON-decoded as the number `8`.
+ */
 export const GetScoreHistogramQuerySchema = z
   .object({
-    mode: ModeSchema,
-    mode2: LeaderboardMode2Schema,
+    time: z.union([z.literal(4), z.literal(8)]),
   })
   .strict();
 export type GetScoreHistogramQuery = z.infer<
@@ -24,8 +27,11 @@ export type GetScoreHistogramResponse = z.infer<
   typeof GetScoreHistogramResponseSchema
 >;
 
-export const GetSiteStatsResponseSchema = responseWithData(SiteStatsSchema);
-export type GetSiteStatsResponse = z.infer<typeof GetSiteStatsResponseSchema>;
+export const GetTrainingStatsResponseSchema =
+  responseWithData(TrainingStatsSchema);
+export type GetTrainingStatsResponse = z.infer<
+  typeof GetTrainingStatsResponseSchema
+>;
 
 const c = initContract();
 export const publicContract = c.router(
@@ -42,13 +48,13 @@ export const publicContract = c.router(
       },
     },
 
-    getSiteStats: {
-      summary: "get site stats",
+    getTrainingStats: {
+      summary: "get training stats",
       description: "get number of tests and time users spend solving.",
       method: "GET",
-      path: "/siteStats",
+      path: "/trainingStats",
       responses: {
-        200: GetSiteStatsResponseSchema,
+        200: GetTrainingStatsResponseSchema,
       },
     },
   },
