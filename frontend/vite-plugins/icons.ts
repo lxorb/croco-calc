@@ -16,12 +16,12 @@
  * 2. `icons()` — a Vite plugin that audits the source tree on every build:
  *    every `set:name` literal under `src/` must exist in the generated bundle
  *    (CP-002 wants the icon set auditable), and the collection split of C10 is
- *    enforced — `tabler:*` only inside the settings bar, `ph:*` everywhere else.
+ *    enforced — `tabler:*` only for the settings bar's own documented icon set
+ *    (SB-060), `ph:*` everywhere else.
  *
- * The plugin is pure validation. Nothing at runtime depends on it being
- * registered, so the app builds and tests green either way; registering it in
- * `vite.config.ts` (WP-12) only turns a silently-missing icon into a build
- * failure.
+ * The plugin is pure validation: it reads the tree and reports, and never
+ * rewrites a module. `frontend/vite.config.ts` (WP-12) registers it, which is
+ * what turns a silently-missing or mis-collected icon into a build failure.
  */
 
 import { createRequire } from "node:module";
@@ -43,14 +43,53 @@ export type IconPrefix = (typeof ICON_PREFIXES)[number];
 export const ICON_ID_PATTERN = /\b(?:ph|tabler):[a-z0-9]+(?:-[a-z0-9]+)*\b/g;
 
 /**
- * SB-061: the settings bar is the single documented `tabler:*` exception, and
- * it may not mix collections. Paths are `src/`-relative prefixes.
+ * The settings bar's own icon set — SB-060's table verbatim, which is the whole
+ * of the `tabler:*` exception C10 grants. `tabler:plus-minus` is the one
+ * addition: SB-011's negatives control cycles through an ON state that shows
+ * both signs. Any other `tabler:*` id anywhere in the tree is a C10 violation,
+ * because the exception is the bar's *documented set*, not the collection.
+ */
+export const TABLER_BAR_ICONS = new Set([
+  "tabler:plus",
+  "tabler:x",
+  "tabler:divide",
+  "tabler:math-1-divide-2",
+  "tabler:math-x-divide-y",
+  "tabler:decimal",
+  "tabler:minus",
+  "tabler:plus-minus",
+  "tabler:clock",
+  "tabler:settings",
+  "tabler:share",
+  "tabler:trophy",
+  "tabler:refresh",
+]);
+
+/**
+ * SB-061: the bar reads as one typographic unit, so its own components may not
+ * mix collections — inside these paths `ph:*` is prohibited. Paths are
+ * `src/`-relative prefixes.
  */
 export const TABLER_ONLY_PATHS = [
   "ts/components/pages/test/TestConfig.tsx",
   "ts/components/pages/test/modes-notice/",
   "ts/components/modals/MobileTestConfigModal.tsx",
   "ts/components/modals/ShareTestSettings.tsx",
+];
+
+/**
+ * Where a `TABLER_BAR_ICONS` id may appear. SB-060's table already reaches past
+ * the bar's own markup: the "restore defaults" row is a **commandline** command
+ * (SB-157, `tabler:refresh`) and the eight bar commands of SB-152/SB-156 are
+ * generated from config metadata, so their icons are declared in
+ * `ts/config/metadata.tsx` rather than in a bar component. Those two homes are
+ * part of the bar's surface and are listed here; everywhere else `ph:*` is the
+ * only collection (C10).
+ */
+export const TABLER_ALLOWED_PATHS = [
+  ...TABLER_ONLY_PATHS,
+  "ts/commandline/",
+  "ts/config/metadata.tsx",
 ];
 
 /**
@@ -61,10 +100,16 @@ export const TABLER_ONLY_PATHS = [
  * icon name while it migrates off the deleted `Fa.tsx`.
  *
  * It lives here rather than in the component because DoD-12 requires
- * `grep -rn "fa-|@fortawesome" frontend/src` to return nothing. The generator
- * unions these values into the bundle, so every icon a migrating call site can
- * possibly need already ships. Once the last call site uses a literal `ph:*`
- * id, this table can be deleted.
+ * `grep -rn "fa-|@fortawesome" frontend/src` to return nothing. That is also
+ * why no `frontend/src` module can import it: the table is a migration sheet
+ * for the packages still holding `fa-` call sites, not a runtime lookup. The
+ * generator unions these values into the bundle, so every icon a migrating call
+ * site can possibly need already ships. Once the last call site uses a literal
+ * `ph:*` id, this table can be deleted.
+ *
+ * The names it deliberately does not map are `FA_UNMAPPED` below, and the test
+ * suite asserts that the two lists together cover every `fa-*` string left in
+ * `frontend/src` — so the table cannot silently fall behind the tree.
  */
 export const FA_TO_PHOSPHOR: Record<string, string> = {
   "fa-ad": "ph:megaphone-bold",
@@ -73,7 +118,10 @@ export const FA_TO_PHOSPHOR: Record<string, string> = {
   "fa-angle-double-up": "ph:caret-double-up-bold",
   "fa-angle-down": "ph:caret-down-bold",
   "fa-angle-up": "ph:caret-up-bold",
+  "fa-arrow-down": "ph:arrow-down-bold",
   "fa-arrow-left": "ph:arrow-left-bold",
+  "fa-arrow-right": "ph:arrow-right-bold",
+  "fa-arrow-up": "ph:arrow-up-bold",
   "fa-at": "ph:at-bold",
   "fa-award": "ph:medal-bold",
   "fa-backspace": "ph:backspace-bold",
@@ -140,6 +188,7 @@ export const FA_TO_PHOSPHOR: Record<string, string> = {
   "fa-fill-drip": "ph:paint-bucket-bold",
   "fa-filter": "ph:funnel-bold",
   "fa-fire": "ph:fire-bold",
+  "fa-fire-alt": "ph:fire-bold",
   "fa-flag": "ph:flag-bold",
   "fa-flask": "ph:flask-bold",
   "fa-folder": "ph:folder-bold",
@@ -174,13 +223,16 @@ export const FA_TO_PHOSPHOR: Record<string, string> = {
   "fa-list": "ph:list-bullets-bold",
   "fa-list-ol": "ph:list-numbers-bold",
   "fa-lock": "ph:lock-bold",
+  "fa-long-arrow-alt-right": "ph:arrow-right-bold",
   "fa-minus": "ph:minus-bold",
   "fa-mountain": "ph:mountains-bold",
   "fa-mouse-pointer": "ph:cursor-bold",
   "fa-palette": "ph:palette-bold",
   "fa-patreon": "ph:patreon-logo-bold",
+  "fa-pause": "ph:pause-bold",
   "fa-pen": "ph:pencil-simple-bold",
   "fa-pen-fancy": "ph:pen-nib-bold",
+  "fa-play": "ph:play-bold",
   "fa-plus": "ph:plus-bold",
   "fa-question": "ph:question-bold",
   "fa-question-circle": "ph:question-bold",
@@ -188,6 +240,7 @@ export const FA_TO_PHOSPHOR: Record<string, string> = {
   // cut, and DoD-07 bans the token from frontend/src, which the bundled icon
   // id "ph:quotes-bold" would reintroduce.
   "fa-random": "ph:shuffle-bold",
+  "fa-redo": "ph:arrow-clockwise-bold",
   "fa-redo-alt": "ph:arrow-clockwise-bold",
   "fa-ruler": "ph:ruler-bold",
   "fa-running": "ph:person-simple-run-bold",
@@ -199,6 +252,7 @@ export const FA_TO_PHOSPHOR: Record<string, string> = {
   "fa-sign-in-alt": "ph:sign-in-bold",
   "fa-sign-out-alt": "ph:sign-out-bold",
   "fa-sliders-h": "ph:sliders-horizontal-bold",
+  "fa-slash": "ph:prohibit-bold",
   "fa-sort-down": "ph:caret-down-bold",
   "fa-sort-up": "ph:caret-up-bold",
   "fa-square": "ph:square-bold",
@@ -240,6 +294,25 @@ export const FA_TO_PHOSPHOR: Record<string, string> = {
   "fa-volume-mute": "ph:speaker-slash-bold",
   "fa-volume-up": "ph:speaker-high-bold",
   "fa-wrench": "ph:wrench-bold",
+};
+
+/**
+ * Font Awesome strings that `FA_TO_PHOSPHOR` deliberately leaves out, with the
+ * reason. The icon spec test asserts this list plus the table covers every
+ * `fa-*` string still in `frontend/src`, so "unmapped" always means "listed
+ * here on purpose" and never "nobody noticed" (AC-020).
+ */
+export const FA_UNMAPPED: Record<string, string> = {
+  // Modifier classes, not icon names: `Icon.tsx` expresses them as props
+  // (SB-062) or, for the rotation, as a caller-side transform.
+  "fa-fw": "modifier — the `fixedWidth` prop",
+  "fa-spin": "modifier — the `spin` prop",
+  "fa-rotate-90": "modifier — no icon of its own",
+  // Cut feature. The phosphor equivalent spells a term DoD-07 bans from
+  // `frontend/src`, and mapping it would push that term into the generated
+  // bundle; both call sites are deleted with the feature.
+  "fa-quote-left": "cut feature, and the phosphor name is banned vocabulary",
+  "fa-quote-right": "cut feature, and the phosphor name is banned vocabulary",
 };
 
 const START_MARKER = "// #region GENERATED ICON BUNDLE";
@@ -438,17 +511,25 @@ export async function generateIconBundle(
   return { bundled: ids, bytes: block.length };
 }
 
+/**
+ * Every `.ts`/`.tsx`/`.html` file under `dir`. Sibling directories are walked
+ * concurrently: the audit runs inside `buildStart` and inside the test suite,
+ * where a serial walk of `frontend/src` is slow enough to blow a test timeout.
+ */
 async function collectSourceFiles(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   const files: string[] = [];
+  const nested = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => collectSourceFiles(path.join(dir, entry.name))),
+  );
   for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await collectSourceFiles(full)));
-    } else if (/\.(?:tsx?|html)$/.test(entry.name)) {
-      files.push(full);
+    if (!entry.isDirectory() && /\.(?:tsx?|html)$/.test(entry.name)) {
+      files.push(path.join(dir, entry.name));
     }
   }
+  for (const group of nested) files.push(...group);
   return files;
 }
 
@@ -459,8 +540,55 @@ export type IconAuditProblem = {
 };
 
 /**
+ * The C10 placement rule for one id in one `src/`-relative file. Returns
+ * `undefined` when the id is where it belongs.
+ *
+ * - `tabler:*` must be one of SB-060's documented bar icons, and must sit in a
+ *   settings-bar file or on the commands that drive the bar (SB-156, SB-157).
+ * - `ph:*` is the collection everywhere else, and SB-061 keeps it out of the
+ *   bar's own components so the bar never mixes stroke weights.
+ */
+export function iconPlacementProblem(
+  id: string,
+  relative: string,
+): "wrong-collection" | undefined {
+  const misplaced = id.startsWith("tabler:")
+    ? !TABLER_BAR_ICONS.has(id) ||
+      !TABLER_ALLOWED_PATHS.some((p) => relative.startsWith(p))
+    : TABLER_ONLY_PATHS.some((p) => relative.startsWith(p));
+  return misplaced ? "wrong-collection" : undefined;
+}
+
+/** How many files the audit reads at once. */
+const READ_CONCURRENCY = 32;
+
+async function mapConcurrently<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (next < items.length) {
+        const index = next++;
+        results[index] = await fn(items[index] as T);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+/**
  * Walks `srcDir` and reports every icon literal that is not in the bundle or
- * sits on the wrong side of the C10 collection split.
+ * sits on the wrong side of the C10 collection split:
+ *
+ * - a `tabler:*` id that is not one of SB-060's documented bar icons, anywhere;
+ * - a `tabler:*` id outside `TABLER_ALLOWED_PATHS`;
+ * - a `ph:*` id inside `TABLER_ONLY_PATHS`, which SB-061 forbids from mixing.
  */
 export async function auditIconUsage(
   srcDir: string,
@@ -468,38 +596,55 @@ export async function auditIconUsage(
 ): Promise<IconAuditProblem[]> {
   const source = await readFile(iconComponent, "utf8");
   const bundled = readBundledIcons(source);
-  const problems: IconAuditProblem[] = [];
+  const files = (await collectSourceFiles(srcDir)).filter(
+    (file) => path.resolve(file) !== path.resolve(iconComponent),
+  );
 
-  for (const file of await collectSourceFiles(srcDir)) {
-    if (path.resolve(file) === path.resolve(iconComponent)) continue;
-    const relative = path.relative(srcDir, file).replaceAll("\\", "/");
-    const tablerAllowed = TABLER_ONLY_PATHS.some((p) => relative.startsWith(p));
-    const text = await readFile(file, "utf8");
-    for (const id of new Set(text.match(ICON_ID_PATTERN) ?? [])) {
-      if (!bundled.has(id)) {
-        problems.push({ file: relative, id, reason: "unbundled" });
-        continue;
-      }
-      const isTabler = id.startsWith("tabler:");
-      if (isTabler !== tablerAllowed) {
-        problems.push({ file: relative, id, reason: "wrong-collection" });
-      }
-    }
-  }
+  const perFile = await mapConcurrently(
+    files,
+    READ_CONCURRENCY,
+    async (file) => {
+      const relative = path.relative(srcDir, file).replaceAll("\\", "/");
+      const text = await readFile(file, "utf8");
+      const ids = new Set(text.match(ICON_ID_PATTERN) ?? []);
+      if (ids.size === 0) return [];
 
-  return problems;
+      const problems: IconAuditProblem[] = [];
+      for (const id of ids) {
+        if (!bundled.has(id)) {
+          problems.push({ file: relative, id, reason: "unbundled" });
+          continue;
+        }
+        const reason = iconPlacementProblem(id, relative);
+        if (reason !== undefined) problems.push({ file: relative, id, reason });
+      }
+      return problems;
+    },
+  );
+
+  return perFile.flat();
 }
 
 export type IconsPluginOptions = {
-  /** Absolute path to `frontend/src`. Defaults to `<root>/src`. */
+  /** Absolute path to `frontend/src`. Derived from vite's `root` if omitted. */
   srcDir?: string;
   /** Fail the build instead of warning. Defaults to `true` for `vite build`. */
   strict?: boolean;
 };
 
 /**
+ * `frontend/vite.config.ts` sets `root` to `frontend/src`, but a bare
+ * `icons()` in some other config would get `frontend/`. Resolve both without
+ * making the caller care, so the plugin never silently audits an empty tree.
+ */
+export function resolveSrcDir(root: string): string {
+  return path.basename(root) === "src" ? root : path.resolve(root, "src");
+}
+
+/**
  * Vite plugin: enforces CP-002 (auditable literal `set:name` strings) and C10
- * (phosphor app-wide, tabler in the settings bar) at build time.
+ * (phosphor app-wide, SB-060's documented set for the settings bar and the
+ * commands that drive it) at build time.
  */
 export function icons(options: IconsPluginOptions = {}): Plugin {
   let srcDir = options.srcDir;
@@ -508,7 +653,7 @@ export function icons(options: IconsPluginOptions = {}): Plugin {
   return {
     name: "croco-calc:icons",
     configResolved(config) {
-      srcDir ??= path.resolve(config.root, "src");
+      srcDir ??= resolveSrcDir(config.root);
       const isProductionBuild = config.command === "build";
       strict = options.strict ?? isProductionBuild;
     },
@@ -529,7 +674,7 @@ export function icons(options: IconsPluginOptions = {}): Plugin {
         ...problems.map(({ file, id, reason }) =>
           reason === "unbundled"
             ? `  ${file}: "${id}" is not in the generated bundle — add it to Icon.tsx and run \`npx tsx ./vite-plugins/icons.ts\``
-            : `  ${file}: "${id}" breaks the C10 collection split (tabler:* is settings-bar only, ph:* everywhere else)`,
+            : `  ${file}: "${id}" breaks the C10 collection split (tabler:* is SB-060's settings-bar set, in settings-bar files only; ph:* everywhere else)`,
         ),
       ].join("\n");
 
