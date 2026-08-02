@@ -12,6 +12,7 @@ import {
 import { Config, setFullConfigStore } from "./store";
 import { getDefaultConfig } from "../constants/default-config";
 import { configEvent } from "../events/config";
+import { restartTestEvent } from "../events/test";
 import { migrateConfig } from "./utils";
 import { promiseWithResolvers } from "../utils/misc";
 import { setConfig } from "./setters";
@@ -128,9 +129,15 @@ export async function resetConfig(): Promise<void> {
 
 /**
  * SB-157 — set all eight settings-bar keys back to the SB-110 defaults in one
- * `applyConfig` call, leaving every appearance/behaviour key untouched. Backs
- * the `restoreDefaultTestSettings` palette command and the clickable
- * "not eligible for leaderboards" notice (SB-181).
+ * `applyConfig` call, leaving every appearance/behaviour key untouched, then
+ * restart the test. Backs the `restoreDefaultTestSettings` palette command and
+ * the clickable "not eligible for leaderboards" notice (SB-181).
+ *
+ * The restart is dispatched here rather than at the two call sites so both
+ * surfaces inherit it, and for the same reason SB-054 requires it of every
+ * single-control change: `applyConfig` ran with `nosave`/`partOfFullConfigChange`
+ * and therefore skipped the per-key `changeRequiresRestart` path, so without
+ * this dispatch the already-generated task list would keep the old settings.
  */
 export async function restoreDefaultTestSettings(): Promise<void> {
   const defaults = getDefaultConfig();
@@ -146,6 +153,7 @@ export async function restoreDefaultTestSettings(): Promise<void> {
     time: defaults.time,
   });
   saveFullConfigToLocalStorage();
+  restartTestEvent.dispatch();
 }
 
 const { promise: configLoadPromise, resolve: loadDone } =
