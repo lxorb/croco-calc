@@ -4,96 +4,62 @@ import { Formatting } from "../../src/ts/utils/format";
 import { Config } from "@croco-calc/schemas/configs";
 
 describe("format.ts", () => {
-  describe("typingsSpeed", () => {
-    it("should format with typing speed and decimalPlaces from configuration", () => {
-      //wpm, no decimals
-      const wpmNoDecimals = getInstance({
-        typingSpeedUnit: "wpm",
-        alwaysShowDecimalPlaces: false,
-      });
-      expect(wpmNoDecimals.typingSpeed(12.5)).toEqual("13");
-      expect(wpmNoDecimals.typingSpeed(0)).toEqual("0");
+  /**
+   * CP-142 — there is one speed unit, `tpm` (tasks per minute). The upstream
+   * suite covered the wpm/cpm unit switch, which INV-118c deleted along with
+   * `typing-speed-units.ts`; these cases carry the same behaviours over to the
+   * one unit that remains.
+   */
+  describe("tpm", () => {
+    it("should format with decimalPlaces from configuration", () => {
+      const noDecimals = getInstance({ alwaysShowDecimalPlaces: false });
+      expect(noDecimals.tpm(12.5)).toEqual("13");
+      expect(noDecimals.tpm(0)).toEqual("0");
 
-      //cpm, no decimals
-      const cpmNoDecimals = getInstance({
-        typingSpeedUnit: "cpm",
-        alwaysShowDecimalPlaces: false,
-      });
-      expect(cpmNoDecimals.typingSpeed(12.5)).toEqual("63");
-      expect(cpmNoDecimals.typingSpeed(0)).toEqual("0");
-
-      //wpm, with decimals
-      const wpmWithDecimals = getInstance({
-        typingSpeedUnit: "wpm",
-        alwaysShowDecimalPlaces: true,
-      });
-      expect(wpmWithDecimals.typingSpeed(12.5)).toEqual("12.50");
-      expect(wpmWithDecimals.typingSpeed(0)).toEqual("0.00");
-
-      //cpm, with decimals
-      const cpmWithDecimals = getInstance({
-        typingSpeedUnit: "cpm",
-        alwaysShowDecimalPlaces: true,
-      });
-      expect(cpmWithDecimals.typingSpeed(12.5)).toEqual("62.50");
-      expect(cpmWithDecimals.typingSpeed(0)).toEqual("0.00");
+      const withDecimals = getInstance({ alwaysShowDecimalPlaces: true });
+      expect(withDecimals.tpm(12.5)).toEqual("12.50");
+      expect(withDecimals.tpm(0)).toEqual("0.00");
     });
 
     it("should format with fallback", () => {
-      //default fallback
       const format = getInstance();
-      expect(format.typingSpeed(null)).toEqual("-");
-      expect(format.typingSpeed(undefined)).toEqual("-");
+      expect(format.tpm(null)).toEqual("-");
+      expect(format.tpm(undefined)).toEqual("-");
 
-      //provided fallback
-      expect(format.typingSpeed(null, { fallback: "none" })).toEqual("none");
-      expect(format.typingSpeed(null, { fallback: "" })).toEqual("");
-      expect(format.typingSpeed(undefined, { fallback: "none" })).toEqual(
-        "none",
-      );
-
-      expect(format.typingSpeed(undefined, { fallback: "" })).toEqual("");
-      expect(format.typingSpeed(undefined, { fallback: undefined })).toEqual(
-        "",
-      );
+      expect(format.tpm(null, { fallback: "none" })).toEqual("none");
+      expect(format.tpm(null, { fallback: "" })).toEqual("");
+      expect(format.tpm(undefined, { fallback: "none" })).toEqual("none");
+      expect(format.tpm(undefined, { fallback: "" })).toEqual("");
+      expect(format.tpm(undefined, { fallback: undefined })).toEqual("");
     });
 
     it("should format with decimals", () => {
       //force with decimals
-      const wpmNoDecimals = getInstance({
-        typingSpeedUnit: "wpm",
-        alwaysShowDecimalPlaces: false,
-      });
-      expect(
-        wpmNoDecimals.typingSpeed(100, { showDecimalPlaces: true }),
-      ).toEqual("100.00");
+      const noDecimals = getInstance({ alwaysShowDecimalPlaces: false });
+      expect(noDecimals.tpm(100, { showDecimalPlaces: true })).toEqual(
+        "100.00",
+      );
       //force without decimals
-      const wpmWithDecimals = getInstance({
-        typingSpeedUnit: "wpm",
-        alwaysShowDecimalPlaces: true,
-      });
-      expect(
-        wpmWithDecimals.typingSpeed(100, { showDecimalPlaces: false }),
-      ).toEqual("100");
+      const withDecimals = getInstance({ alwaysShowDecimalPlaces: true });
+      expect(withDecimals.tpm(100, { showDecimalPlaces: false })).toEqual(
+        "100",
+      );
     });
 
     it("should format with suffix", () => {
-      const format = getInstance({
-        typingSpeedUnit: "wpm",
-        alwaysShowDecimalPlaces: false,
-      });
-      expect(format.typingSpeed(100, { suffix: " raw" })).toEqual("100 raw");
-      expect(format.typingSpeed(100, { suffix: undefined })).toEqual("100");
-      expect(format.typingSpeed(0, { suffix: " raw" })).toEqual("0 raw");
-      expect(format.typingSpeed(null, { suffix: " raw" })).toEqual("-");
-      expect(format.typingSpeed(undefined, { suffix: " raw" })).toEqual("-");
+      const format = getInstance({ alwaysShowDecimalPlaces: false });
+      expect(format.tpm(100, { suffix: " tpm" })).toEqual("100 tpm");
+      expect(format.tpm(100, { suffix: undefined })).toEqual("100");
+      expect(format.tpm(0, { suffix: " tpm" })).toEqual("0 tpm");
+      expect(format.tpm(null, { suffix: " tpm" })).toEqual("-");
+      expect(format.tpm(undefined, { suffix: " tpm" })).toEqual("-");
     });
 
     it("should format with rounding", () => {
       const format = getInstance({ alwaysShowDecimalPlaces: false });
-      expect(format.typingSpeed(80.25)).toEqual("80");
-      expect(format.typingSpeed(80.25, { rounding: Math.ceil })).toEqual("81");
-      expect(format.typingSpeed(80.75, { rounding: Math.floor })).toEqual("80");
+      expect(format.tpm(80.25)).toEqual("80");
+      expect(format.tpm(80.25, { rounding: Math.ceil })).toEqual("81");
+      expect(format.tpm(80.75, { rounding: Math.floor })).toEqual("80");
     });
   });
 
