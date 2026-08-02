@@ -31,6 +31,12 @@ provider "azurerm" {
     }
   }
   subscription_id = var.subscription_id
+
+  # INF-081 records that every required provider is already registered, and
+  # INF-085 scopes the CI identity to rg-croco-calc-prod — it deliberately holds
+  # no subscription-level */register/action. Leaving the default registration
+  # behaviour on would make every CI plan fail before it read a single resource.
+  resource_provider_registrations = "none"
 }
 
 # Credentials come from MONGODB_ATLAS_PUBLIC_KEY / MONGODB_ATLAS_PRIVATE_KEY in

@@ -16,6 +16,17 @@ variable "github_repository" {
   default     = "lxorb/croco-calc"
 }
 
+variable "github_environments" {
+  description = <<-EOT
+    GitHub deployment environments whose jobs authenticate to Azure with OIDC.
+    Each one needs its own federated credential because referencing an
+    environment rewrites the token's `sub` claim to
+    `repo:<owner>/<repo>:environment:<name>` (INF-079, INF-085, INF-130).
+  EOT
+  type        = list(string)
+  default     = ["prod", "prod-infra"]
+}
+
 variable "backup_retention_days" {
   description = "Days a mongodump archive is kept in the backups container (INF-061)."
   type        = number

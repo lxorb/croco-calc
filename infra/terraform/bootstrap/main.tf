@@ -127,9 +127,64 @@ resource "azurerm_federated_identity_credential" "cicd_pull_request" {
   subject             = "repo:${var.github_repository}:pull_request"
 }
 
+# The two credentials above cover the `ref:`/`pull_request` subjects INF-085
+# names verbatim. They are NOT sufficient on their own: the moment a job
+# declares `environment:`, GitHub swaps the OIDC `sub` claim from the `ref:`
+# form to `repo:<owner>/<repo>:environment:<name>`, and azure/login fails with
+# AADSTS70021 ("no matching federated identity record"). INF-079 requires the
+# apply job to sit behind a manual-approval environment, and INF-130's deploy
+# job uses one too, so both subjects must be registered as well.
+#
+#   infra.yml          apply  -> environment: prod-infra
+#   deploy-backend.yml deploy -> environment: prod
+resource "azurerm_federated_identity_credential" "cicd_environments" {
+  for_each = toset(var.github_environments)
+
+  name                = "github-env-${each.value}"
+  resource_group_name = azurerm_resource_group.tfstate.name
+  parent_id           = azurerm_user_assigned_identity.cicd.id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = "https://token.actions.githubusercontent.com"
+  subject             = "repo:${var.github_repository}:environment:${each.value}"
+}
+
 resource "azurerm_role_assignment" "cicd_prod_contributor" {
   scope                = azurerm_resource_group.prod.id
   role_definition_name = "Contributor"
+  principal_id         = azurerm_user_assigned_identity.cicd.principal_id
+}
+
+# Contributor explicitly denies Microsoft.Authorization/roleAssignments/write,
+# but the prod root module creates three of them on the Key Vault (INF-083,
+# INF-084, INF-085). Without this grant `terraform apply` from CI fails on the
+# vault module and INF-080's idempotency criterion is unreachable.
+#
+# "Role Based Access Control Administrator" is the least-privilege built-in that
+# carries roleAssignments write — narrower than "User Access Administrator",
+# which would also hand CI Microsoft.Authorization/*/write.
+resource "azurerm_role_assignment" "cicd_prod_rbac_admin" {
+  scope                = azurerm_resource_group.prod.id
+  role_definition_name = "Role Based Access Control Administrator"
+  principal_id         = azurerm_user_assigned_identity.cicd.principal_id
+}
+
+# INF-143's budget is an azurerm_consumption_budget_SUBSCRIPTION — a write at
+# /subscriptions/<id>, outside rg-croco-calc-prod. Cost Management Contributor
+# is the least-privilege built-in covering Microsoft.Consumption/* and grants no
+# access to any other resource.
+resource "azurerm_role_assignment" "cicd_cost_management" {
+  scope                = "/subscriptions/${var.subscription_id}"
+  role_definition_name = "Cost Management Contributor"
+  principal_id         = azurerm_user_assigned_identity.cicd.principal_id
+}
+
+# prod/main.tf reads `id-croco-calc-cicd` with a data source, and that identity
+# lives in rg-croco-calc-tfstate where CI otherwise holds only the *data-plane*
+# Storage Blob Data Contributor role. Without an ARM read the data source 403s
+# before any resource is touched.
+resource "azurerm_role_assignment" "cicd_self_reader" {
+  scope                = azurerm_user_assigned_identity.cicd.id
+  role_definition_name = "Reader"
   principal_id         = azurerm_user_assigned_identity.cicd.principal_id
 }
 
