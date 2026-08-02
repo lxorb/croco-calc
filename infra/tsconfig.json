@@ -1,21 +1,19 @@
 {
   // `infra/` is not a pnpm workspace package, so neither `mongodb` nor
   // `@types/node` resolve from here on their own. Without this file
-  // `oxlint --type-aware` sees every import as an error type and reports
-  // dozens of phantom no-unsafe-* violations in scripts/db-probe.ts.
+  // `oxlint --type-aware` treats every import as an error type and reports
+  // dozens of phantom no-unsafe-* violations in scripts/db-probe.ts. The
+  // compiler options come from the shared base by relative path — the
+  // `@croco-calc/typescript-config` specifier is not resolvable outside the
+  // workspace.
+  "extends": "../packages/typescript-config/base.json",
   "compilerOptions": {
     "target": "es2023",
     "lib": ["es2023"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "strict": true,
     "noEmit": true,
-    "skipLibCheck": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "noUncheckedIndexedAccess": true,
-    "types": ["node"],
     "typeRoots": ["../node_modules/@types"],
     "paths": {
+      // pnpm installs mongodb only under backend/.
       "mongodb": ["../backend/node_modules/mongodb/mongodb.d.ts"]
     }
   },
