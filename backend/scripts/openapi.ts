@@ -4,7 +4,6 @@ import { writeFileSync, mkdirSync } from "fs";
 import { EndpointMetadata, PermissionId } from "@croco-calc/contracts/util/api";
 import type { OpenAPIObject, OperationObject } from "openapi3-ts";
 import {
-  RateLimitIds,
   getLimits,
   RateLimiterId,
   Window,
@@ -23,11 +22,7 @@ export function getOpenApi(): OpenAPIObject {
       info: {
         title: "croco calc API",
         description:
-          "Documentation for the endpoints provided by the croco calc API server.
-
-Authentication is performed with the Authorization HTTP header in the format `Authorization: Bearer FIREBASE_ID_TOKEN`.
-
-There is a rate limit of `30 requests per minute` across all endpoints, with some endpoints being more strict.",
+          "Documentation for the endpoints provided by the croco calc API server.\n\nAuthentication is performed with the Authorization HTTP header in the format `Authorization: Bearer FIREBASE_ID_TOKEN`.\n\nThere is a rate limit of `30 requests per minute` across all endpoints, with some endpoints being more strict.",
         version: `2.${COMPATIBILITY_CHECK}.0`,
         termsOfService: "https://crococalc.com/terms-of-service",
         contact: {
@@ -62,8 +57,7 @@ There is a rate limit of `30 requests per minute` across all endpoints, with som
         },
         {
           name: "configs",
-          description:
-            "User specific configs like test settings or theme.",
+          description: "User specific configs like test settings or theme.",
           "x-displayName": "User configs",
           "x-public": "no",
         },
@@ -115,12 +109,6 @@ There is a rate limit of `30 requests per minute` across all endpoints, with som
             "Development related endpoints. Only available on dev environment",
           "x-displayName": "Development",
           "x-public": "no",
-        },
-        {
-          name: "webhooks",
-          description: "Endpoints for incoming webhooks.",
-          "x-displayName": "Webhooks",
-          "x-public": "yes",
         },
       ],
     },
@@ -221,18 +209,12 @@ function addRateLimit(
   };
 }
 
-function getRateLimitDescription(limit: RateLimiterId | RateLimitIds): string {
+function getRateLimitDescription(limit: RateLimiterId): string {
   const limits = getLimits(limit);
 
-  let result = `**Rate limit:** This operation can be called up to ${
+  const result = `**Rate limit:** This operation can be called up to ${
     limits.limiter.max
-  } times ${formatWindow(limits.limiter.window)} for regular users`;
-
-  if (limits.apeKeyLimiter !== undefined) {
-    result += ` and up to ${limits.apeKeyLimiter.max} times ${formatWindow(
-      limits.apeKeyLimiter.window,
-    )} with ApeKeys`;
-  }
+  } times ${formatWindow(limits.limiter.window)}`;
 
   return `${result}.\n\n`;
 }
