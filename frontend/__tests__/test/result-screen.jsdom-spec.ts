@@ -41,6 +41,24 @@ const SETTINGS: MathGeneratorSettings = {
 /** The C2 canonical settings the daily leaderboard is keyed on (SB-170). */
 const LEADERBOARD_SETTINGS = SETTINGS;
 
+/**
+ * `result.ts` pulls in config, the collections, the states, `math-engine` and
+ * the generated icon bundle; transforming and executing that graph cold costs
+ * ~3 s on an idle machine, and the whole 52-file suite competing for the CPU
+ * pushes it past vitest's default 5 s per-test budget. That is a fixed setup
+ * cost, not a slow assertion — every test after the first runs in well under
+ * 150 ms — so it gets an explicit, generous budget here rather than a
+ * `testTimeout` in `vitest.config.ts`, which is WP-12's file.
+ */
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
+
+/**
+ * U+2212 MINUS SIGN — what ME-161 and master C33 require on screen. Written as
+ * an escape rather than pasted so the assertion cannot silently pass on the
+ * ASCII hyphen U+002D, which is visually near-identical in a monospace editor.
+ */
+const MINUS_SIGN = "\u2212";
+
 let presenter: ((payload: TestResultPayload) => Promise<void>) | undefined;
 const restart = vi.fn();
 
@@ -206,11 +224,35 @@ function hook(name: string): string | null {
   return document.querySelector("#result")?.getAttribute(name) ?? null;
 }
 
+/**
+ * `present()` ends on `await Misc.promiseAnimate("#result", { duration:
+ * applyReducedMotion(125) })`, and jsdom's `matchMedia` answers `matches:
+ * false` to every query — so without this every render in this file really did
+ * sleep 125 ms, which is ~3 s of the runtime and most of the reason the file
+ * used to exceed vitest's default 5 s per-test timeout once a loaded full-suite
+ * run took the CPU away from it. Reporting the preference sends
+ * `Misc.applyReducedMotion` down the exact zero-duration branch a user with
+ * `prefers-reduced-motion` set already gets in production: the code path under
+ * test is real, only the sleeping is gone.
+ */
+function useReducedMotion(): void {
+  vi.stubGlobal(
+    "matchMedia",
+    (query: string): Partial<MediaQueryList> => ({
+      media: query,
+      matches: query.includes("prefers-reduced-motion"),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  );
+}
+
 describe("results screen", () => {
   beforeEach(() => {
     // jsdom implements neither of these; the results screen scrolls itself into
     // view and fades in on every render.
     Element.prototype.scrollIntoView ??= vi.fn();
+    useReducedMotion();
     vi.resetModules();
     presenter = undefined;
     localPb.mockReturnValue(undefined);
@@ -251,7 +293,7 @@ describe("results screen", () => {
       expect(text("#result .stats .avgTime .bottom")).toBe("24.0s");
     });
 
-    it("renders a negative score with a sign (CP-101)", async () => {
+    it("renders a negative score with a U+2212 sign (CP-101, ME-161, C33)", async () => {
       const taskLog = [
         taskEntry(0, true, 1),
         taskEntry(1, false, 2),
@@ -260,7 +302,17 @@ describe("results screen", () => {
       expect(computeMetrics(taskLog, 240).score).toBe(-1);
 
       await present(buildPayload(taskLog));
-      expect(text("#result .stats .score .bottom")).toBe("-1");
+      expect(text("#result .stats .score .bottom")).toBe(`${MINUS_SIGN}1`);
+      // ...while the machine-readable hook keeps the parseable ASCII form.
+      expect(hook("data-score")).toBe("-1");
+    });
+
+    it("renders a positive score without a sign (CP-101)", async () => {
+      const taskLog = [taskEntry(0, true, 1), taskEntry(1, true, 2)];
+      expect(computeMetrics(taskLog, 240).score).toBe(2);
+
+      await present(buildPayload(taskLog));
+      expect(text("#result .stats .score .bottom")).toBe("2");
     });
 
     it("shows `-` for acc and avg time when nothing was answered (CP-103, CP-106)", async () => {
