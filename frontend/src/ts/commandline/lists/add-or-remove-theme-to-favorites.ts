@@ -27,7 +27,6 @@ const commands: Command[] = [
     id: "removeThemeFromFavorite",
     display: "Remove current theme from favorite",
     icon: "ph:star-bold",
-    iconType: "regular",
     available: (): boolean => {
       return (
         !Config.customTheme &&

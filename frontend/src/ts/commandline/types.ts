@@ -16,8 +16,10 @@ export type Command = {
   singleListDisplayNoIcon?: string;
   subgroup?: CommandsSubgroup;
   found?: boolean;
+  /** C30 — an iconify id (`ph:*` / `tabler:*`). monkeytype's companion
+   * `iconType: "regular" | "solid"` picked between `fa-regular` and `fa-solid`
+   * and is deleted with the rest of font awesome. */
   icon?: string;
-  iconType?: "regular" | "solid";
   sticky?: boolean;
   alias?: string;
   input?: boolean;
