@@ -1,0 +1,16 @@
+{
+  // `scripts/` is not a pnpm workspace package, so `@types/node` does not
+  // resolve from here on its own. Without this file `oxlint --type-aware`
+  // treats every `node:` import as an error type and reports ~250 phantom
+  // no-unsafe-* violations in generate-icon.ts. The compiler options come from
+  // the shared base by relative path — the `@croco-calc/typescript-config`
+  // specifier is not resolvable outside the workspace.
+  "extends": "../packages/typescript-config/base.json",
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "noEmit": true,
+    "typeRoots": ["../node_modules/@types"]
+  },
+  "include": ["**/*.ts"]
+}

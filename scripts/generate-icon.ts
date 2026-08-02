@@ -135,12 +135,11 @@ class Pen {
     }
     const ordered = area < 0 === !negative ? [...points].reverse() : points;
     const [first, ...rest] = ordered as [Point, ...Point[]];
+    const lines = rest
+      .map((p) => `L${round(this.x(p[0]))} ${round(this.y(p[1]))}`)
+      .join("");
     this.parts.push(
-      `M${round(this.x(first[0]))} ${round(this.y(first[1]))}` +
-        rest
-          .map((p) => `L${round(this.x(p[0]))} ${round(this.y(p[1]))}`)
-          .join("") +
-        "Z",
+      `M${round(this.x(first[0]))} ${round(this.y(first[1]))}${lines}Z`,
     );
   }
 
@@ -360,6 +359,15 @@ function buildSvgMasters(): void {
 
   // Square favicon — solid plate plus the glyph, mirroring the two-tone
   // structure of the favicon it replaces.
+  //
+  // DELIBERATE DEVIATION from INF-114, which annotates this row "monochrome".
+  // This file is not only a deliverable, it is the raster master: parseSvg reads
+  // each path's explicit `fill` and render() honours it, so every PNG, the ICO
+  // and the mstiles inherit the plate/glyph split from here. Flattening it to
+  // one colour would flatten the whole icon set with it, and nothing links
+  // favicon.svg directly — head.html points at favicon.ico. safari-pinned-tab
+  // .svg remains the genuinely monochrome single-path deliverable INF-114 also
+  // requires.
   const plate = new Pen(IDENTITY);
   plate.roundRect(0, 0, 64, 64, 16);
   const small = new Pen(fitGlyph(4, 4, 56, 56, STROKE_SMALL));
@@ -574,6 +582,19 @@ function render(options: {
   const SS = 8;
   const coverage = new Float32Array(width * height);
 
+  /** Accumulates one scanline span's coverage. Extracted from the rasteriser's
+   * innermost loop purely to keep the nesting inside the max-depth limit. */
+  const addSpan = (row: number, spanFrom: number, spanTo: number): void => {
+    const from = Math.max(0, Math.floor(spanFrom));
+    const to = Math.min(width - 1, Math.ceil(spanTo) - 1);
+    for (let px = from; px <= to; px++) {
+      const overlap = Math.min(spanTo, px + 1) - Math.max(spanFrom, px);
+      if (overlap <= 0) continue;
+      const idx = row * width + px;
+      coverage[idx] = (coverage[idx] ?? 0) + overlap / SS;
+    }
+  };
+
   for (const shape of svg.shapes) {
     coverage.fill(0);
     type Edge = { x0: number; y0: number; x1: number; y1: number };
@@ -617,14 +638,11 @@ function render(options: {
         for (let c = 0; c < crossings.length - 1; c++) {
           winding += (crossings[c] as { dir: number }).dir;
           if (winding === 0) continue;
-          const spanFrom = (crossings[c] as { x: number }).x;
-          const spanTo = (crossings[c + 1] as { x: number }).x;
-          const first = Math.max(0, Math.floor(spanFrom));
-          const last = Math.min(width - 1, Math.ceil(spanTo) - 1);
-          for (let px = first; px <= last; px++) {
-            const overlap = Math.min(spanTo, px + 1) - Math.max(spanFrom, px);
-            if (overlap > 0) coverage[row * width + px] += overlap / SS;
-          }
+          addSpan(
+            row,
+            (crossings[c] as { x: number }).x,
+            (crossings[c + 1] as { x: number }).x,
+          );
         }
       }
     }
