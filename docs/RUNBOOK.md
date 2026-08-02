@@ -236,7 +236,26 @@ build whose `RECAPTCHA_SITE_KEY` is empty or is that test key.
 | Infrastructure | `infra` workflow. `plan` on any PR touching `infra/**`; `apply` only via `workflow_dispatch` with `action=apply` on `main`, behind the `prod-infra` approval |
 
 First-time order: create the two GitHub environments → `bootstrap` (manual,
-local) → `infra` apply → `deploy-backend` → `deploy-frontend`.
+local) → **push an API image** → `infra` apply → `deploy-backend` →
+`deploy-frontend`.
+
+**Why an image has to exist before the first `infra` apply (INF-043).**
+`var.container_image` has no default and rejects `:latest`, because the Container
+App must be pinned to an immutable SHA tag from its very first revision — the
+module also carries `ignore_changes` on the image, so a bootstrap on a mutable
+tag would never be corrected by Terraform. `infra.yml` passes
+`TF_VAR_container_image=ghcr.io/lxorb/croco-calc-api:${{ github.sha }}`, so that
+tag has to be in ghcr already. Two ways to get it there:
+
+- run `deploy-backend` with `workflow_dispatch` on the same commit first — its
+  build-and-push job succeeds on its own; only the final
+  `az containerapp update` step fails, because the app does not exist yet. Then
+  dispatch `infra` `apply` on that same commit; or
+- build and push by hand:
+  `docker build -f docker/backend/Dockerfile -t ghcr.io/lxorb/croco-calc-api:$(git rev-parse HEAD) --build-arg server_version=$(git rev-parse HEAD) . && docker push …`.
+
+A local apply must pass the tag explicitly:
+`terraform apply -var container_image=ghcr.io/lxorb/croco-calc-api:<sha>`.
 
 **Create the environments first.** `bootstrap` issues one federated credential
 per environment, and the subject string it registers has to match the one
