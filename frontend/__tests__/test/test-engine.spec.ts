@@ -339,6 +339,32 @@ describe("createTestEngine", () => {
       engine.tick(4_000);
       expect(engine.afkSeconds()).toBe(2);
     });
+
+    it("separates a tail of silence from scattered idle seconds (C19, C37)", () => {
+      const engine = makeEngine();
+      engine.press("3", 0);
+
+      // Input every other second: `afkSeconds` climbs because it *sums* idle
+      // seconds, but the run is never abandoned, so the trailing counter is
+      // reset again and again. This is the case a `afkDuration >= 60` rule
+      // would misread as "walked away" in a long test.
+      for (let second = 1; second <= 10; second++) {
+        if (second % 2 === 0) answer(engine, "3", second * 1000 - 500);
+        engine.tick(second * 1000);
+        expect(engine.trailingIdleSeconds()).toBeLessThanOrEqual(1);
+      }
+      expect(engine.afkSeconds()).toBe(4);
+
+      // Now actually walk away.
+      for (let second = 11; second <= 18; second++) engine.tick(second * 1000);
+      expect(engine.trailingIdleSeconds()).toBe(8);
+      expect(engine.afkSeconds()).toBe(12);
+
+      // Coming back resets it immediately.
+      answer(engine, "3", 18_500);
+      engine.tick(19_000);
+      expect(engine.trailingIdleSeconds()).toBe(0);
+    });
   });
 
   describe("the task log and chart samples (ME-159, CP-113 … CP-116)", () => {

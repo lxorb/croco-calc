@@ -1,6 +1,6 @@
 /**
- * The croco calc test state machine — the replacement for monkeytype's
- * `test-words.ts` + `test-input.ts` + the judging half of `test-logic.ts`.
+ * The croco calc test state machine — the replacement for the upstream
+ * prompt-source + input modules and the judging half of `test-logic.ts`.
  *
  * It is **pure**: no DOM, no timers, no globals. Every method that needs the
  * clock takes `nowMs`, so the whole machine is deterministic under test
@@ -55,16 +55,16 @@ export type TaskView = {
    * this is what CP-041 renders as the hint under a wrong answer.
    */
   expected?: string;
-  /** The characters the user typed. For the active task this is the live buffer. */
+  /** What the user entered. For the active task this is the live buffer. */
   given: string;
 };
 
 export type PressResult =
-  /** the character was ignored by the CP-055 … CP-058 filter */
+  /** the keystroke was ignored by the CP-055 … CP-058 filter */
   | "ignored"
-  /** the character entered the buffer */
+  /** the keystroke entered the buffer */
   | "accepted"
-  /** the character entered the buffer *and* started the test (CP-049) */
+  /** the keystroke entered the buffer *and* started the test (CP-049) */
   | "started";
 
 export type CommitResultKind = "noop" | "correct" | "incorrect";
@@ -75,7 +75,7 @@ export type EngineSnapshot = {
   correct: number;
   wrong: number;
   answered: number;
-  /** Whole seconds elapsed since the first accepted character. */
+  /** Whole seconds elapsed since the first accepted keystroke. */
   elapsedSeconds: number;
   /** Seconds remaining on the countdown (CP-074). */
   remainingSeconds: number;
@@ -105,7 +105,7 @@ export type TestEngine = {
 
   /** CP-049 / CP-055: feed one keystroke. Starts the test on the first accepted one. */
   press(ch: string, nowMs: number): PressResult;
-  /** CP-059: delete one character, or the whole answer with `whole`. Never crosses a task. */
+  /** CP-059: delete one symbol, or the whole answer with `whole`. Never crosses a task. */
   backspace(whole: boolean): boolean;
   /** CP-037 / CP-038 / CP-058a: commit on Enter or Space. */
   commit(nowMs: number): CommitResultKind;
@@ -117,11 +117,17 @@ export type TestEngine = {
 
   /** ME-159 — committed tasks only. */
   taskLog(): readonly TaskLogEntry[];
-  /** C37 — whole seconds during which nothing was typed. */
+  /** C37 — whole seconds during which nothing was entered, summed. */
   afkSeconds(): number;
+  /**
+   * Consecutive idle seconds at the *end* of the run. Upstream's "afk
+   * detected" notice keys off this, not off {@link afkSeconds}: a run that is
+   * idle for one second in every ten is slow, not abandoned.
+   */
+  trailingIdleSeconds(): number;
   /** CP-113 … CP-116 — one sample per elapsed second. */
   chartSamples(): { score: number[]; tpm: number[]; wrong: number[] };
-  /** ms timestamp of the first accepted character, or `undefined` while idle. */
+  /** ms timestamp of the first accepted keystroke, or `undefined` while idle. */
   startedAt(): number | undefined;
 };
 
@@ -152,6 +158,8 @@ export function createTestEngine(options: TestEngineOptions): TestEngine {
   const log: TaskLogEntry[] = [];
 
   let afk = 0;
+  /** Consecutive idle seconds at the tail of the run, for `trailingIdleSeconds`. */
+  let trailingIdle = 0;
   let inputSinceTick = false;
   const chart = {
     score: [] as number[],
@@ -227,7 +235,7 @@ export function createTestEngine(options: TestEngineOptions): TestEngine {
 
   function press(ch: string, nowMs: number): PressResult {
     if (phase === "finished") return "ignored";
-    // CP-055 / CP-050: only a character the filter accepts may start the test,
+    // CP-055 / CP-050: only a keystroke the filter accepts may start the test,
     // and it must be the *same* event that starts the clock (CP-049).
     if (normalizeAnswerChar(ch) === null) return "ignored";
     const next = appendAnswerChar(buffer, ch);
@@ -309,7 +317,12 @@ export function createTestEngine(options: TestEngineOptions): TestEngine {
 
     while (elapsedSeconds < next && elapsedSeconds < durationSeconds) {
       elapsedSeconds++;
-      if (!inputSinceTick) afk++;
+      if (inputSinceTick) {
+        trailingIdle = 0;
+      } else {
+        afk++;
+        trailingIdle++;
+      }
       inputSinceTick = false;
       sampleSecond();
     }
@@ -341,6 +354,7 @@ export function createTestEngine(options: TestEngineOptions): TestEngine {
     finish,
     taskLog: () => log,
     afkSeconds: () => afk,
+    trailingIdleSeconds: () => trailingIdle,
     chartSamples: () => ({
       score: [...chart.score],
       tpm: [...chart.tpm],

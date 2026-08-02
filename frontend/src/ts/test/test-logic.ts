@@ -60,7 +60,13 @@ export type TestResultPayload = {
   /** `hash` and `uid` are added by the save layer. */
   completedEvent: Omit<CompletedEvent, "hash" | "uid">;
   isRepeated: boolean;
-  /** C37 — at least one whole minute with no input at all. */
+  /**
+   * The run *ended* idle — upstream's rule, kept per C19: the last
+   * {@link AFK_TRAILING_SECONDS} seconds carried no input at all. Deliberately
+   * not `afkDuration >= 60`: C37's `afkDuration` is the **sum** of idle
+   * seconds, so sixty scattered pauses in an eight-minute run would trip a
+   * flag that means "you walked away".
+   */
   afkDetected: boolean;
   /** CP-109 — nothing was answered, so the run is invalid. */
   tooShort: boolean;
@@ -81,6 +87,9 @@ let presentResult: ResultPresenter = () => {
 export function registerResultPresenter(presenter: ResultPresenter): void {
   presentResult = presenter;
 }
+
+/** C19 — upstream flags a run as abandoned from its last five seconds. */
+const AFK_TRAILING_SECONDS = 5;
 
 let engine: TestEngine | undefined;
 /** ME-169 — the uint32 the whole run is reproducible from (CP-089). */
@@ -156,7 +165,10 @@ export function restart(options?: {
   if (previous !== undefined && !isInitial) {
     const { phase, elapsedSeconds, correct, answered } = previous.snapshot();
     // An abandoned run is recorded, never saved as a result (CP-088, C38).
-    if (phase === "active" && elapsedSeconds > 0) {
+    // Every restart of a *started* test counts, including one inside the first
+    // second: `restartCount` is derived from this list, and upstream's guard is
+    // "the test was active", nothing more.
+    if (phase === "active") {
       pushIncompleteTest({
         acc: answered === 0 ? 0 : (correct / answered) * 100,
         seconds: elapsedSeconds,
@@ -208,7 +220,7 @@ export function restart(options?: {
 
 /**
  * CP-049 — the reveal and the clock start are the same event. Called only from
- * the input pipeline, only for an accepted answer character.
+ * the input pipeline, only for an accepted answer symbol.
  */
 export function startTest(): void {
   if (engine === undefined || !isPreStart()) return;
@@ -224,7 +236,7 @@ export function startTest(): void {
   });
 }
 
-/** Feeds one accepted character in and re-renders the active answer. */
+/** Feeds one accepted symbol in and re-renders the active answer. */
 export function pressCharacter(ch: string): void {
   if (engine === undefined) return;
   const result = engine.press(ch, performance.now());
@@ -326,6 +338,18 @@ function buildCompletedEvent(
   };
 }
 
+/**
+ * C19 / C37 — "you walked away", not "you were slow". A run shorter than the
+ * window is judged on its whole length, which is upstream's `slice(-5)`.
+ */
+function isAfkDetected(active: TestEngine): boolean {
+  const elapsed = active.snapshot().elapsedSeconds;
+  if (elapsed === 0) return false;
+  return (
+    active.trailingIdleSeconds() >= Math.min(AFK_TRAILING_SECONDS, elapsed)
+  );
+}
+
 /** The timer expired. The only path that produces a saveable result (C38). */
 export async function finish(): Promise<void> {
   const active = engine;
@@ -350,7 +374,7 @@ export async function finish(): Promise<void> {
   await presentResult({
     completedEvent,
     isRepeated: isRepeated(),
-    afkDetected: completedEvent.afkDuration >= 60,
+    afkDetected: isAfkDetected(active),
     tooShort: invalid,
     dontSave: invalid || !Config.resultSaving,
   });
