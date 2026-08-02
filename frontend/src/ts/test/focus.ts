@@ -15,16 +15,10 @@ let cache: {
 function initializeCache(): void {
   if (cacheReady) return;
 
-  const elementsSelector = [
-    "app",
-    "footer",
-    "main",
-    "#bannerCenter",
-    "#ad-vertical-right-wrapper",
-    "#ad-vertical-left-wrapper",
-    "#ad-footer-wrapper",
-    "#ad-footer-small-wrapper",
-  ].join(",");
+  // INV-050 removed the banner and the four ad wrappers from `index.html`, so
+  // the upstream selector list is down to the three chrome containers that
+  // `main.focus` actually dims.
+  const elementsSelector = ["app", "footer", "main"].join(",");
 
   cache.focus = qsa(elementsSelector);
 
