@@ -479,6 +479,43 @@ describe("result controller test", () => {
       expect(resultAddMock).not.toHaveBeenCalled();
     });
 
+    it("C37 — rejects idle time longer than the test itself", async () => {
+      // Unbounded above in the schema. Left unchecked it makes `calculateXp`
+      // produce a negative base, which AC-034 turns into a client-triggerable
+      // 500, and drives the site-wide training time backwards.
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({
+          result: buildCompletedEvent({ afkDuration: TEST_DURATION + 100 }),
+        })
+        .expect(463);
+
+      expect(resultAddMock).not.toHaveBeenCalled();
+    });
+
+    it("C37 — accepts idle time exactly equal to the test", async () => {
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({ result: buildCompletedEvent({ afkDuration: TEST_DURATION }) })
+        .expect(200);
+
+      // AC-026: the base is zero, so no XP — but no 500 either.
+      expect(userIncrementXpMock).toHaveBeenCalledWith(uid, 0);
+    });
+
+    it("never reports a negative training time to the public stats", async () => {
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({ result: buildCompletedEvent({ afkDuration: TEST_DURATION }) })
+        .expect(200);
+
+      const [, seconds] = publicUpdateStatsMock.mock.calls[0] ?? [];
+      expect(seconds).toBeGreaterThanOrEqual(0);
+    });
+
     it("BL-5 — saves a run whose accuracy is well under 75 %", async () => {
       // The single reason BL-5 was a blocker: monkeytype rejected `acc < 75`.
       const taskLog = honestTaskLog(60).map((entry, i) =>

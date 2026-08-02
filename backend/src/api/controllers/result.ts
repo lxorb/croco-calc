@@ -172,6 +172,7 @@ export async function addResult(
   // leaderboard eligibility are keyed on (C4, C31), so it is **derived** here and
   // compared, never taken on trust (ME-019).
   assertSettingsConsistent(completedEvent);
+  assertIdleWithinTest(completedEvent);
 
   if (user.suspicious === true) {
     await addImportantLog("suspicious_user_result", completedEvent, uid);
@@ -482,6 +483,32 @@ function assertSettingsConsistent(completedEvent: CompletedEvent): void {
   }
 }
 
+/**
+ * C37 — `afkDuration` is idle time *inside* the test, so it cannot exceed the
+ * test. The schema only bounds it below (`z.number().nonnegative()`), and
+ * nothing downstream re-checks it:
+ *
+ *  * `calculateXp` computes `base = (testDuration - afkDuration) * 2`, so an
+ *    over-long idle makes the base negative, then the total negative, and
+ *    AC-034 turns that into a **500**. A client would be able to make the
+ *    server report an internal error at will;
+ *  * `totalDurationSolvedSeconds` feeds `updateTypingStats` and
+ *    `PublicDAL.updateStats`, so a negative value would run the user's and the
+ *    site's lifetime training time *backwards* — silently, and permanently.
+ *
+ * A malformed number is the client's error, so it is a 4xx, not a 500.
+ */
+function assertIdleWithinTest(completedEvent: CompletedEvent): void {
+  const { afkDuration, testDuration, incompleteTestSeconds } = completedEvent;
+
+  if (afkDuration > testDuration + incompleteTestSeconds) {
+    throw new CrocoError(
+      CrocoStatusCodes.RESULT_DATA_INVALID.code,
+      "Result idle time exceeds the test duration",
+    );
+  }
+}
+
 /** Rounded metrics are compared with a tolerance; counts must match exactly. */
 const METRIC_TOLERANCE = 0.011;
 
@@ -598,7 +625,10 @@ export async function calculateXp(
   const breakdown: XpBreakdown = {};
 
   // AC-026 — XP rewards time on task, not score, so a beginner still levels up.
-  const baseXp = Math.round((testDuration - afkDuration) * 2);
+  // The floor is belt and braces: `assertIdleWithinTest` has already rejected an
+  // over-long idle at the controller, and AC-034 would turn a negative base into
+  // a 500 rather than a rejection.
+  const baseXp = Math.max(0, Math.round((testDuration - afkDuration) * 2));
   breakdown.base = baseXp;
 
   let modifier = modeModifierOf(settings);
