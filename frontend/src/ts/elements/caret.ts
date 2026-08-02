@@ -5,12 +5,12 @@
  * native browser caret to fall back on — that is exactly the presupposition
  * INV-068 got wrong, and why C11 overrules it.
  *
- * Cut relative to monkeytype: the pace caret (CP-071), the tape-mode margin
- * bookkeeping, the RTL / joining-script handling (CP-072) and the `carrot` /
- * `banana` / `monkey` image carets (CP-069).
+ * Cut relative to upstream: the pace caret (CP-071), the tape-mode margin
+ * bookkeeping, the RTL / joining-script handling (CP-072) and the three image
+ * carets (CP-069).
  *
- * `goTo({ wordIndex, letterIndex })` is renamed to `goTo({ taskIndex, charIndex })`
- * with identical semantics (CP-067).
+ * The upstream `goTo` argument pair is renamed to
+ * `goTo({ taskIndex, charIndex })` with identical semantics (CP-067).
  */
 
 import { EasingParam, JSAnimation } from "animejs";
@@ -70,7 +70,7 @@ export class Caret {
     return this.element.hasClass("hidden");
   }
 
-  /** CP-070: blinking stops while the user is typing and resumes when idle. */
+  /** CP-070: blinking stops while the user is answering and resumes when idle. */
   public startBlinking(): void {
     this.element.setStyle({
       animationName:
@@ -143,12 +143,34 @@ export class Caret {
   }
 
   /**
-   * CP-067 / CP-068 — sit immediately after the last typed character of the
+   * Folds a finished line-jump margin back into `top`, leaving the caret in
+   * exactly the same place on screen but with a clean margin, so the next
+   * absolute placement is not offset by a line. Without this the caret drifts
+   * one line up after every jump.
+   */
+  private settleLineJumpMargin(): void {
+    if (!this.readyToResetMarginTop) return;
+    this.readyToResetMarginTop = false;
+    // Inline styles only: these are the ones the animation writes, and reading
+    // them is far cheaper than a computed-style lookup.
+    const inline = this.element.getStyle();
+    const margin = parseFloat(inline.marginTop) || 0;
+    if (margin === 0) {
+      this.element.setStyle({ marginTop: "0px" });
+      return;
+    }
+    const top = parseFloat(inline.top) || 0;
+    this.element.setStyle({ marginTop: "0px", top: `${top + margin}px` });
+  }
+
+  /**
+   * CP-067 / CP-068 — sit immediately after the last entered symbol of the
    * active task's `.answer`; with an empty answer, immediately after the
    * prompt's trailing ` = `.
    *
    * Positions are measured against `#tasksWrapper`, which is the caret's
-   * offset parent, so no scroll bookkeeping is needed.
+   * offset parent, so no scroll bookkeeping is needed beyond settling the
+   * line-jump margin above.
    */
   public goTo(options: {
     taskIndex: number;
@@ -161,6 +183,8 @@ export class Caret {
       const wrapper = qs("#tasksWrapper");
       const task = qs(`#tasks .task[data-taskindex="${options.taskIndex}"]`);
       if (wrapper === null || task === null) return;
+
+      this.settleLineJumpMargin();
 
       const letters =
         task.native.querySelectorAll<HTMLElement>(".answer letter");

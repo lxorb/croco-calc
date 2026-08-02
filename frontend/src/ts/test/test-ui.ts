@@ -1,11 +1,34 @@
 /**
  * The task stream (CP-030 … CP-052).
  *
- * monkeytype renders `#words` as a wrapping flex row of `.word`s with the caret
- * over the active letter and a line-jump scroll. croco calc keeps exactly that
- * metaphor with `word → task` — three visible lines of upcoming content that
- * flow past you (CP-030, CP-044). The Zetamac single-centred-task alternative
- * was considered and rejected in doc 03 §2.3.
+ * The upstream project renders its prompt stream as a wrapping flex row with the
+ * caret over the active glyph and a line-jump scroll. croco calc keeps exactly
+ * that metaphor with `prompt → task` — three visible lines of upcoming content
+ * that flow past you (CP-030, CP-044). The Zetamac single-centred-task
+ * alternative was considered and rejected in doc 03 §2.3.
+ *
+ * ## Geometry and the line jump (CP-044)
+ *
+ * Two elements, two jobs, and they must not be the same element:
+ *
+ * - `#tasksWrapper` is the **viewport**: a fixed height of exactly
+ *   {@link VISIBLE_LINES} line boxes, clipped vertically by `test.scss`.
+ * - `#tasks` is the **content**: `height: fit-content`, unclipped, scrolled by
+ *   animating its `margin-top`. Clipping the same element you scroll would move
+ *   the window along with its contents and scroll nothing.
+ *
+ * The offset is **derived, never accumulated**: on every move of the active task
+ * the target margin is recomputed from that task's line index inside the
+ * currently rendered document. So a full re-render (which happens every 20
+ * commits to keep the runway stocked) lands on a correct offset instead of
+ * inheriting a stale one, and a dropped or interrupted animation self-corrects
+ * on the next commit instead of desynchronising the stream forever.
+ *
+ * The active task sits on the first line until it reaches the second, and stays
+ * pinned there for the rest of the run — one committed line above it, one
+ * upcoming line below. That is the upstream steady state, reproduced without
+ * upstream's "animate one line, then delete the top line and reset the margin"
+ * bookkeeping.
  *
  * ## The pre-start hide (CP-046 … CP-052)
  *
@@ -22,7 +45,7 @@
  *    CSS class in devtools, screenshotting, or reading `document.body.textContent`
  *    yields nothing, because there is nothing to yield. This is the real defence.
  * 2. **The `preStart` class**, carrying the same `opacity: 0.25; filter: blur(4px)`
- *    monkeytype uses for its own blur, kept separate from `blurred` so the two
+ *    upstream uses for its own blur, kept separate from `blurred` so the two
  *    compose independently and each can be asserted in isolation (CP-046, CP-084).
  *
  * The reveal is one atomic step driven by the same event that starts the clock
@@ -32,26 +55,43 @@
  * `revealStream()` (CP-050, CP-085).
  */
 
+import type { JSAnimation } from "animejs";
+
 import { getConfig } from "../config/store";
+import { configEvent } from "../events/config";
 import { focusInputElement } from "../input/input-element";
-import { getActiveTaskIndex, isPreStart, setPreStart } from "../states/test";
-import { qs, qsr } from "../utils/dom";
+import {
+  getActiveTaskIndex,
+  isPreStart,
+  setOutOfFocusMaxHeight,
+  setPreStart,
+} from "../states/test";
+import { qs, qsa, qsr } from "../utils/dom";
 import * as Caret from "./caret";
 import type { TaskView } from "./test-engine";
 
-/** CP-044 — monkeytype's default: three visible lines. */
+/** CP-044 — the upstream default: three visible lines. */
 export const VISIBLE_LINES = 3;
+/**
+ * Which of those lines the active task settles on, zero-based. It starts on
+ * line 0 and stops climbing once it reaches line 1, so there is always one
+ * finished line above and one upcoming line below.
+ */
+const ACTIVE_LINE = 1;
 /** How many tasks past the active one are kept in the document (CP-045). */
 const RENDER_AHEAD = 60;
 /** How many committed tasks stay behind the active one, so hints remain visible. */
 const RENDER_BEHIND = 24;
-/** CP-051 — the reveal transition, matching `test.scss`. */
-const REVEAL_SECONDS = 0.25;
+/** CP-044 — duration of one line jump, in ms. */
+const LINE_JUMP_MS = 125;
 /** Widths, in `ch`, a masked task occupies. Task-shaped, but empty. */
 const MASK_WIDTHS = [9, 11, 13, 10, 12];
 
-let renderedLineTop: number | undefined;
-let lineJumping = false;
+/** One line box of the stream in px, margins included. 0 until measurable. */
+let lineHeight = 0;
+/** The `margin-top` currently applied to `#tasks`, in px. Always ≤ 0. */
+let streamOffset = 0;
+let lineJumpAnimation: JSAnimation | undefined;
 
 function tasksElement(): ReturnType<typeof qsr> {
   return qsr("#tasks");
@@ -138,18 +178,17 @@ export function applyPreStart(): void {
   const tasks = tasksElement();
   setPreStart(true);
   tasks.addClass("preStart");
-  tasks.setStyle({ transition: `${REVEAL_SECONDS}s`, marginTop: "0px" });
   setTestState("preStart");
-  renderedLineTop = undefined;
   tasks.setHtml(
     Array.from({ length: RENDER_AHEAD }, (_, i) => maskedTaskHtml(i)).join(""),
   );
+  resetStreamOffset();
   applyGeometry();
 }
 
 /**
  * CP-049 / CP-051 — the reveal. Only the input pipeline's "first accepted
- * character" path reaches this, and it does so in the same turn as the clock start.
+ * symbol" path reaches this, and it does so in the same turn as the clock start.
  */
 export function revealStream(views: readonly TaskView[]): void {
   setPreStart(false);
@@ -162,15 +201,18 @@ export function revealStream(views: readonly TaskView[]): void {
 export function renderStream(views: readonly TaskView[]): void {
   const tasks = tasksElement();
   tasks.setHtml(views.map(taskHtml).join(""));
-  renderedLineTop = undefined;
+  resetStreamOffset();
   applyGeometry();
-  updateActiveElement(getActiveTaskIndex());
+  // The window normally starts RENDER_BEHIND tasks *before* the active one, so
+  // the correct offset after a re-render is several lines — snap to it rather
+  // than animating a jump the user never triggered.
+  updateActiveElement(getActiveTaskIndex(), true);
 }
 
 /**
  * CP-032 — re-render only the active task's `<letter>` run. Deliberately no
- * per-character feedback of any kind (CP-036 / ME-152): the letters carry no
- * correct/incorrect class while the answer is being typed.
+ * per-keystroke feedback of any kind (CP-036 / ME-152): the letters carry no
+ * correct/incorrect class while the answer is being entered.
  */
 export function updateActiveAnswer(buffer: string): void {
   const answer = qs(
@@ -203,62 +245,156 @@ export function commitTask(view: TaskView, nextActive: number): void {
 
 /**
  * CP-044 — move the `.active` marker and, when the active task has dropped onto
- * a new line, scroll the stream up by exactly one line.
+ * a new line, scroll the stream so that task is back on {@link ACTIVE_LINE}.
+ *
+ * `instant` skips the animation; it is used after a re-render, where the offset
+ * can legitimately change by many lines at once.
  */
-export function updateActiveElement(activeIndex: number): void {
-  const next = qs(`#tasks .task[data-taskindex="${activeIndex}"]`);
+export function updateActiveElement(
+  activeIndex: number,
+  instant = false,
+): void {
+  const tasks = tasksElement().native;
+  const next = tasks.querySelector<HTMLElement>(
+    `.task[data-taskindex="${activeIndex}"]`,
+  );
   if (next === null) return;
-  next.addClass("active");
+  for (const stale of tasks.querySelectorAll(".task.active")) {
+    if (stale !== next) stale.classList.remove("active");
+  }
+  next.classList.add("active");
 
-  const top = next.native.offsetTop;
-  if (renderedLineTop === undefined) {
-    renderedLineTop = top;
-    Caret.updatePosition(true);
-    return;
-  }
-  if (top > renderedLineTop) {
-    lineJump(top - renderedLineTop);
-    renderedLineTop = top;
-  }
-  Caret.updatePosition();
+  scrollActiveIntoView(next, instant);
+  Caret.updatePosition(instant);
 }
 
-function lineJump(delta: number): void {
-  if (lineJumping) return;
-  lineJumping = true;
-  const duration = 125;
-  tasksElement().animate({
-    marginTop: -delta,
-    duration,
-    onComplete: () => {
-      lineJumping = false;
-    },
-  });
-  Caret.caret.handleLineJump({ newMarginTop: -delta, duration });
+/** The zero-based line the given task occupies inside `#tasks`. */
+function lineIndexOf(task: HTMLElement): number {
+  if (lineHeight <= 0) return 0;
+  const first = tasksElement().native.querySelector<HTMLElement>(".task");
+  if (first === null) return 0;
+  // A difference of two `offsetTop`s is immune to the stream's own margin, so
+  // this is safe to read while a line jump is mid-animation.
+  return Math.max(
+    0,
+    Math.round((task.offsetTop - first.offsetTop) / lineHeight),
+  );
 }
 
-/** Clamps the stream to `VISIBLE_LINES` lines — what makes it a stream. */
-function applyGeometry(): void {
-  const tasks = tasksElement();
-  const first = tasks.native.querySelector<HTMLElement>(".task");
-  if (first === null) return;
-  const lineHeight = first.offsetHeight;
-  if (lineHeight > 0) {
-    tasks.setStyle({
-      height: `${lineHeight * VISIBLE_LINES}px`,
-      overflow: "hidden",
+/**
+ * CP-044 — the line jump. Recomputed from scratch each time, so it cannot drift.
+ */
+function scrollActiveIntoView(active: HTMLElement, instant: boolean): void {
+  if (lineHeight <= 0) return;
+  const target = -Math.max(0, lineIndexOf(active) - ACTIVE_LINE) * lineHeight;
+  if (target === streamOffset) return;
+
+  const delta = target - streamOffset;
+  const duration = instant ? 0 : LINE_JUMP_MS;
+  streamOffset = target;
+
+  lineJumpAnimation?.cancel();
+  if (duration === 0) {
+    tasksElement().setStyle({ marginTop: `${target}px` });
+  } else {
+    lineJumpAnimation = tasksElement().animate({
+      marginTop: target,
+      duration,
     });
   }
-  qs("#tasksWrapper")?.setStyle({
+  // The caret is positioned against `#tasksWrapper`, so it needs the *delta* of
+  // this jump, not the absolute offset of the stream.
+  Caret.caret.handleLineJump({ newMarginTop: delta, duration });
+}
+
+/** Puts the stream back at line 0 with no animation in flight. */
+function resetStreamOffset(): void {
+  lineJumpAnimation?.cancel();
+  lineJumpAnimation = undefined;
+  streamOffset = 0;
+  tasksElement().setStyle({ marginTop: "0px" });
+  Caret.caret.clearMargins();
+}
+
+/**
+ * Measures one line box — `offsetHeight` alone is the content box and misses
+ * `.task`'s vertical margins, which are what actually separate two lines.
+ */
+function measureLineHeight(task: HTMLElement): number {
+  const style = window.getComputedStyle(task);
+  const margins =
+    (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0);
+  return task.offsetHeight + margins;
+}
+
+/**
+ * Clamps the **viewport** to `VISIBLE_LINES` lines — what makes it a stream.
+ * `#tasks` itself stays `height: fit-content` so it can be scrolled inside it.
+ */
+function applyGeometry(): void {
+  const wrapper = qs("#tasksWrapper");
+  wrapper?.setStyle({
     maxWidth:
       getConfig.maxLineWidth === 0 ? "" : `${getConfig.maxLineWidth}rem`,
   });
+
+  const first = tasksElement().native.querySelector<HTMLElement>(".task");
+  // jsdom and a hidden page both report 0 — leave the last good measurement.
+  if (first === null || first.offsetHeight === 0) return;
+
+  lineHeight = measureLineHeight(first);
+  if (lineHeight <= 0) return;
+
+  const height = lineHeight * VISIBLE_LINES;
+  wrapper?.setStyle({ height: `${height}px` });
+  // CP-083 — the out-of-focus warning is clamped to the same box.
+  setOutOfFocusMaxHeight(height);
 }
+
+/**
+ * Applies the four config keys that change how the stream is laid out or
+ * coloured, then re-measures. `#tasks` inherits its size from `#tasksTest`,
+ * exactly as upstream sizes its stream from the test container.
+ */
+export function applyStreamStyles(): void {
+  const tasks = tasksElement();
+  qsa("#caret, #tasksTest, #tasksInput").setStyle({
+    fontSize: `${getConfig.fontSize}rem`,
+  });
+  if (getConfig.flipTestColors) tasks.addClass("flipped");
+  else tasks.removeClass("flipped");
+  if (getConfig.colorfulMode) tasks.addClass("colorfulMode");
+  else tasks.removeClass("colorfulMode");
+
+  applyGeometry();
+  const active =
+    tasksElement().native.querySelector<HTMLElement>(".task.active");
+  if (active !== null) scrollActiveIntoView(active, true);
+}
+
+const STYLE_KEYS = new Set<string>([
+  "fontSize",
+  "fontFamily",
+  "maxLineWidth",
+  "flipTestColors",
+  "colorfulMode",
+]);
+
+configEvent.subscribe(({ key }) => {
+  if (key === "fullConfigChangeFinished" || STYLE_KEYS.has(key ?? "")) {
+    applyStreamStyles();
+  }
+});
+
+// A resize changes how many tasks fit on a line, so both the measured line box
+// and the active task's line index can move.
+window.addEventListener("resize", () => {
+  applyStreamStyles();
+});
 
 /** CP-083 — the out-of-focus blur, independent of `preStart` (CP-084). */
 export function setBlurred(blurred: boolean): void {
   const tasks = tasksElement();
-  tasks.setStyle({ transition: `${REVEAL_SECONDS}s` });
   if (blurred) tasks.addClass("blurred");
   else tasks.removeClass("blurred");
 }
@@ -269,8 +405,8 @@ export function isHidden(): boolean {
 }
 
 /**
- * Puts the keyboard back on the capture textarea. Named `focusWords` upstream;
- * `event-handlers/global.ts` (WP-08) is the one remaining caller of the old name.
+ * Puts the keyboard back on the capture textarea. `event-handlers/global.ts`
+ * (WP-08) is the one remaining caller of the pre-rename name.
  */
 export function focusTasks(): void {
   focusInputElement();

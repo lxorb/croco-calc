@@ -1,12 +1,13 @@
 // The test page: the task stream, its capture textarea, the pre-start blur and
 // the restart button. The `#result*` rules were split out into `result.scss`
 // (WP-06 → WP-07 hand-off, §6 "First action").
-//
-// Renames applied per CP-020 / CP-031 / CP-032 / C30: `#words` → `#tasks`,
-// `#wordsWrapper` → `#tasksWrapper`, `#wordsInput` → `#tasksInput`,
-// `.word` → `.task`. The four `--*-letter-color` / `--*-letter-animation`
-// custom properties keep their monkeytype names because all 52 theme files
-// under `frontend/static/themes/` set them through `#tasks` / `#tasks.flipped`.
+
+// Renames applied per CP-020 / CP-031 / CP-032 / C30: the upstream stream id,
+// its wrapper, its capture textarea and its item class all became the `tasks*`
+// / `.task` set used below. The four `--*-letter-color` /
+// `--*-letter-animation` custom properties keep their upstream names because
+// all 52 theme files under `frontend/static/themes/` set them through
+// `#tasks` / `#tasks.flipped`.
 
 .pageTest {
   position: relative;
@@ -45,8 +46,15 @@
   }
 }
 
-// CP-030: the `#words` rule reused unchanged — this is the wrapping stream that
-// is the whole visual identity of monkeytype.
+// CP-030: the upstream stream rule reused unchanged — this wrapping row is the
+// whole visual identity we are adapting.
+
+// CP-044: this element is the *content*, not the viewport. It must stay
+// `fit-content` and unclipped; `#tasksWrapper` below is what is clamped to
+// three lines. `test-ui.ts` scrolls the stream by animating `margin-top` here,
+// which is why the transition below names `opacity` and `filter` explicitly
+// rather than using the `all` shorthand — a transitioned margin would fight
+// the line-jump animation.
 #tasks {
   height: fit-content;
   padding-bottom: 0.5em; // to account for hints of the bottom line
@@ -55,6 +63,10 @@
   width: 100%;
   align-content: flex-start;
   user-select: none;
+  // CP-051 / CP-083 — the reveal and the out-of-focus blur, same duration.
+  transition:
+    opacity 0.25s,
+    filter 0.25s;
 
   --correct-letter-color: var(--text-color);
   --correct-letter-animation: none;
@@ -63,8 +75,8 @@
   --incorrect-letter-color: var(--error-color);
   --incorrect-letter-animation: none;
 
-  // CP-035 — upcoming tasks are dim; the active task and every typed answer
-  // character is bright; a committed wrong task turns error-coloured; a
+  // CP-035 — upcoming tasks are dim; the active task and every entered answer
+  // symbol is bright; a committed wrong task turns error-coloured; a
   // committed correct task goes back to dim.
   .task {
     color: var(--untyped-letter-color);
@@ -97,7 +109,7 @@
   }
 
   // CP-041 — the correct answer of an already committed wrong task, shown
-  // beneath it. Identical geometry to monkeytype's `#words .word .hints hint`.
+  // beneath it. Identical geometry to the upstream stream-item hint.
   .task .hints hint {
     position: absolute;
     bottom: -1.1em;
@@ -209,7 +221,7 @@
 }
 
 // CP-053 — the hidden capture textarea. Kept byte-identical in behaviour to
-// monkeytype's `#wordsInput`; only the id changed.
+// the upstream capture field; only the id changed.
 #tasksInput {
   width: 0;
   font-size: 1em;
@@ -280,6 +292,10 @@
   display: grid;
   grid-template-rows: 1fr auto 1fr;
 
+  // CP-044 — the viewport. `test-ui.ts` gives it a fixed height of exactly
+  // three line boxes; the vertical `clip` is what turns the stream into a
+  // three-line window. `overflow-x` stays `visible` so the caret and the
+  // hints of a long task are not cut off sideways.
   #tasksWrapper {
     position: relative;
     overflow: visible clip;
