@@ -21,12 +21,36 @@ from) and the human actions still outstanding.
 
 Every rate below was read from the Azure Retail Prices API for `westeurope` in
 USD on **2026-08-02**, or from the vendor's own pricing documentation on the
-same date. This section replaces the estimate in
-`docs/requirements/06-infra-and-ops.md` §2 (INF-037), whose rates were recorded
-from memory. `infra.yml` refuses to run `terraform apply` while this file still
-contains the word the old table used to mark an unchecked row (INF-156).
+same date. Each query is reproducible, e.g.
+
+```bash
+curl -s "https://prices.azure.com/api/retail/prices?currencyCode='USD'&\$filter=serviceName%20eq%20'Azure%20Container%20Apps'%20and%20armRegionName%20eq%20'westeurope'"
+```
+
+> ### ⚠ INF-156 is NOT cleared, and cannot be cleared from inside this file
+>
+> INF-156 gates `terraform apply` on the **INF-037** table, and that table lives
+> in `docs/requirements/06-infra-and-ops.md`, where all fifteen `source` cells
+> still read `UNVERIFIED`. That document is read-only to every work package
+> (`docs/REQUIREMENTS.md` §6, WP-01's Owns list: *"the other five source
+> documents and this file remain read-only to every package"*), so no package
+> — including the one that owns INF-156 — is permitted to fill those cells in.
+>
+> `.github/workflows/infra.yml` therefore greps
+> `docs/requirements/06-infra-and-ops.md`, not this file, and **currently fails
+> by design**. Pointing it at this file instead would make the gate vacuous,
+> which is the one thing INF-156 exists to prevent.
+>
+> **To clear it:** whoever owns the requirement documents transcribes the rate
+> card below into INF-037's `source` column, replacing each `UNVERIFIED`. The
+> figures are already checked; the remaining step is an ownership decision, not
+> a pricing one. Note also that two INF-037 rows are simply wrong against the
+> real rates — vCPU reads `~3.4` where the arithmetic gives **4.46**, and memory
+> reads `~6.7` where it gives **8.93** — so the transcription must correct them,
+> not just cite them.
 
 The month is taken as 30 days = 2,592,000 seconds.
+
 
 ### Rate card
 
@@ -154,6 +178,28 @@ identity. There is deliberately **no `DB_URI` repository secret**: one copy of
 the credential, rotated in one place, and the CI identity already holds
 Key Vault Secrets Officer on the vault.
 
+### Secret scanning (INF-089)
+
+`ci.yml`'s `secret-scan` job runs `gitleaks` (pinned to 8.30.0, tarball checked
+against a committed SHA-256) over the checked-out tree on every push and pull
+request, and fails the build on any finding. Run it locally the same way:
+
+```bash
+gitleaks dir --config .gitleaks.toml --redact --exit-code 1 .
+```
+
+A local run reports two findings CI never sees:
+`backend/src/credentials/serviceAccountKey.json` and
+`frontend/src/ts/constants/firebase-config.ts`. Those are real credentials, and
+they are deliberately **not** allowlisted — they are gitignored (INF-088), so
+they cannot reach a CI checkout, and if one ever did the scan must fail.
+
+`.gitleaks.toml` allowlists exactly one thing: Google's published reCAPTCHA test
+key pair (`6LeIxAcTAAAA…`), which is a documented public constant used by
+`ci.yml` and by dev builds. INF-107 forbids it in *production* configuration;
+that is enforced by `frontend/vite.config.ts`, which now refuses a production
+build whose `RECAPTCHA_SITE_KEY` is empty or is that test key.
+
 ---
 
 ## 3. Deploy
@@ -164,14 +210,62 @@ Key Vault Secrets Officer on the vault.
 | Backend | Push to `main` touching `backend/**`, `packages/**` or `docker/**`, or run `deploy-backend` manually. It pushes `ghcr.io/lxorb/croco-calc-api:<sha>` and `az containerapp update`s to that SHA |
 | Infrastructure | `infra` workflow. `plan` on any PR touching `infra/**`; `apply` only via `workflow_dispatch` with `action=apply` on `main`, behind the `prod-infra` approval |
 
-First-time order: `bootstrap` (manual, local) → `infra` apply → `deploy-backend`
-→ `deploy-frontend`.
+First-time order: create the two GitHub environments → `bootstrap` (manual,
+local) → `infra` apply → `deploy-backend` → `deploy-frontend`.
+
+**Create the environments first.** `bootstrap` issues one federated credential
+per environment, and the subject string it registers has to match the one
+GitHub will mint:
+
+```bash
+gh api -X PUT repos/lxorb/croco-calc/environments/prod
+gh api -X PUT repos/lxorb/croco-calc/environments/prod-infra
+# then add a required reviewer to prod-infra in the repo settings UI (INF-079)
+```
 
 ```bash
 cd infra/terraform/bootstrap
 terraform init
 terraform apply          # local state, run once, keep the state file
 ```
+
+### Why `bootstrap` issues four federated credentials, not two
+
+INF-085 names two subjects, `…:ref:refs/heads/main` and `…:pull_request`. Those
+alone are not enough. The moment a job declares `environment:`, GitHub rewrites
+the OIDC token's `sub` claim to `repo:lxorb/croco-calc:environment:<name>`, and
+`azure/login` fails with **AADSTS70021: No matching federated identity record
+found**. Two of our jobs do exactly that:
+
+| Workflow | Job | `environment:` | Subject presented |
+|---|---|---|---|
+| `infra.yml` | `plan` | none | `repo:lxorb/croco-calc:pull_request` (PR) |
+| `infra.yml` | `apply` | `prod-infra` | `repo:lxorb/croco-calc:environment:prod-infra` |
+| `deploy-backend.yml` | `deploy` | `prod` | `repo:lxorb/croco-calc:environment:prod` |
+| `backup-db.yml` | `backup` | none | `repo:lxorb/croco-calc:ref:refs/heads/main` |
+
+`azurerm_federated_identity_credential.cicd_environments` covers the two
+environment subjects; the list is the `github_environments` variable. Adding a
+new environment to a workflow means adding it there too.
+
+### Roles the CI identity holds, and why each is needed
+
+INF-085 names three. Applying `infra/terraform/prod` needs three more, because
+two of its resources sit outside what `Contributor` on one resource group can
+reach:
+
+| Role | Scope | Why |
+|---|---|---|
+| `Contributor` | `rg-croco-calc-prod` | INF-085 — the application resources |
+| `Storage Blob Data Contributor` | `stcrococalctfstate` | INF-077 — remote state and backups |
+| `Key Vault Secrets Officer` | `kv-crococalc-prod` | INF-085 — granted by the `prod` module itself |
+| `Role Based Access Control Administrator` | `rg-croco-calc-prod` | `Contributor` explicitly **denies** `Microsoft.Authorization/roleAssignments/write`, but the key-vault module creates three role assignments (INF-083, INF-084). Without this, every apply fails there |
+| `Cost Management Contributor` | `/subscriptions/<id>` | INF-143's budget is an `azurerm_consumption_budget_subscription` — a write at subscription scope, outside the resource group |
+| `Reader` | `id-croco-calc-cicd` | `prod/main.tf` reads the identity with a data source; it lives in `rg-croco-calc-tfstate`, where CI otherwise holds only a *data-plane* storage role |
+
+`prod/providers.tf` also sets `resource_provider_registrations = "none"`: the CI
+identity deliberately has no subscription-level `*/register/action`, and INF-081
+records that every provider croco calc needs is already registered.
 
 ---
 
@@ -353,7 +447,8 @@ The probe cannot run until BL-4 clears. **Status: not yet run.**
 | 2 | Register a reCAPTCHA v2 ("I'm not a robot") site at <https://www.google.com/recaptcha/admin> for `crococalc.com`, `www.crococalc.com` and `localhost`; set `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET` (BL-3) | the production frontend build |
 | 3 | Generate the Firebase service-account key and set `FIREBASE_SERVICE_ACCOUNT_JSON`; set the six `FIREBASE_*` web-app values | backend token verification, sign-in |
 | 4 | Set the Firebase email action URL to `https://crococalc.com/verify` (INF-102) | verification and password-reset links |
-| 5 | Create the `prod` and `prod-infra` GitHub environments; put a required reviewer on `prod-infra` | INF-079's approval gate |
+| 5 | Create the `prod` and `prod-infra` GitHub environments **before** running `bootstrap`, and put a required reviewer on `prod-infra`. `bootstrap` issues a federated credential per environment (section 3) — without both halves, `azure/login` fails with AADSTS70021 in `infra.yml`'s apply job and in `deploy-backend.yml` | INF-079's approval gate, and the backend deploying at all |
+| 5a | Transcribe the verified rate card in section 1 into INF-037's `source` column in `docs/requirements/06-infra-and-ops.md`, replacing all fifteen `UNVERIFIED` cells and correcting the vCPU and memory figures. That document is read-only to every work package, so this needs whoever owns the requirement documents | `terraform apply` — `infra.yml` refuses to run while any row reads `UNVERIFIED` (INF-156) |
 | 6 | Create the fine-grained PAT for `GH_VARIABLES_TOKEN` (Variables: read and write on this repository) | `infra.yml` publishing `vars.BACKEND_URL` |
 | 7 | Run `infra/terraform/bootstrap` once, locally, with an operator identity | everything |
 | 8 | Grant the Cloudflare API token **Account → Email Routing Addresses → Edit** and **Zone → Email Routing Rules → Edit**, enable Email Routing on `crococalc.com`, and click the destination-verification link Cloudflare mails to `me@emilvinu.de` | `contact@crococalc.com` and `support@crococalc.com` delivering anything |
