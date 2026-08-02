@@ -88,7 +88,7 @@ function resolveSpecifier(
   }
 
   // @monkeytype packages are treated as leaf nodes (no recursion into them)
-  if (specifier.startsWith("@monkeytype/")) return specifier;
+  if (specifier.startsWith("@croco-calc/")) return specifier;
 
   return null; // third-party / virtual
 }
@@ -135,7 +135,7 @@ function walk(
     reachable.add(resolved);
 
     // @monkeytype packages are leaf nodes — don't recurse
-    if (resolved.startsWith("@monkeytype/")) {
+    if (resolved.startsWith("@croco-calc/")) {
       maxDepth = Math.max(maxDepth, 1);
       continue;
     }
@@ -199,7 +199,7 @@ function depthColor(depth: number): string {
 
 function leavesFolder(filePath: string): boolean {
   if (boundary === null) return false;
-  if (filePath.startsWith("@monkeytype/")) return true;
+  if (filePath.startsWith("@croco-calc/")) return true;
   return !filePath.startsWith(`${boundary}/`);
 }
 

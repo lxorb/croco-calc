@@ -70,13 +70,6 @@ export default defineConfig({
     coverage: {
       include: ["**/*.ts", "**/*.tsx"],
     },
-    deps: {
-      optimizer: {
-        web: {
-          include: ["@monkeytype/funbox"],
-        },
-      },
-    },
   },
   plugins,
 });

@@ -5,6 +5,12 @@ packages:
 
 onlyBuiltDependencies:
   - "@firebase/util"
+  # INV-012 requires pruning entries for removed deps. Both entries below are
+  # still REQUIRED as of wave 1 and must not be removed yet:
+  #   @fortawesome/fontawesome-free -> direct dep of frontend; WP-04 removes it (INV-063).
+  #   @sentry/cli                   -> transitive via @sentry/vite-plugin; WP-12 removes it (INV-118d).
+  # This file is WP-01's, so WP-04/WP-12 cannot prune these themselves — raise it
+  # to WP-01 (or whoever holds root tooling) when the dependency actually goes.
   - "@fortawesome/fontawesome-free"
   - "@sentry/cli"
   - bcrypt
