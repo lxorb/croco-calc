@@ -73,7 +73,7 @@ node_modules_bak/
 .vscode/*
 .vscode/.*
 *.code-workspace
-!monkeytype.code-workspace
+!croco-calc.code-workspace
 
 
 .idea

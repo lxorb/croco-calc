@@ -29,6 +29,17 @@ Express + MongoDB, pnpm + turbo monorepo. **React was explicitly rejected.** Nod
 Workspace packages are scoped `@croco-calc/*`: `frontend`, `backend`, `packages/{math-engine,
 schemas,contracts,util,oxlint-config,typescript-config,tsup-config}`.
 
+> **Repo state after wave 1 (WP-01).** The lines below describe the **target** state. Some of it does
+> not exist yet, so check before you rely on it:
+> - `packages/math-engine` is **not created yet** — WP-02 delivers it.
+> - `Icon.tsx` does **not exist yet** and FontAwesome is **not deleted yet** — WP-04 delivers both.
+>   Until then `frontend/src/ts/components/common/Fa.tsx`, `fa-` classes and the
+>   `@fortawesome/fontawesome-free` dependency are all still present and still in use.
+> - `frontend/` and `backend/` do **not** typecheck. WP-01 deleted packages and modules whose
+>   importers are owned by WP-05..WP-12; repointing them is those packages' work. `packages/` is
+>   green and must stay that way. Do not "fix" a dangling import by re-adding a deleted file — §6.2
+>   says that is a sequencing bug to raise, not to resolve locally.
+
 ## What this project is not
 
 Typing concepts are **cut**, not adapted: languages, quotes, wordlists, keyboard layouts/keymaps,
@@ -49,9 +60,11 @@ The unit of work is a **task** (one arithmetic problem), not a word. The headlin
 - Styling: Tailwind CSS via the `class` property and the `cn` utility. Do not use `classlist`. Only
   the colours defined in the Tailwind config are available.
 - Icons: use the `Icon` component (`frontend/src/ts/components/common/Icon.tsx`), which renders
-  `tabler:*` and `ph:*` from a build-time bundle. **FontAwesome is deleted** — no `fa-` classes, no
-  `@fortawesome` imports, no `Fa` component.
+  `tabler:*` and `ph:*` from a build-time bundle. FontAwesome is to be deleted — no `fa-` classes, no
+  `@fortawesome` imports, no `Fa` component. *(WP-04 delivers this; neither is true yet — see the
+  repo-state note above. Write new code against `Icon`, do not add new `Fa` usages.)*
 - Never use `Math.random` in `packages/math-engine`; generation is seeded and deterministic.
+  *(WP-02 creates that package.)*
 
 ## Commands
 
