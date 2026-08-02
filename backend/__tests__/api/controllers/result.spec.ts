@@ -8,8 +8,20 @@ import * as PublicDal from "../../../src/dal/public";
 import { ObjectId } from "mongodb";
 import { enableRateLimitExpects } from "../../__testData__/rate-limit";
 import { DBResult } from "../../../src/utils/result";
-import { omit } from "../../../src/utils/misc";
 import { CompletedEvent } from "@croco-calc/schemas/results";
+import {
+  buildSettingsId,
+  type MathGeneratorSettings,
+} from "@croco-calc/schemas/math";
+import {
+  computeMetrics,
+  generateSequence,
+  MATH_ENGINE_VERSION,
+  type TaskLogEntry,
+} from "@croco-calc/math-engine";
+
+/** SB-012: the test length the fixtures use, in minutes. */
+const SETTINGS_TIME = 8;
 
 const { mockApp, uid, mockAuth } = setup();
 const configuration = Configuration.getCachedConfiguration();
@@ -21,8 +33,6 @@ describe("result controller test", () => {
 
     beforeEach(async () => {
       resultMock.mockResolvedValue([]);
-      await enablePremiumFeatures(true);
-      vi.spyOn(UserDal, "checkIfUserIsPremium").mockResolvedValue(false);
     });
 
     afterEach(() => {
@@ -116,26 +126,6 @@ describe("result controller test", () => {
         } exceeded.`,
       );
     });
-    it("should get with higher max limit for premium user", async () => {
-      //GIVEN
-      vi.spyOn(UserDal, "checkIfUserIsPremium").mockResolvedValue(true);
-
-      //WHEN
-      await mockApp
-        .get("/results")
-        .query({ limit: 800, offset: 600 })
-        .set("Authorization", `Bearer ${uid}`)
-        .send()
-        .expect(200);
-
-      //THEN
-
-      expect(resultMock).toHaveBeenCalledWith(uid, {
-        limit: 800,
-        offset: 600,
-        onOrAfterTimestamp: NaN,
-      });
-    });
     it("should get results if offset/limit is partly outside the max limit", async () => {
       //WHEN
       await mockApp
@@ -155,7 +145,6 @@ describe("result controller test", () => {
     });
     it("should fail exceeding 1k limit", async () => {
       //GIVEN
-      vi.spyOn(UserDal, "checkIfUserIsPremium").mockResolvedValue(false);
 
       //WHEN
       const { body } = await mockApp
@@ -169,79 +158,6 @@ describe("result controller test", () => {
       expect(body).toEqual({
         message: "Invalid query schema",
         validationErrors: ['"limit" Number must be less than or equal to 1000'],
-      });
-    });
-    it("should fail exceeding maxlimit for premium user", async () => {
-      //GIVEN
-      vi.spyOn(UserDal, "checkIfUserIsPremium").mockResolvedValue(true);
-
-      //WHEN
-      const { body } = await mockApp
-        .get("/results")
-        .query({ limit: 1000, offset: 25000 })
-        .set("Authorization", `Bearer ${uid}`)
-        .send()
-        .expect(422);
-      //THEN
-      expect(body.message).toEqual(
-        `Max results limit of ${
-          (await configuration).results.limits.premiumUser
-        } exceeded.`,
-      );
-    });
-    it("should get results within regular limits for premium users even if premium is globally disabled", async () => {
-      //GIVEN
-      vi.spyOn(UserDal, "checkIfUserIsPremium").mockResolvedValue(true);
-      await enablePremiumFeatures(false);
-
-      //WHEN
-      await mockApp
-        .get("/results")
-        .query({ limit: 100, offset: 900 })
-        .set("Authorization", `Bearer ${uid}`)
-        .send()
-        .expect(200);
-
-      //THEN
-      expect(resultMock).toHaveBeenCalledWith(uid, {
-        limit: 100,
-        offset: 900,
-        onOrAfterTimestamp: NaN,
-      });
-    });
-    it("should fail exceeding max limit for premium user if premium is globally disabled", async () => {
-      //GIVEN
-      vi.spyOn(UserDal, "checkIfUserIsPremium").mockResolvedValue(true);
-      await enablePremiumFeatures(false);
-
-      //WHEN
-      const { body } = await mockApp
-        .get("/results")
-        .query({ limit: 200, offset: 900 })
-        .set("Authorization", `Bearer ${uid}`)
-        .send()
-        .expect(503);
-
-      //THEN
-      expect(body.message).toEqual("Premium feature disabled.");
-    });
-    it("should get results with regular limit as default for premium users if premium is globally disabled", async () => {
-      //GIVEN
-      vi.spyOn(UserDal, "checkIfUserIsPremium").mockResolvedValue(true);
-      await enablePremiumFeatures(false);
-
-      //WHEN
-      await mockApp
-        .get("/results")
-        .set("Authorization", `Bearer ${uid}`)
-        .send()
-        .expect(200);
-
-      //THEN
-      expect(resultMock).toHaveBeenCalledWith(uid, {
-        limit: 1000, //the default limit for regular users
-        offset: 0,
-        onOrAfterTimestamp: NaN,
       });
     });
     it("should fail with unknown query parameters", async () => {
@@ -352,149 +268,10 @@ describe("result controller test", () => {
         .expect(401);
     });
   });
-  describe("updateTags", () => {
-    const getResultMock = vi.spyOn(ResultDal, "getResult");
-    const updateTagsMock = vi.spyOn(ResultDal, "updateTags");
-    const getUserPartialMock = vi.spyOn(UserDal, "getPartialUser");
-    const checkIfTagPbMock = vi.spyOn(UserDal, "checkIfTagPb");
-
-    afterEach(() => {
-      [
-        getResultMock,
-        updateTagsMock,
-        getUserPartialMock,
-        checkIfTagPbMock,
-      ].forEach((it) => it.mockClear());
-    });
-
-    it("should update tags", async () => {
-      //GIVEN
-      const result = givenDbResult(uid);
-      const resultIdString = result._id.toHexString();
-      const tagIds = [
-        new ObjectId().toHexString(),
-        new ObjectId().toHexString(),
-      ];
-      const partialUser = { tags: [] };
-      getResultMock.mockResolvedValue(result);
-      updateTagsMock.mockResolvedValue({} as any);
-      getUserPartialMock.mockResolvedValue(partialUser as any);
-      checkIfTagPbMock.mockResolvedValue([]);
-
-      //WHEN
-      const { body } = await mockApp
-        .patch("/results/tags")
-        .set("Authorization", `Bearer ${uid}`)
-        .send({ resultId: resultIdString, tagIds })
-        .expect(200);
-
-      //THEN
-      expect(body.message).toEqual("Result tags updated");
-      expect(body.data).toEqual({
-        tagPbs: [],
-      });
-
-      expect(updateTagsMock).toHaveBeenCalledWith(uid, resultIdString, tagIds);
-      expect(getResultMock).toHaveBeenCalledWith(uid, resultIdString);
-      expect(getUserPartialMock).toHaveBeenCalledWith(uid, "update tags", [
-        "tags",
-      ]);
-      expect(checkIfTagPbMock).toHaveBeenCalledWith(uid, partialUser, result);
-    });
-    it("should apply defaults on missing data", async () => {
-      //GIVEN
-      const result = givenDbResult(uid);
-      const partialResult = omit(result, [
-        "difficulty",
-        "language",
-        "funbox",
-        "lazyMode",
-        "punctuation",
-        "numbers",
-      ]);
-
-      const resultIdString = result._id.toHexString();
-      const tagIds = [
-        new ObjectId().toHexString(),
-        new ObjectId().toHexString(),
-      ];
-      const partialUser = { tags: [] };
-      getResultMock.mockResolvedValue(partialResult);
-      updateTagsMock.mockResolvedValue({} as any);
-      getUserPartialMock.mockResolvedValue(partialUser as any);
-      checkIfTagPbMock.mockResolvedValue([]);
-
-      //WHEN
-      const { body } = await mockApp
-        .patch("/results/tags")
-        .set("Authorization", `Bearer ${uid}`)
-        .send({ resultId: resultIdString, tagIds })
-        .expect(200);
-
-      //THEN
-      expect(body.message).toEqual("Result tags updated");
-      expect(body.data).toEqual({
-        tagPbs: [],
-      });
-
-      expect(updateTagsMock).toHaveBeenCalledWith(uid, resultIdString, tagIds);
-      expect(getResultMock).toHaveBeenCalledWith(uid, resultIdString);
-      expect(getUserPartialMock).toHaveBeenCalledWith(uid, "update tags", [
-        "tags",
-      ]);
-      expect(checkIfTagPbMock).toHaveBeenCalledWith(uid, partialUser, {
-        ...result,
-        difficulty: "normal",
-        language: "english",
-        funbox: [],
-        lazyMode: false,
-        punctuation: false,
-        numbers: false,
-      });
-    });
-    it("should fail with missing mandatory properties", async () => {
-      //GIVEN
-
-      //WHEN
-      const { body } = await mockApp
-        .patch("/results/tags")
-        .set("Authorization", `Bearer ${uid}`)
-        .send({})
-        .expect(422);
-
-      //THEN
-      expect(body).toEqual({
-        message: "Invalid request data schema",
-        validationErrors: ['"tagIds" Required', '"resultId" Required'],
-      });
-    });
-    it("should fail with unknown properties", async () => {
-      //GIVEN
-
-      //WHEN
-      const { body } = await mockApp
-        .patch("/results/tags")
-        .set("Authorization", `Bearer ${uid}`)
-        .send({ extra: "value" })
-        .expect(422);
-
-      //THEN
-      expect(body).toEqual({
-        message: "Invalid request data schema",
-        validationErrors: [
-          '"tagIds" Required',
-          '"resultId" Required',
-          "Unrecognized key(s) in object: 'extra'",
-        ],
-      });
-    });
-  });
   describe("addResult", () => {
     //TODO improve test coverage for addResult
     const insertedId = new ObjectId();
     const userGetMock = vi.spyOn(UserDal, "getUser");
-    const userUpdateStreakMock = vi.spyOn(UserDal, "updateStreak");
-    const userCheckIfTagPbMock = vi.spyOn(UserDal, "checkIfTagPb");
     const userCheckIfPbMock = vi.spyOn(UserDal, "checkIfPb");
     const userIncrementXpMock = vi.spyOn(UserDal, "incrementXp");
     const userUpdateTypingStatsMock = vi.spyOn(UserDal, "updateTypingStats");
@@ -507,8 +284,6 @@ describe("result controller test", () => {
 
       [
         userGetMock,
-        userUpdateStreakMock,
-        userCheckIfTagPbMock,
         userCheckIfPbMock,
         userIncrementXpMock,
         userUpdateTypingStatsMock,
@@ -516,92 +291,216 @@ describe("result controller test", () => {
         publicUpdateStatsMock,
       ].forEach((it) => it.mockClear());
 
-      userGetMock.mockResolvedValue({ name: "bob" } as any);
-      userUpdateStreakMock.mockResolvedValue(0);
-      userCheckIfTagPbMock.mockResolvedValue([]);
+      userGetMock.mockResolvedValue({ name: "bob", uid } as any);
       userCheckIfPbMock.mockResolvedValue(true);
       resultAddMock.mockResolvedValue({ insertedId });
       userIncrementXpMock.mockResolvedValue();
     });
 
-    it("should add result", async () => {
+    /**
+     * The whole point of this block: `POST /results` runs the ME-174
+     * regeneration, ME-175's hash/duplicate checks, ME-179 … ME-182's
+     * plausibility layer and AC-025's metric recomputation before anything is
+     * saved. Before this rewrite the spec sent a monkeytype payload and never
+     * mentioned `mathSeed`, `taskLog` or `engineVersion` at all, so none of that
+     * pipeline was exercised end to end.
+     */
+    it("should add an honest result", async () => {
       //GIVEN
+      const completedEvent = buildCompletedEvent();
 
-      const completedEvent = buildCompletedEvent({
-        funbox: ["58008", "read_ahead_hard"],
-      });
       //WHEN
       const { body } = await mockApp
         .post("/results")
         .set("Authorization", `Bearer ${uid}`)
-        .send({
-          result: completedEvent,
-        })
+        .send({ result: completedEvent })
         .expect(200);
 
+      //THEN
       expect(body.message).toEqual("Result saved");
-      expect(body.data).toEqual({
+      expect(body.data).toMatchObject({
         isPb: true,
-        tagPbs: [],
-        xp: 0,
-        dailyXpBonus: false,
-        xpBreakdown: {
-          configMultiplier: 0,
-          accPenalty: 28,
-          base: 20,
-          incomplete: 5,
-          funbox: 80,
-        },
-        streak: 0,
         insertedId: insertedId.toHexString(),
       });
 
       expect(resultAddMock).toHaveBeenCalledWith(
         uid,
         expect.objectContaining({
-          acc: 86,
-          afkDuration: 5,
-          charStats: [100, 2, 3, 5],
-          chartData: {
-            err: [0, 2, 0],
-            burst: [50, 55, 56],
-            wpm: [1, 2, 3],
-          },
-          consistency: 23.5,
-          incompleteTestSeconds: 2,
-          isPb: true,
-          keyConsistency: 12,
-          keyDurationStats: {
-            average: 2.67,
-            sd: 2.05,
-          },
-          keySpacingStats: {
-            average: 2,
-            sd: 1.63,
-          },
+          score: completedEvent.score,
+          correct: completedEvent.correct,
+          wrong: completedEvent.wrong,
+          acc: completedEvent.acc,
           mode: "time",
-          mode2: "15",
+          mode2: `${SETTINGS_TIME}`,
+          settingsId: completedEvent.settingsId,
           name: "bob",
-          rawWpm: 99,
-          restartCount: 4,
-          tags: ["tagOneId", "tagTwoId"],
-          testDuration: 15.1,
-          uid: uid,
-          wpm: 80,
+          uid,
+          isPb: true,
         }),
       );
+    });
 
-      expect(publicUpdateStatsMock).toHaveBeenCalledWith(
-        4,
-        15.1 + 2 - 5, //duration + incompleteTestSeconds-afk
+    it("never persists the anti-cheat inputs", async () => {
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({ result: buildCompletedEvent() })
+        .expect(200);
+
+      const stored = resultAddMock.mock.calls[0]?.[1] as Record<
+        string,
+        unknown
+      >;
+      for (const field of [
+        "hash",
+        "mathSeed",
+        "mathSettings",
+        "engineVersion",
+        "taskLog",
+        "incompleteTests",
+      ]) {
+        expect(stored[field], field).toBeUndefined();
+      }
+    });
+
+    it("ME-174 — rejects a forged task log with 467", async () => {
+      const forged = honestTaskLog(60);
+      forged[7] = { ...(forged[7] as TaskLogEntry), prompt: "1 + 1" };
+
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({ result: buildCompletedEvent({ taskLog: forged }) })
+        .expect(467);
+
+      expect(resultAddMock).not.toHaveBeenCalled();
+    });
+
+    it("ME-174 — rejects a log that belongs to a different seed", async () => {
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({ result: buildCompletedEvent({ mathSeed: MATH_SEED + 1 }) })
+        .expect(467);
+
+      expect(resultAddMock).not.toHaveBeenCalled();
+    });
+
+    it("ME-184 — rejects a stale engine version with 468, not 467", async () => {
+      const { status } = await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({ result: buildCompletedEvent({ engineVersion: "0.0.1" }) });
+
+      expect(status).toBe(468);
+      expect(resultAddMock).not.toHaveBeenCalled();
+    });
+
+    it("ME-179 — rejects an implausibly fast run", async () => {
+      // Driven through ME-176's `"toolong"` path, where the ceiling is measured
+      // against the committed count. A full 968-entry log would be a ~105 kB
+      // body, which express's default `json()` limit rejects before the
+      // controller is reached — see the note on `app.ts` in the WP-10 report.
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({
+          result: buildCompletedEvent({
+            taskLog: "toolong",
+            correct: 1400,
+            wrong: 0,
+            score: 1400,
+            acc: 100,
+            tpm: 175,
+            spm: 175,
+          }),
+        })
+        .expect(467);
+
+      expect(resultAddMock).not.toHaveBeenCalled();
+    });
+
+    it("ME-176 — accepts a plausible run whose log was too long to send", async () => {
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({
+          result: buildCompletedEvent({
+            taskLog: "toolong",
+            correct: 800,
+            wrong: 0,
+            score: 800,
+            acc: 100,
+            tpm: 100,
+            spm: 100,
+          }),
+        })
+        .expect(200);
+    });
+
+    it("ME-182(a) — rejects a testDuration that is not time * 60", async () => {
+      // `assertSettingsConsistent` catches this before the anti-cheat layer
+      // does, so the code is RESULT_DATA_INVALID rather than 467. Both checks
+      // exist on purpose; the anti-cheat copy is covered directly in
+      // `__tests__/anticheat/index.spec.ts`.
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({
+          result: buildCompletedEvent({ testDuration: TEST_DURATION + 1 }),
+        })
+        .expect(463);
+
+      expect(resultAddMock).not.toHaveBeenCalled();
+    });
+
+    it("ME-019/C4 — rejects a settingsId that does not derive from settings", async () => {
+      // Well-formed, but not the signature these settings hash to.
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({
+          result: buildCompletedEvent({
+            settingsId: "100:12:off:off:0:0:0",
+          }),
+        })
+        .expect(463);
+
+      expect(resultAddMock).not.toHaveBeenCalled();
+    });
+
+    it("AC-025 — rejects metrics that disagree with the task log", async () => {
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({ result: buildCompletedEvent({ score: 9999 }) })
+        .expect(463);
+
+      expect(resultAddMock).not.toHaveBeenCalled();
+    });
+
+    it("BL-5 — saves a run whose accuracy is well under 75 %", async () => {
+      // The single reason BL-5 was a blocker: monkeytype rejected `acc < 75`.
+      const taskLog = honestTaskLog(60).map((entry, i) =>
+        i % 2 === 0 ? { ...entry, given: "999999", correct: false } : entry,
       );
-      expect(userIncrementXpMock).toHaveBeenCalledWith(uid, 0);
-      expect(userUpdateTypingStatsMock).toHaveBeenCalledWith(
+      // Derived, not asserted: the controller recomputes them from the log
+      // (AC-025), so hard-coding would test the fixture rather than the floor.
+      const metrics = computeMetrics(taskLog, TEST_DURATION);
+      expect(metrics.acc).toBe(50);
+
+      await mockApp
+        .post("/results")
+        .set("Authorization", `Bearer ${uid}`)
+        .send({ result: buildCompletedEvent({ taskLog, ...metrics }) })
+        .expect(200);
+
+      expect(resultAddMock).toHaveBeenCalledWith(
         uid,
-        4,
-        15.1 + 2 - 5, //duration + incompleteTestSeconds-afk
+        expect.objectContaining({ acc: 50, score: 0 }),
       );
     });
+
     it("should fail if result saving is disabled", async () => {
       //GIVEN
       await enableResultsSaving(false);
@@ -657,24 +556,6 @@ describe("result controller test", () => {
       });
     });
 
-    it("should fail wit duplicate funboxes", async () => {
-      //GIVEN
-
-      //WHEN
-      const { body } = await mockApp
-        .post("/results")
-        .set("Authorization", `Bearer ${uid}`)
-        .send({
-          result: buildCompletedEvent({
-            funbox: ["58008", "58008"],
-          }),
-        })
-        .expect(400);
-
-      //THEN
-      expect(body.message).toEqual("Duplicate funboxes");
-    });
-
     // it("should fail invalid properties ", async () => {
     //GIVEN
     //WHEN
@@ -696,82 +577,99 @@ describe("result controller test", () => {
   });
 });
 
+const SETTINGS: MathGeneratorSettings = {
+  addition: "1000",
+  multiplication: "100",
+  division: "threeByTwo",
+  fractionAddition: "99",
+  fractionMultiplication: true,
+  decimals: true,
+  negatives: true,
+};
+
+const MATH_SEED = 0x0badf00d;
+const TEST_DURATION = SETTINGS_TIME * 60;
+
+/**
+ * An **honest** payload: the task log is regenerated from `(mathSeed, settings)`
+ * by `packages/math-engine`, so it reproduces exactly and the ME-174 layer
+ * accepts it. Building it any other way would make every `addResult` test a test
+ * of the anti-cheat rejection path instead of the save path.
+ */
+function honestTaskLog(n: number, stepMs = 1000): TaskLogEntry[] {
+  return generateSequence(
+    MATH_SEED,
+    { ...SETTINGS, time: SETTINGS_TIME },
+    n,
+  ).map((task, i) => ({
+    i,
+    kind: task.kind,
+    prompt: task.prompt,
+    expected: task.answerDisplay,
+    given: task.answerDisplay.replace("−", "-"),
+    correct: true,
+    tStart: i * stepMs,
+    tEnd: i * stepMs + stepMs - 1,
+  }));
+}
+
 function buildCompletedEvent(result?: Partial<CompletedEvent>): CompletedEvent {
+  const taskLog = result?.taskLog ?? honestTaskLog(60);
+  const correct = taskLog === "toolong" ? 60 : taskLog.length;
   return {
-    acc: 86,
-    afkDuration: 5,
-    bailedOut: false,
-    blindMode: false,
-    charStats: [100, 2, 3, 5],
-    chartData: { wpm: [1, 2, 3], burst: [50, 55, 56], err: [0, 2, 0] },
-    consistency: 23.5,
-    difficulty: "normal",
-    funbox: [],
-    hash: "hash",
-    incompleteTestSeconds: 2,
-    incompleteTests: [{ acc: 75, seconds: 10 }],
-    keyConsistency: 12,
-    keyDuration: [0, 3, 5],
-    keySpacing: [0, 2, 4],
-    language: "english",
-    lazyMode: false,
+    score: correct,
+    correct,
+    wrong: 0,
+    acc: 100,
+    tpm: correct / (TEST_DURATION / 60),
+    spm: correct / (TEST_DURATION / 60),
+    consistency: 90,
     mode: "time",
-    mode2: "15",
-    numbers: false,
-    punctuation: false,
-    rawWpm: 99,
-    restartCount: 4,
-    tags: ["tagOneId", "tagTwoId"],
-    testDuration: 15.1,
-    timestamp: 1000,
+    mode2: `${SETTINGS_TIME}`,
+    timestamp: Date.now() - 1000,
+    testDuration: TEST_DURATION,
+    chartData: { score: [1, 2, 3], tpm: [4, 5, 6], wrong: [0, 0, 0] },
     uid,
-    wpmConsistency: 55,
-    wpm: 80,
-    stopOnLetter: false,
-    //new required
-    charTotal: 5,
-    keyOverlap: 7,
-    lastKeyToEnd: 9,
-    startToFirstKey: 11,
+    settings: SETTINGS,
+    settingsId: buildSettingsId(SETTINGS),
+    restartCount: 4,
+    incompleteTestSeconds: 2,
+    afkDuration: 5,
+    hash: "hash",
+    mathSeed: MATH_SEED,
+    mathSettings: { ...SETTINGS, time: SETTINGS_TIME },
+    engineVersion: MATH_ENGINE_VERSION,
+    taskLog,
+    incompleteTests: [{ acc: 75, seconds: 10 }],
     ...result,
   };
 }
 
-async function enablePremiumFeatures(enabled: boolean): Promise<void> {
-  const mockConfig = await configuration;
-  mockConfig.users.premium = { ...mockConfig.users.premium, enabled };
-
-  vi.spyOn(Configuration, "getCachedConfiguration").mockResolvedValue(
-    mockConfig,
-  );
-}
 function givenDbResult(uid: string, customize?: Partial<DBResult>): DBResult {
   return {
     _id: new ObjectId(),
-    wpm: Math.random() * 100,
-    rawWpm: Math.random() * 100,
-    charStats: [
-      Math.round(Math.random() * 10),
-      Math.round(Math.random() * 10),
-      Math.round(Math.random() * 10),
-      Math.round(Math.random() * 10),
-    ],
-    acc: 80 + Math.random() * 20, //min accuracy is 75%
-    mode: "time",
-    mode2: "60",
-    timestamp: Math.round(Math.random() * 100),
-    testDuration: 1 + Math.random() * 100,
+    score: 190,
+    correct: 200,
+    wrong: 10,
+    // BL-5: accuracy is unbounded below — a stored result may legitimately be
+    // anywhere in [0, 100].
+    acc: Math.random() * 100,
+    tpm: Math.random() * 100,
+    spm: Math.random() * 100,
     consistency: Math.random() * 100,
-    keyConsistency: Math.random() * 100,
-    uid,
-    keySpacingStats: { average: Math.random() * 100, sd: Math.random() },
-    keyDurationStats: { average: Math.random() * 100, sd: Math.random() },
-    isPb: true,
+    mode: "time",
+    mode2: "8",
+    timestamp: Math.round(Math.random() * 100),
+    testDuration: 480,
     chartData: {
-      wpm: [Math.random() * 100],
-      burst: [Math.random() * 100],
-      err: [Math.random() * 100],
+      score: [Math.random() * 100],
+      tpm: [Math.random() * 100],
+      wrong: [Math.random() * 10],
     },
+    settings: SETTINGS,
+    settingsId: buildSettingsId(SETTINGS),
+    isPb: true,
+    uid,
     name: "testName",
     ...customize,
   };
@@ -787,7 +685,7 @@ async function enableResultsSaving(enabled: boolean): Promise<void> {
 }
 async function enableUsersXpGain(enabled: boolean): Promise<void> {
   const mockConfig = await configuration;
-  mockConfig.users.xp = { ...mockConfig.users.xp, enabled, funboxBonus: 1 };
+  mockConfig.users.xp = { ...mockConfig.users.xp, enabled };
 
   vi.spyOn(Configuration, "getCachedConfiguration").mockResolvedValue(
     mockConfig,
