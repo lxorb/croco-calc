@@ -122,7 +122,9 @@ function buildCommandWithSubgroup<K extends keyof ConfigSchemas.Config>(
   return {
     id: `change${capitalizeFirstLetter(key)}`,
     display: display,
-    icon: configMeta?.fa?.icon ?? "fa-cog",
+    // C30/SB-060 — `configMetadata` carries an iconify id (`icon: string`);
+    // font awesome and its `fa` sub-object are gone.
+    icon: configMeta.icon,
     subgroup: {
       title: display,
       configKey: key,
@@ -130,6 +132,34 @@ function buildCommandWithSubgroup<K extends keyof ConfigSchemas.Config>(
     },
     alias: rootAlias,
   };
+}
+
+/**
+ * SB-155 — the option label shown in the palette.
+ *
+ * 1. an explicit `display()` on the commandline metadata still wins (fonts,
+ *    `flash_text` → `flash text`, …);
+ * 2. the OFF state is the literal word `off`, never the bar's struck-through
+ *    label — the palette cannot render a strikethrough, so `+100` for
+ *    `addition: "off"` would read as ON;
+ * 3. `true` is `on`, mirroring the parenthetical option list in SB-155;
+ * 4. otherwise `configMetadata[key].optionsMetadata[value].displayString`, the
+ *    same table the bar reads (`config/bar-controls.ts:getBarLabel`), so the
+ *    two surfaces cannot disagree;
+ * 5. finally the raw value.
+ */
+function resolveOptionDisplay(
+  key: keyof ConfigSchemas.Config,
+  value: ConfigSchemas.ConfigValue,
+  explicit: string | undefined,
+): string {
+  if (explicit !== undefined) return explicit;
+  if (value === "off" || value === false) return "off";
+  if (value === true) return "on";
+
+  const options: Record<string, { displayString?: string }> | undefined =
+    configMetadata[key].optionsMetadata;
+  return options?.[String(value)]?.displayString ?? String(value);
 }
 
 function buildSubgroupCommand<K extends keyof ConfigSchemas.Config>(
@@ -148,17 +178,11 @@ function buildSubgroupCommand<K extends keyof ConfigSchemas.Config>(
 ): Command {
   const val = value;
 
-  let displayString = commandDisplay?.(value);
-
-  if (displayString === undefined) {
-    if (value === true) {
-      displayString = "on";
-    } else if (value === false) {
-      displayString = "off";
-    } else {
-      displayString = value.toString();
-    }
-  }
+  const displayString = resolveOptionDisplay(
+    key,
+    value,
+    commandDisplay?.(value),
+  );
 
   return {
     id: `set${capitalizeFirstLetter(key)}${capitalizeFirstLetter(
@@ -216,7 +240,8 @@ function buildInputCommand<K extends keyof ConfigSchemas.Config>({
     display: displayString,
     alias: inputProps?.alias ?? undefined,
     input: true,
-    icon: configMeta?.fa?.icon ?? "fa-cog",
+    // C30 — iconify id from the config metadata (see `buildCommandWithSubgroup`).
+    icon: configMeta.icon,
 
     //@ts-expect-error this is fine
     exec: ({ input }): void => {

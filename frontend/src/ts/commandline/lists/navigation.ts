@@ -1,4 +1,5 @@
 import { navigate } from "../../controllers/route-controller";
+import { showModal } from "../../states/modals";
 import { isAuthenticated } from "../../states/core";
 import { toggleFullscreen } from "../../utils/misc";
 import { Command, withValidation } from "../types";
@@ -9,9 +10,9 @@ import Ape from "../../ape";
 const commands: Command[] = [
   {
     id: "viewTypingPage",
-    display: "View Typing Page",
-    alias: "navigate go to start begin type test",
-    icon: "fa-keyboard",
+    display: "View Test Page",
+    alias: "navigate go to start begin test",
+    icon: "ph:calculator-bold",
     exec: (): void => {
       void navigate("/");
     },
@@ -20,7 +21,7 @@ const commands: Command[] = [
     id: "viewLeaderboards",
     display: "View Leaderboards",
     alias: "navigate go to",
-    icon: "fa-crown",
+    icon: "ph:crown-bold",
     exec: (): void => {
       void navigate("/leaderboards");
     },
@@ -29,18 +30,25 @@ const commands: Command[] = [
     id: "viewAbout",
     display: "View About Page",
     alias: "navigate go to",
-    icon: "fa-info",
+    icon: "ph:info-bold",
     exec: (): void => {
       void navigate("/about");
     },
   },
+  /**
+   * Master C9 — the monkeytype settings page is deleted, its theme picker was
+   * extracted into a modal, and the `settings` nav item now opens that modal.
+   * The palette entry follows the nav item rather than pointing at a dead
+   * `/settings` route.
+   */
   {
     id: "viewSettings",
-    display: "View Settings Page",
-    alias: "navigate go to",
-    icon: "fa-cog",
+    display: "Change theme",
+    alias: "navigate go to settings theme appearance colors",
+    icon: "ph:gear-bold",
+    opensModal: true,
     exec: (): void => {
-      void navigate("/settings");
+      showModal("Theme");
     },
   },
 
@@ -48,7 +56,7 @@ const commands: Command[] = [
     id: "viewAccount",
     display: "View Account Page",
     alias: "navigate go to stats",
-    icon: "fa-user",
+    icon: "ph:user-bold",
     exec: (): void => {
       isAuthenticated() ? void navigate("/account") : void navigate("/login");
     },
@@ -57,7 +65,7 @@ const commands: Command[] = [
     id: "searchProfile",
     display: "Search for a profile",
     alias: "profile user search find lookup",
-    icon: "fa-search",
+    icon: "ph:magnifying-glass-bold",
     input: true,
     validation: {
       schema: UserNameWithoutFilterSchema,
@@ -77,7 +85,7 @@ const commands: Command[] = [
   {
     id: "toggleFullscreen",
     display: "Toggle Fullscreen",
-    icon: "fa-expand",
+    icon: "ph:arrows-out-bold",
     exec: (): void => {
       toggleFullscreen();
     },

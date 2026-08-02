@@ -58,13 +58,12 @@ export type CommandsSubgroup = {
 };
 
 export type CommandlineSubgroupKey = ConfigKey | CommandlineListKey;
-export type CommandlineListKey =
-  | "themes"
-  | "loadChallenge"
-  | "minBurst"
-  | "funbox"
-  | "tags"
-  | "ads";
+/**
+ * Named subgroups that are not backed by a single config key. Only the theme
+ * list survives: `loadChallenge` (INV-185), `minBurst` (C22), `funbox`
+ * (SB-159), `tags` (C15) and `ads` (INV-189) are all deleted features.
+ */
+export type CommandlineListKey = "themes";
 
 export function withValidation<T>(command: CommandWithValidation<T>): Command {
   return command as unknown as Command;

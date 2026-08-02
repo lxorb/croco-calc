@@ -1,172 +1,127 @@
-import MinBurstCommands from "./lists/min-burst";
-import BailOutCommands from "./lists/bail-out";
-import QuoteFavoriteCommands from "./lists/quote-favorites";
-import NavigationCommands from "./lists/navigation";
-import ResultScreenCommands from "./lists/result-screen";
-import CustomBackgroundCommands from "./lists/custom-background";
-import FontFamilyCommands from "./lists/font-family";
-import CustomBackgroundFilterCommands from "./lists/background-filter";
-import AddOrRemoveThemeToFavorite from "./lists/add-or-remove-theme-to-favorites";
-import TagsCommands from "./lists/tags";
-import CustomThemesListCommands from "./lists/custom-themes-list";
-import PresetsCommands from "./lists/presets";
-import FunboxCommands from "./lists/funbox";
-import ThemesCommands from "./lists/themes";
-import LoadChallengeCommands from "./lists/load-challenge";
+import { ConfigKey } from "@croco-calc/schemas/configs";
 
+import {
+  applyConfigFromJson,
+  restoreDefaultTestSettings,
+} from "../config/lifecycle";
 import { Config } from "../config/store";
-import { setConfig } from "../config/setters";
+import {
+  hideFpsCounter,
+  showFpsCounter,
+} from "../components/layout/overlays/FpsCounter";
 import { randomizeTheme } from "../controllers/theme-controller";
+import { isAuthAvailable, signOut } from "../firebase";
+import { isAuthenticated } from "../states/core";
 import { showModal } from "../states/modals";
 import {
   showErrorNotification,
   clearAllNotifications,
   showSuccessNotification,
 } from "../states/notifications";
-import * as VideoAdPopup from "../popups/video-ad-popup";
+import { getLastEventLog } from "../states/test";
+import { CommandlineConfigMetadataObject } from "./commandline-metadata";
+import { getIconHtml } from "./icons";
+import AddOrRemoveThemeToFavorite from "./lists/add-or-remove-theme-to-favorites";
+import CustomBackgroundFilterCommands from "./lists/background-filter";
+import CustomBackgroundCommands from "./lists/custom-background";
+import CustomThemesListCommands from "./lists/custom-themes-list";
+import FontFamilyCommands from "./lists/font-family";
+import NavigationCommands from "./lists/navigation";
+import ResultScreenCommands from "./lists/result-screen";
+import ThemesCommands from "./lists/themes";
 import { Command, CommandlineListKey, CommandsSubgroup } from "./types";
 import { buildCommandForConfigKey } from "./util";
-import { CommandlineConfigMetadataObject } from "./commandline-metadata";
-import { isAuthAvailable, signOut } from "../firebase";
-import { isAuthenticated } from "../states/core";
-import { ConfigKey } from "@croco-calc/schemas/configs";
-import {
-  hideFpsCounter,
-  showFpsCounter,
-} from "../components/layout/overlays/FpsCounter";
-import { applyConfigFromJson } from "../config/lifecycle";
-import { getLastEventLog } from "../states/test";
 
-const adsCommands = buildCommands("ads");
-
+/**
+ * The croco calc command palette (master C8 keeps it; INV-117/INV-069 are
+ * overruled).
+ *
+ * SB-153: the eight settings-bar commands come first, in bar order, generated
+ * from config metadata (SB-152) rather than hand-written, so the bar and the
+ * palette can never disagree about the option set.
+ *
+ * SB-159 removed from monkeytype's list: `language`, `quoteLength`,
+ * `punctuation`, `numbers`, `mode`, `words`, `changeCustomModeText`,
+ * `viewQuoteSearchPopup`, the quote-favourite commands, `britishEnglish`,
+ * `lazyMode`, `customPolyglot`, `customLayoutfluid`, `layout`, every `keymap*`
+ * command, every funbox command, `loadChallenge`, `watchVideoAd`, `ads` and
+ * `minBurst` — plus, by later rulings, the sound commands, presets, tags,
+ * `difficulty`, `minWpm`/`minAcc` (C14, C15, C22), `bailOut` (C38) and
+ * `blindMode` (C41). The input-side commands of monkeytype's typing pipeline
+ * (`freedomMode`, `strictSpace`, `stopOnError`, `quickEnd`, `hideExtraLetters`,
+ * …) go with the config keys §6.1 struck, as do `capsLockWarning`, `monkey`,
+ * `monkeyPowerLevel`, `liveBurstStyle`, `tapeMode` and the rest of the
+ * appearance keys that no longer exist.
+ */
 export const commands: CommandsSubgroup = {
   title: "",
   list: [
     //result
     ...ResultScreenCommands,
 
-    //test screen
+    // ------------------------------------------------------------------
+    // test — SB-153: the eight settings-bar commands, first, in bar order
+    // (decimals, negatives, addition, multiplication, division, fraction
+    // addition, fraction multiplication, time). Each is built by
+    // `buildCommandForConfigKey`, so its option list is the zod enum in cycle
+    // order (SB-154, SB-011) and executing one produces exactly the same
+    // mutation, coupling, persistence and restart as clicking the control
+    // (SB-162).
+    // ------------------------------------------------------------------
     ...buildCommands(
-      "punctuation",
-      "numbers",
-      "mode",
+      "decimals",
+      "negatives",
+      "addition",
+      "multiplication",
+      "division",
+      "fractionAddition",
+      "fractionMultiplication",
       "time",
-      "words",
-      "quoteLength",
-      "language",
     ),
+    /**
+     * SB-157 — one command that puts all eight keys back to the SB-110
+     * defaults and restarts the test. Its alias names the reason it exists:
+     * the defaults are the only leaderboard-eligible settings (SB-171), and
+     * SB-181 makes the "not eligible for leaderboards" notice execute it.
+     */
     {
-      id: "changeCustomModeText",
-      display: "Change custom text",
-      icon: "fa-align-left",
-      exec: (): void => {
-        showModal("CustomText");
+      id: "restoreDefaultTestSettings",
+      display: "Restore default test settings",
+      alias: "default leaderboard eligible reset settings",
+      icon: "tabler:refresh",
+      exec: async (): Promise<void> => {
+        await restoreDefaultTestSettings();
       },
     },
-    {
-      id: "viewQuoteSearchPopup",
-      display: "Search for quotes",
-      icon: "fa-search",
-      exec: (): void => {
-        setConfig("mode", "quote");
-        showModal("QuoteSearch");
-      },
-      shouldFocusTestUI: false,
-    },
-    ...QuoteFavoriteCommands,
-    ...BailOutCommands,
     {
       id: "shareTestSettings",
       display: "Share test settings",
-      icon: "fa-share",
+      alias: "share link url",
+      icon: "tabler:share",
+      opensModal: true,
       exec: (): void => {
         showModal("ShareTestSettings");
       },
     },
 
-    //account
-    ...TagsCommands,
-    ...PresetsCommands,
-
     //behavior
-    ...buildCommands(
-      "resultSaving",
-      "difficulty",
-      "quickRestart",
-      "repeatQuotes",
-      "blindMode",
-      "alwaysShowWordsHistory",
-      "singleListCommandLine",
-      "minWpm",
-      "minAcc",
-      ...MinBurstCommands,
-      "britishEnglish",
-      ...FunboxCommands,
-      "customLayoutfluid",
-      "customPolyglot",
-    ),
+    ...buildCommands("resultSaving", "quickRestart", "singleListCommandLine"),
 
-    //input
-    ...buildCommands(
-      "freedomMode",
-      "strictSpace",
-      "oppositeShiftMode",
-      "stopOnError",
-      "confidenceMode",
-      "quickEnd",
-      "indicateTypos",
-      "compositionDisplay",
-      "hideExtraLetters",
-      "lazyMode",
-      "layout",
-      "codeUnindentOnBackspace",
-    ),
+    //caret (restored by master C11)
+    ...buildCommands("smoothCaret", "caretStyle"),
 
-    //sound
-    ...buildCommands(
-      "soundVolume",
-      "playSoundOnClick",
-      "playSoundOnError",
-      "playTimeWarning",
-    ),
-
-    //caret
-    ...buildCommands(
-      "smoothCaret",
-      "caretStyle",
-      "paceCaret",
-      "repeatedPace",
-      "paceCaretStyle",
-    ),
-
-    //appearence
+    //appearance
     ...buildCommands(
       "timerStyle",
       "liveSpeedStyle",
       "liveAccStyle",
-      "liveBurstStyle",
-
       "timerColor",
       "timerOpacity",
-      "highlightMode",
-      "typedEffect",
-
-      "tapeMode",
-      "tapeMargin",
-      "smoothLineScroll",
-      "showAllLines",
-      "typingSpeedUnit",
       "alwaysShowDecimalPlaces",
       "startGraphsAtZero",
       "maxLineWidth",
       "fontSize",
       ...FontFamilyCommands,
-      "keymapMode",
-      "keymapStyle",
-      "keymapLegendStyle",
-      "keymapSize",
-      "keymapLayout",
-      "keymapKeys",
     ),
 
     //theme
@@ -187,7 +142,7 @@ export const commands: CommandsSubgroup = {
     {
       id: "randomizeTheme",
       display: "Next random theme",
-      icon: "fa-random",
+      icon: "ph:shuffle-bold",
       exec: async (): Promise<void> => randomizeTheme(),
       available: (): boolean => {
         return Config.randomTheme !== "off";
@@ -198,32 +153,16 @@ export const commands: CommandsSubgroup = {
     ...buildCommands(
       "showKeyTips",
       "showOutOfFocusWarning",
-      "capsLockWarning",
       "showAverage",
       "showPb",
-      "monkeyPowerLevel",
-      "monkey",
     ),
 
-    //danger zone
-    ...adsCommands,
-
     //other
-    ...LoadChallengeCommands,
     ...NavigationCommands,
-    {
-      id: "watchVideoAd",
-      display: "Watch video ad",
-      alias: "support donate",
-      icon: "fa-ad",
-      exec: (): void => {
-        void VideoAdPopup.show();
-      },
-    },
     {
       id: "importSettingsJSON",
       display: "Import settings JSON",
-      icon: "fa-cog",
+      icon: "ph:file-arrow-up-bold",
       alias: "import config",
       input: true,
       exec: async ({ input }): Promise<void> => {
@@ -234,7 +173,7 @@ export const commands: CommandsSubgroup = {
     {
       id: "exportSettingsJSON",
       display: "Export settings JSON",
-      icon: "fa-cog",
+      icon: "ph:file-arrow-down-bold",
       alias: "export config",
       input: true,
       defaultValue: (): string => {
@@ -244,7 +183,7 @@ export const commands: CommandsSubgroup = {
     {
       id: "clearNotifications",
       display: "Clear all notifications",
-      icon: "fa-trash-alt",
+      icon: "ph:trash-bold",
       alias: "dismiss",
       exec: async (): Promise<void> => {
         clearAllNotifications();
@@ -253,7 +192,7 @@ export const commands: CommandsSubgroup = {
     {
       id: "clearSwCache",
       display: "Clear SW cache",
-      icon: "fa-cog",
+      icon: "ph:hard-drives-bold",
       exec: async (): Promise<void> => {
         const clist = await caches.keys();
         for (const name of clist) {
@@ -265,7 +204,7 @@ export const commands: CommandsSubgroup = {
     {
       id: "getSwCache",
       display: "Get SW cache",
-      icon: "fa-cog",
+      icon: "ph:hard-drives-bold",
       exec: async (): Promise<void> => {
         alert(await caches.keys());
       },
@@ -274,7 +213,7 @@ export const commands: CommandsSubgroup = {
       id: "copyResultStats",
       display: "Copy last event log (result data)",
       alias: "stats events",
-      icon: "fa-cog",
+      icon: "ph:clipboard-bold",
       visible: false,
       available: (): boolean => {
         return getLastEventLog() !== null;
@@ -293,7 +232,7 @@ export const commands: CommandsSubgroup = {
     {
       id: "fpsCounter",
       display: "FPS counter...",
-      icon: "fa-cog",
+      icon: "ph:gauge-bold",
       visible: false,
       subgroup: {
         title: "FPS counter...",
@@ -301,7 +240,7 @@ export const commands: CommandsSubgroup = {
           {
             id: "startFpsCounter",
             display: "show",
-            icon: "fa-cog",
+            icon: "ph:gauge-bold",
             exec: (): void => {
               showFpsCounter();
             },
@@ -309,7 +248,7 @@ export const commands: CommandsSubgroup = {
           {
             id: "stopFpsCounter",
             display: "hide",
-            icon: "fa-cog",
+            icon: "ph:gauge-bold",
             exec: (): void => {
               hideFpsCounter();
             },
@@ -318,40 +257,9 @@ export const commands: CommandsSubgroup = {
       },
     },
     {
-      id: "fixSkillIssue",
-      display: "Fix skill issue",
-      icon: "fa-wrench",
-      visible: false,
-      exec: async (): Promise<void> => {
-        // window.open("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-        (document.querySelector("body") as HTMLElement).innerHTML = `
-          <div class="centerbox" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events: none;width: 100%; max-width: 800px;">
-            <h1 style="font-size:3rem;margin-bottom:1rem;">Fixing skill issue...</h1>
-            <iframe style="width: 100%; aspect-ratio: 4 / 3" src="https://www.youtube.com/embed/dQw4w9WgXcQ?si=Kr48u8WHcwvX95G7&amp;controls=0&autoplay=1&mute=0&disablekb=1&fs=0&modestbranding=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-          </div>
-        `;
-        setTimeout(() => {
-          document
-            .querySelector(".centerbox")
-            ?.insertAdjacentHTML(
-              "beforeend",
-              `<p style="margin-top:1rem;font-size:1.5rem;">If your skill issue is not fixed yet, please wait a bit longer...</p>`,
-            );
-        }, 5000);
-      },
-    },
-    {
-      id: "joinDiscord",
-      display: "Join the Discord server",
-      icon: "fa-users",
-      exec: (): void => {
-        window.open("https://discord.gg/monkeytype");
-      },
-    },
-    {
       id: "signOut",
       display: "Sign out",
-      icon: "fa-sign-out-alt",
+      icon: "ph:sign-out-bold",
       exec: (): void => {
         void signOut();
       },
@@ -364,11 +272,6 @@ export const commands: CommandsSubgroup = {
 
 const lists: Record<CommandlineListKey, CommandsSubgroup | undefined> = {
   themes: ThemesCommands[0]?.subgroup,
-  loadChallenge: LoadChallengeCommands[0]?.subgroup,
-  minBurst: MinBurstCommands[0]?.subgroup,
-  funbox: FunboxCommands[0]?.subgroup,
-  tags: TagsCommands[0]?.subgroup,
-  ads: adsCommands[0]?.subgroup,
 };
 
 const subgroupByConfigKey = Object.fromEntries(
@@ -444,6 +347,10 @@ export async function getSingleSubgroup(): Promise<CommandsSubgroup> {
   return singleList;
 }
 
+/**
+ * SB-161 — `singleListCommandLine` keeps working for the eight new commands:
+ * their subgroup entries flatten into `"<Command> > <option>"` rows.
+ */
 function buildSingleListCommands(
   command: Command,
   parentCommand?: Command,
@@ -471,9 +378,7 @@ function buildSingleListCommands(
       );
       const singleListDisplay = `${
         parentCommandDisplay
-      }<i class="fas fa-fw fa-chevron-right chevronIcon"></i>${
-        command.display
-      }`;
+      }${getChevronHtml()}${command.display}`;
 
       const singleListDisplayNoIcon = `${parentCommandDisplay} ${command.display}`;
 
@@ -506,6 +411,16 @@ function buildSingleListCommands(
     }
   }
   return commands;
+}
+
+/**
+ * The separator between a flattened command and its option in single-list mode.
+ * Cached iconify markup (C30: zero `fa-` strings anywhere in `frontend/src`).
+ * `commandline.ts` string-replaces it to splice the active-value checkmark in,
+ * so both sides must call this one function rather than inline the markup.
+ */
+export function getChevronHtml(): string {
+  return getIconHtml("ph:caret-right-bold", "chevronIcon");
 }
 
 function buildCommands(

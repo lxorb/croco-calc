@@ -1,17 +1,9 @@
 import * as ConfigSchemas from "@croco-calc/schemas/configs";
-import * as SoundController from "../controllers/sound-controller";
-import * as TestLogic from "../test/test-logic";
-import {
-  getLanguageDisplayString,
-  replaceUnderscoresWithSpaces,
-} from "../utils/strings";
+import { replaceUnderscoresWithSpaces } from "../utils/strings";
 
-import { areUnsortedArraysEqual } from "../utils/arrays";
-import { Config } from "../config/store";
-import { get as getTypingSpeedUnit } from "../utils/typing-speed-units";
-import { getActivePage, isAuthenticated } from "../states/core";
-import { Fonts } from "../constants/fonts";
-import { KnownFontName } from "@croco-calc/schemas/fonts";
+import { restartTestEvent } from "../events/test";
+import { Fonts, KnownFontName } from "../constants/fonts";
+import { isAuthenticated } from "../states/core";
 import * as UI from "../ui";
 import { Validation } from "../types/validation";
 import { typedKeys } from "@croco-calc/util/objects";
@@ -19,24 +11,21 @@ import { typedKeys } from "@croco-calc/util/objects";
 //TODO: remove display property and instead use optionsMetadata from configMetadata
 // eventually this file should be fully merged into config metadata, probably under the 'commandline' property
 
+/**
+ * Config keys with no palette command at all — they are either edited through a
+ * dedicated surface (the theme modal, C9) or never edited by hand.
+ */
 type ConfigKeysWithoutCommands =
-  | "minWpmCustomSpeed"
-  | "minAccCustom"
-  | "minBurstCustomSpeed"
   | "accountChart"
   | "customThemeColors"
   | "favThemes"
-  | "paceCaretCustomSpeed"
   | "autoSwitchTheme"
   | "themeLight"
-  | "themeDark"
-  | "burstHeatmap";
+  | "themeDark";
 
 type SkippedConfigKeys =
-  | "minBurst" //this is skipped for now because it has 2 nested inputs;
   | "customBackgroundFilter" //this is skipped for now because it has 4 nested inputs;
-  | "theme" //themes are sorted by color and also affected by config.favThemes
-  | "funbox"; //is using a special non schema command at the top to clear funboxes
+  | "theme"; //themes are sorted by color and also affected by config.favThemes
 
 export type CommandlineConfigMetadataObject = {
   [K in keyof Omit<
@@ -93,113 +82,72 @@ export type SubgroupProps<T extends keyof ConfigSchemas.Config> = {
   options: "fromSchema" | ConfigSchemas.Config[T][];
 };
 
+/**
+ * SB-154 restates monkeytype's `afterExec: () => void TestLogic.restart()`.
+ * croco calc dispatches `restartTestEvent` instead, which `test/test-logic.ts`
+ * subscribes to (`test-logic.ts:1323`) — the identical restart, reached through
+ * the identical path the settings bar uses (`TestConfig.tsx:173`). SB-162 makes
+ * that identity binding, and going through the event keeps the palette free of
+ * a static import of the test engine.
+ */
+function restartTest(): void {
+  restartTestEvent.dispatch();
+}
+
 export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
-  //test
-  punctuation: {
-    subgroup: {
-      options: "fromSchema",
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
+  // ------------------------------------------------------------------
+  // test — the eight settings-bar controls (SB-152 … SB-158).
+  //
+  // None of them declares `display`: `buildCommandWithSubgroup` derives it from
+  // `configMetadata[key].displayString`, which is what makes SB-152's "generated
+  // from config metadata, not hand-written" true. The derived strings are
+  // exactly SB-156's — `Decimals...`, `Negative numbers...`, `Addition...`,
+  // `Multiplication...`, `Division...`, `Fraction addition...`,
+  // `Fraction multiplication...`, `Time...`.
+  //
+  // Likewise none declares `display` on its subgroup: option labels come from
+  // `configMetadata[key].optionsMetadata[value].displayString`, so the bar and
+  // the palette read one mapping table (SB-155).
+  // ------------------------------------------------------------------
+  decimals: {
+    alias: "decimal point comma",
+    subgroup: { options: "fromSchema", afterExec: restartTest },
   },
-  numbers: {
-    subgroup: {
-      options: "fromSchema",
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
+  negatives: {
+    alias: "minus negative",
+    subgroup: { options: "fromSchema", afterExec: restartTest },
   },
-  words: {
-    alias: "words",
-    subgroup: {
-      options: [10, 25, 50, 100],
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
-    input: {
-      inputValueConvert: Number,
-
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
+  addition: {
+    alias: "plus add",
+    subgroup: { options: "fromSchema", afterExec: restartTest },
   },
+  multiplication: {
+    alias: "times multiply",
+    subgroup: { options: "fromSchema", afterExec: restartTest },
+  },
+  division: {
+    alias: "divide",
+    subgroup: { options: "fromSchema", afterExec: restartTest },
+  },
+  fractionAddition: {
+    alias: "fraction fractions",
+    subgroup: { options: "fromSchema", afterExec: restartTest },
+  },
+  fractionMultiplication: {
+    alias: "fraction fractions",
+    subgroup: { options: "fromSchema", afterExec: restartTest },
+  },
+  // SB-158 — no `input` branch and no second-based option list. croco calc's
+  // time domain is closed (1/2/4/8 minutes, SB-012); an arbitrary duration
+  // would fragment the leaderboards, whose second axis is exactly this key
+  // (SB-172, SB-176).
   time: {
-    subgroup: {
-      options: [15, 30, 60, 120],
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
-    input: {
-      inputValueConvert: Number,
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
+    alias: "duration minutes",
+    subgroup: { options: "fromSchema", afterExec: restartTest },
   },
-  mode: {
-    subgroup: {
-      options: "fromSchema",
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
-  },
-  quoteLength: {
-    alias: "quotes",
-    subgroup: {
-      options: [[0, 1, 2, 3], [0], [1], [2], [3], [-3]],
-      configValueMode: () => "include",
-      isAvailable: (value) => {
-        if (value[0] === -3) {
-          return isAuthenticated;
-        }
-        return undefined;
-      },
-      display: (value) => {
-        if (areUnsortedArraysEqual(value, [0, 1, 2, 3])) {
-          return "all";
-        }
 
-        const map: Record<number, string> = {
-          0: "short",
-          1: "medium",
-          2: "long",
-          3: "thicc",
-          "-3": "favorite",
-        };
-
-        return map[value[0] as number] as string;
-      },
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
-  },
-  language: {
-    subgroup: {
-      options: "fromSchema",
-      display: (value) => {
-        return getLanguageDisplayString(value);
-      },
-    },
-  },
   //behavior
-  difficulty: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
   quickRestart: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  repeatQuotes: {
     subgroup: {
       options: "fromSchema",
     },
@@ -209,264 +157,14 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
       options: "fromSchema",
       alias: (val) => (val ? "enabled" : "disabled"),
     },
-    alias: "results practice incognito",
-  },
-  blindMode: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  alwaysShowWordsHistory: {
-    subgroup: {
-      options: "fromSchema",
-    },
+    alias: "results incognito",
   },
   singleListCommandLine: {
     subgroup: {
       options: "fromSchema",
     },
   },
-  minWpm: {
-    display: "Minimum speed...",
-    alias: "wpm",
-    subgroup: {
-      options: ["off"],
-    },
-    input: {
-      configValue: "custom",
-      display: "custom...",
-      secondKey: "minWpmCustomSpeed",
-      inputValueConvert: (value) => {
-        let newVal = Number(value);
-        newVal = getTypingSpeedUnit(Config.typingSpeedUnit).toWpm(newVal);
-        return newVal;
-      },
-    },
-  },
-  minAcc: {
-    display: "Minimum accuracy...",
-    subgroup: {
-      options: ["off"],
-    },
-    input: {
-      configValue: "custom",
-      display: "custom...",
-      secondKey: "minAccCustom",
-      inputValueConvert: (value) => {
-        return Number(value);
-      },
-    },
-  },
-  // minBurst: null,
-  britishEnglish: {
-    subgroup: {
-      options: "fromSchema",
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
-  },
-  // funbox: null,
-  customLayoutfluid: {
-    input: {
-      defaultValue: () => {
-        return Config.customLayoutfluid.join(" ");
-      },
-      inputValueConvert: (val) =>
-        val.trim().split(" ") as ConfigSchemas.CustomLayoutFluid,
-    },
-  },
-  customPolyglot: {
-    input: {
-      defaultValue: () => {
-        return Config.customPolyglot.join(" ");
-      },
-      inputValueConvert: (val) =>
-        val.trim().split(" ") as ConfigSchemas.CustomPolyglot,
-      afterExec: () => {
-        if (getActivePage() === "test") {
-          void TestLogic.restart();
-        }
-      },
-    },
-  },
-  //input
-  freedomMode: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  strictSpace: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  oppositeShiftMode: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  stopOnError: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  confidenceMode: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  quickEnd: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  indicateTypos: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  compositionDisplay: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  hideExtraLetters: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  lazyMode: {
-    subgroup: {
-      options: "fromSchema",
-      afterExec: () => void TestLogic.restart(),
-    },
-  },
-  layout: {
-    subgroup: {
-      options: "fromSchema",
-      display: (layout) =>
-        layout === "default" ? "off" : layout.replace(/_/g, " "),
-      afterExec: () => void TestLogic.restart(),
-    },
-  },
-  codeUnindentOnBackspace: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  //sound
-  soundVolume: {
-    subgroup: {
-      options: [0.1, 0.5, 1],
-      display: (val) =>
-        new Map([
-          [0.1, "quiet"],
-          [0.5, "medium"],
-          [1.0, "loud"],
-        ]).get(val) ?? "custom...",
-      afterExec: () => SoundController.playClick,
-    },
-    input: {
-      inputValueConvert: Number,
-    },
-  },
-  playSoundOnClick: {
-    alias: "play",
-    display: "Sound on click...",
-    subgroup: {
-      options: "fromSchema",
-      display: (value) => {
-        const map: Record<ConfigSchemas.Config["playSoundOnClick"], string> = {
-          off: "off",
-          "1": "click",
-          "2": "beep",
-          "3": "pop",
-          "4": "nk creams",
-          "5": "typewriter",
-          "6": "osu",
-          "7": "hitmarker",
-          "8": "sine",
-          "9": "sawtooth",
-          "10": "square",
-          "11": "triangle",
-          "12": "pentatonic",
-          "13": "wholetone",
-          "14": "fist fight",
-          "15": "rubber keys",
-          "16": "fart",
-          "17": "akko lavenders",
-          "18": "cherrymx black abs",
-          "19": "cherrymx black pbt",
-          "20": "cherrymx blue abs",
-          "21": "cherrymx blue pbt",
-          "22": "cherrymx brown pbt",
-          "23": "kalih box white",
-          "24": "razer green",
-          "25": "tealios v2",
-          "26": "trust gxt",
-        };
-        return map[value];
-      },
-      hover: (value) => {
-        if (value === "off") {
-          return;
-        }
-        void SoundController.previewClick(value);
-      },
-      afterExec: () => {
-        void SoundController.playClick();
-      },
-    },
-  },
-  playSoundOnError: {
-    alias: "play",
-    display: "Sound on error...",
-    subgroup: {
-      options: "fromSchema",
-      display: (value) => {
-        const map: Record<ConfigSchemas.Config["playSoundOnError"], string> = {
-          off: "off",
-          "1": "damage",
-          "2": "triangle",
-          "3": "square",
-          "4": "punch miss",
-        };
-        return map[value];
-      },
-      hover: (value) => {
-        if (value === "off") {
-          return;
-        }
-        void SoundController.previewError(value);
-      },
-      afterExec: () => {
-        void SoundController.playError();
-      },
-    },
-  },
-  playTimeWarning: {
-    alias: "sound",
-    subgroup: {
-      options: "fromSchema",
-      display: (value) => {
-        if (value === "off") {
-          return "off";
-        }
-        return `${value} second${value !== "1" ? "s" : ""}`;
-      },
-      afterExec: (value) => {
-        if (value !== "off") {
-          void SoundController.playTimeWarning();
-        }
-      },
-      hover: (value) => {
-        if (value !== "off") {
-          void SoundController.playTimeWarning();
-        }
-      },
-    },
-  },
+
   //caret
   smoothCaret: {
     subgroup: {
@@ -476,60 +174,21 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
   caretStyle: {
     subgroup: {
       options: "fromSchema",
-      isVisible: (value) => !["banana", "carrot", "monkey"].includes(value),
-    },
-  },
-  paceCaret: {
-    display: "Pace caret mode...",
-    subgroup: {
-      options: ["off", "pb", "tagPb", "last", "average", "daily"],
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
-    input: {
-      secondKey: "paceCaretCustomSpeed",
-      configValue: "custom",
-      inputValueConvert: (value) => {
-        let newVal = Number(value);
-        newVal = getTypingSpeedUnit(Config.typingSpeedUnit).toWpm(newVal);
-        return newVal;
-      },
-      afterExec: () => {
-        void TestLogic.restart();
-      },
-    },
-  },
-  repeatedPace: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  paceCaretStyle: {
-    subgroup: {
-      options: "fromSchema",
-      isVisible: (value) => !["banana", "carrot", "monkey"].includes(value),
     },
   },
 
-  //appearence
+  //appearance
   liveSpeedStyle: {
     subgroup: {
       options: "fromSchema",
     },
-    alias: "wpm",
+    alias: "tpm speed",
   },
   liveAccStyle: {
     subgroup: {
       options: "fromSchema",
     },
-    alias: "wpm",
-  },
-  liveBurstStyle: {
-    subgroup: {
-      options: "fromSchema",
-    },
-    alias: "wpm",
+    alias: "accuracy",
   },
   timerStyle: {
     subgroup: {
@@ -540,7 +199,7 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
   },
   timerColor: {
     display: "Live progress color...",
-    alias: "timer speed wpm burst acc",
+    alias: "timer tpm acc",
     subgroup: {
       options: "fromSchema",
       alias: () => "timer",
@@ -548,47 +207,10 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
   },
   timerOpacity: {
     display: "Live progress opacity...",
-    alias: "timer speed wpm burst acc",
+    alias: "timer tpm acc",
     subgroup: {
       options: "fromSchema",
       alias: () => "timer",
-    },
-  },
-  highlightMode: {
-    subgroup: {
-      options: "fromSchema",
-      display: replaceUnderscoresWithSpaces,
-    },
-  },
-  typedEffect: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  tapeMode: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  tapeMargin: {
-    input: {
-      inputValueConvert: Number,
-    },
-  },
-  smoothLineScroll: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  showAllLines: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  typingSpeedUnit: {
-    subgroup: {
-      options: "fromSchema",
-      isVisible: (val) => val !== "wph",
     },
   },
   alwaysShowDecimalPlaces: {
@@ -619,9 +241,9 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
           Fonts[b]?.display ?? b.replace(/_/g, " "),
         ),
       ),
-      display: (name) =>
+      display: (name: string) =>
         Fonts[name as KnownFontName]?.display ?? name.replaceAll(/_/g, " "),
-      customData: (name) => {
+      customData: (name: string) => {
         const fontConfig = Fonts[name as KnownFontName];
         if (fontConfig === undefined) return {};
         return {
@@ -630,51 +252,8 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
           display: fontConfig.display,
         } as Record<string, string | boolean>;
       },
-      hover: (name) => UI.previewFontFamily(name),
+      hover: (name: string) => UI.previewFontFamily(name),
     },
-  },
-  keymapMode: {
-    alias: "keyboard",
-    subgroup: {
-      options: "fromSchema",
-      alias: (val) => (val === "react" ? "flash" : ""),
-    },
-  },
-  keymapStyle: {
-    subgroup: {
-      options: "fromSchema",
-      display: replaceUnderscoresWithSpaces,
-    },
-    alias: "keyboard",
-  },
-  keymapLegendStyle: {
-    subgroup: {
-      options: "fromSchema",
-    },
-    alias: "keyboard",
-  },
-  keymapSize: {
-    input: {
-      alias: "keyboard",
-      inputValueConvert: Number,
-    },
-  },
-  keymapLayout: {
-    alias: "keyboard",
-    subgroup: {
-      options: "fromSchema",
-      alias: (val) => (val === "overrideSync" ? "default" : ""),
-      display: (layout) =>
-        layout === "overrideSync" ? "emulator sync" : layout.replace(/_/g, " "),
-      afterExec: () => void TestLogic.restart(),
-    },
-  },
-  keymapKeys: {
-    subgroup: {
-      options: "fromSchema",
-      display: replaceUnderscoresWithSpaces,
-    },
-    alias: "keyboard",
   },
 
   //themes
@@ -722,11 +301,6 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
     },
     display: "Out of focus warning...",
   },
-  capsLockWarning: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
   showAverage: {
     subgroup: {
       options: "fromSchema",
@@ -737,34 +311,5 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
       options: "fromSchema",
     },
     alias: "pb",
-  },
-  monkeyPowerLevel: {
-    alias: "powermode",
-    isVisible: false,
-    subgroup: {
-      options: "fromSchema",
-      display: (value) => {
-        const map: Record<ConfigSchemas.Config["monkeyPowerLevel"], string> = {
-          off: "off",
-          "1": "mellow",
-          "2": "high",
-          "3": "ultra",
-          "4": "over 9000",
-        };
-        return map[value];
-      },
-    },
-  },
-  monkey: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-
-  //danger zone
-  ads: {
-    subgroup: {
-      options: "fromSchema",
-    },
   },
 };

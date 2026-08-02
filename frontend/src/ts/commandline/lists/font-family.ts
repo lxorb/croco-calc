@@ -1,4 +1,4 @@
-import { FontNameSchema } from "@croco-calc/schemas/fonts";
+import { FontNameSchema } from "@croco-calc/schemas/configs";
 import { Command, withValidation } from "../types";
 import { buildCommandForConfigKey } from "../util";
 import FileStorage from "../../utils/file-storage";
@@ -14,7 +14,7 @@ if (fromMeta.subgroup) {
   fromMeta.subgroup.list.push({
     id: "customFont",
     display: "Custom font...",
-    icon: "fa-font",
+    icon: "ph:text-aa-bold",
     alias: "custom font options",
     subgroup: {
       title: "Custom font...",
@@ -22,7 +22,7 @@ if (fromMeta.subgroup) {
         withValidation({
           id: "customFontName",
           display: "Custom name...",
-          icon: "fa-font",
+          icon: "ph:text-aa-bold",
           alias: "custom font name",
           input: true,
           validation: {
@@ -40,7 +40,7 @@ if (fromMeta.subgroup) {
         {
           id: "customLocalFont",
           display: "Local font...",
-          icon: "fa-file-import fa-fw",
+          icon: "ph:file-arrow-up-bold",
           alias: "upload font",
           available: async (): Promise<boolean> => {
             return !(await FileStorage.hasFile("LocalFontFamilyFile"));
@@ -97,7 +97,7 @@ if (fromMeta.subgroup) {
         {
           id: "removeLocalFont",
           display: "Remove local font",
-          icon: "fa-trash",
+          icon: "ph:trash-bold",
           alias: "remove font",
           available: async (): Promise<boolean> => {
             return await FileStorage.hasFile("LocalFontFamilyFile");

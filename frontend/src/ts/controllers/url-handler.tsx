@@ -1,84 +1,40 @@
 import {
+  ConfigSchema,
   CustomBackgroundFilter,
   CustomBackgroundFilterSchema,
   CustomBackgroundSize,
   CustomBackgroundSizeSchema,
   CustomThemeColors,
   CustomThemeColorsSchema,
-  FunboxName,
-  FunboxSchema,
 } from "@croco-calc/schemas/configs";
-import { Language } from "@croco-calc/schemas/languages";
-import { CustomTextSettingsSchema } from "@croco-calc/schemas/results";
-import {
-  DifficultySchema,
-  Mode2Schema,
-  ModeSchema,
-} from "@croco-calc/schemas/shared";
 import { parseWithSchema as parseJsonWithSchema } from "@croco-calc/util/json";
 import { tryCatchSync } from "@croco-calc/util/trycatch";
-import { getChallenges } from "@monkeytype/challenges";
 import { decompressFromURI } from "lz-ts";
 import { z } from "zod";
 
-import Ape from "../ape";
+import {
+  SHARED_SETTINGS_ORDER,
+  SharedTestSettings,
+} from "../components/modals/ShareTestSettings";
+import { getBarLabel } from "../config/bar-controls";
 import { setConfig } from "../config/setters";
 import { Config } from "../config/store";
-import * as DB from "../db";
 import { authEvent } from "../events/auth";
-import { hideLoaderBar, showLoaderBar } from "../states/loader-bar";
 import {
-  showErrorNotification,
   showNoticeNotification,
   showSuccessNotification,
 } from "../states/notifications";
-import { setSelectedQuoteId } from "../states/test";
-import * as CustomText from "../test/custom-text";
 import { restart as restartTest } from "../test/test-logic";
 import * as Misc from "../utils/misc";
-import * as ChallengeController from "./challenge-controller";
 
-export async function linkDiscord(hashOverride: string): Promise<void> {
-  if (!hashOverride) return;
-  const fragment = new URLSearchParams(hashOverride.slice(1));
-  if (fragment.has("access_token")) {
-    history.replaceState(null, "", "/");
-    const accessToken = fragment.get("access_token") as string;
-    const tokenType = fragment.get("token_type") as string;
-    const state = fragment.get("state") as string;
-
-    showLoaderBar();
-    const response = await Ape.users.linkDiscord({
-      body: { tokenType, accessToken, state },
-    });
-    hideLoaderBar();
-
-    if (response.status !== 200) {
-      showErrorNotification("Failed to link Discord", { response });
-      return;
-    }
-
-    if (response.body.data === null) {
-      showErrorNotification("Failed to link Discord: data returned was null");
-      return;
-    }
-
-    showSuccessNotification(response.body.message);
-
-    const snapshot = DB.getSnapshot();
-    if (!snapshot) return;
-
-    const { discordId, discordAvatar } = response.body.data;
-    if (discordId !== undefined) {
-      snapshot.discordId = discordId;
-    }
-    if (discordAvatar !== undefined) {
-      snapshot.discordAvatar = discordAvatar;
-    }
-
-    DB.setSnapshot(snapshot);
-  }
-}
+/**
+ * The two things croco calc still reads out of the URL: a shared custom theme
+ * and a shared settings tuple.
+ *
+ * `linkDiscord` is gone with the whole Discord integration (INV-190; the
+ * feature is deferred, master section 5 item 1) and `loadChallengeFromUrl` with
+ * the challenge system (INV-185, SB-159).
+ */
 
 const customThemeUrlDataSchema = z.object({
   c: CustomThemeColorsSchema,
@@ -142,36 +98,29 @@ export function loadCustomThemeFromUrl(getOverride?: string): void {
   }
 }
 
-const TestSettingsSchema = z.tuple([
-  ModeSchema.nullable(),
-  Mode2Schema.nullable(),
-  CustomTextSettingsSchema.partial({
-    pipeDelimiter: true,
-    limit: true,
-    mode: true,
-  })
-    //legacy values
-    .extend({
-      isTimeRandom: z.boolean().optional(),
-      isWordRandom: z.boolean().optional(),
-      word: z.number().int().optional(),
-      time: z.number().int().optional(),
-      delimiter: z.string().optional(),
-    })
-    .nullable(),
-  z.boolean().nullable(), //punctuation
-  z.boolean().nullable(), //numbers
-  z.string().nullable(), //language
-  DifficultySchema.nullable(),
-  FunboxSchema.or(z.string().nullable()), //funbox as array or legacy string as hash separated values
-]);
+/**
+ * SB-193 — the shared-settings tuple is croco calc's eight config keys, in the
+ * order `ShareTestSettings.tsx` writes them (`SHARED_SETTINGS_ORDER`, imported
+ * from there so there is exactly one declaration of the wire format). The
+ * `?testSettings=` parameter name and the `lz-ts` `compressToURI` encoding are
+ * monkeytype's, unchanged.
+ *
+ * A `null` slot means "the sharer unticked this setting", so the recipient
+ * keeps their own value for it.
+ *
+ * The element schemas are read straight off `ConfigSchema`, so an unknown or
+ * out-of-domain value in a hand-edited URL is rejected by zod before it reaches
+ * `setConfig` — the tuple can never widen past the config's own value domain.
+ */
+const TestSettingsSchema = z.tuple(
+  SHARED_SETTINGS_ORDER.map((key) =>
+    ConfigSchema.shape[key].nullable(),
+  ) as unknown as [z.ZodTypeAny, ...z.ZodTypeAny[]],
+);
 
 export function loadTestSettingsFromUrl(getOverride?: string): void {
   const getValue = Misc.findGetParameter("testSettings", getOverride);
   if (getValue === null) return;
-
-  // if the encoding structure or method ever changes, make sure to support the old data format
-  // otherwise eiko will be sad
 
   const { data: de, error } = tryCatchSync(() =>
     parseJsonWithSchema(decompressFromURI(getValue) ?? "", TestSettingsSchema),
@@ -184,109 +133,22 @@ export function loadTestSettingsFromUrl(getOverride?: string): void {
     return;
   }
 
+  const decoded = de as SharedTestSettings;
   const applied: Record<string, string> = {};
 
-  if (de[0] !== null) {
-    setConfig("mode", de[0], {
-      nosave: true,
-    });
-    applied["mode"] = de[0];
-  }
+  SHARED_SETTINGS_ORDER.forEach((key, index) => {
+    const value = decoded[index];
+    if (value === null || value === undefined) return;
 
-  const mode = de[0] ?? Config.mode;
-  if (de[1] !== null) {
-    if (mode === "time") {
-      setConfig("time", parseInt(de[1], 10), {
-        nosave: true,
-      });
-    } else if (mode === "words") {
-      setConfig("words", parseInt(de[1], 10), {
-        nosave: true,
-      });
-    } else if (mode === "quote") {
-      setConfig("quoteLength", [-2]);
-      setSelectedQuoteId(parseInt(de[1], 10));
-    }
-    applied["mode2"] = de[1];
-  }
+    // SB-194 — every applied value goes through `setConfig`, so the SB-215
+    // all-off guard and the SB-090/SB-091 coupling apply to a shared URL
+    // exactly as they do to a click in the bar. A rejected key is simply not
+    // reported as applied.
+    const wasSet = setConfig(key, value as never, { nosave: true });
+    if (!wasSet) return;
 
-  if (de[2] !== null) {
-    const customTextSettings = de[2];
-    CustomText.setText(customTextSettings.text);
-
-    //make sure to set mode before the limit as mode also sets the limit
-    CustomText.setMode(customTextSettings.mode ?? "repeat");
-
-    if (customTextSettings.limit !== undefined) {
-      CustomText.setLimitMode(customTextSettings.limit.mode);
-      CustomText.setLimitValue(customTextSettings.limit.value);
-    }
-    //convert legacy values
-    else {
-      if (customTextSettings.isWordRandom) {
-        CustomText.setLimitMode("word");
-      } else if (customTextSettings.isTimeRandom) {
-        CustomText.setLimitMode("time");
-      }
-      if (customTextSettings.word !== undefined) {
-        CustomText.setLimitValue(customTextSettings.word);
-      } else if (customTextSettings.time !== undefined) {
-        CustomText.setLimitValue(customTextSettings.time);
-      }
-    }
-
-    if (customTextSettings.pipeDelimiter) {
-      CustomText.setPipeDelimiter(customTextSettings.pipeDelimiter);
-    }
-    //convert legacy values
-    else if (customTextSettings.delimiter === "|") {
-      CustomText.setPipeDelimiter(true);
-    }
-
-    applied["custom text settings"] = "";
-  }
-
-  if (de[3] !== null) {
-    setConfig("punctuation", de[3], {
-      nosave: true,
-    });
-    applied["punctuation"] = de[3] ? "on" : "off";
-  }
-
-  if (de[4] !== null) {
-    setConfig("numbers", de[4], {
-      nosave: true,
-    });
-    applied["numbers"] = de[4] ? "on" : "off";
-  }
-
-  if (de[5] !== null) {
-    setConfig("language", de[5] as Language, {
-      nosave: true,
-    });
-    applied["language"] = de[5];
-  }
-
-  if (de[6] !== null) {
-    setConfig("difficulty", de[6], {
-      nosave: true,
-    });
-    applied["difficulty"] = de[6];
-  }
-
-  if (de[7] !== null) {
-    let val: FunboxName[] = [];
-    //convert legacy values
-    if (typeof de[7] === "string") {
-      val = de[7].split("#") as FunboxName[];
-    } else {
-      val = de[7];
-    }
-    setConfig("funbox", val, {
-      nosave: true,
-    });
-    applied["funbox"] = val.join(", ");
-  }
+    applied[key] = getBarLabel(key, Config[key] as never);
+  });
 
   void restartTest({
     nosave: true,
@@ -310,48 +172,13 @@ export function loadTestSettingsFromUrl(getOverride?: string): void {
   }
 }
 
-const challengeNameLookup = Object.fromEntries(
-  getChallenges().map((it) => [it.name.toLowerCase(), it.name]),
-);
-
-export async function loadChallengeFromUrl(
-  getOverride?: string,
-): Promise<void> {
-  const getValue =
-    Misc.findGetParameter("challenge", getOverride)?.toLowerCase() ?? "";
-  if (getValue === "") return;
-
-  const challengeName = challengeNameLookup[getValue];
-
-  if (challengeName === undefined) {
-    showErrorNotification(`Failed to load challenge: invalid name ${getValue}`);
-    return;
-  }
-
-  ChallengeController.setup(challengeName)
-    .then((result) => {
-      if (result) {
-        void restartTest({
-          nosave: true,
-        });
-      }
-    })
-    .catch((e: unknown) => {
-      showErrorNotification("Failed to load challenge");
-      console.error(e);
-    });
-}
-
 authEvent.subscribe(async (event) => {
   if (event.type === "authStateChanged") {
     const search = window.location.search;
-    const hash = window.location.hash;
 
     await event.data.loadPromise;
 
     loadCustomThemeFromUrl(search);
     loadTestSettingsFromUrl(search);
-    void loadChallengeFromUrl(search);
-    void linkDiscord(hash);
   }
 });

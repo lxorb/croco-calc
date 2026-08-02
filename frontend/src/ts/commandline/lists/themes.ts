@@ -61,7 +61,7 @@ const commands: Command[] = [
   {
     id: "changeTheme",
     display: "Theme...",
-    icon: "fa-palette",
+    icon: "ph:palette-bold",
     subgroup,
   },
 ];

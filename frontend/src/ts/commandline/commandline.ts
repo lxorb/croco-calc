@@ -1,7 +1,7 @@
 import * as Focus from "../test/focus";
+import { BLANK_ICON_HTML, DEFAULT_COMMAND_ICON, getIconHtml } from "./icons";
 import * as CommandlineLists from "./lists";
 import { Config } from "../config/store";
-import * as AnalyticsController from "../controllers/analytics-controller";
 import * as ThemeController from "../controllers/theme-controller";
 import { clearFontPreview } from "../ui";
 import AnimatedModal, { ShowOptions } from "../utils/animated-modal";
@@ -184,7 +184,7 @@ export function show(
             command: showInputCommand,
             placeholder: escaped,
             value: showInputCommand.defaultValue?.() ?? "",
-            icon: showInputCommand.icon ?? "fa-chevron-right",
+            icon: showInputCommand.icon ?? DEFAULT_COMMAND_ICON,
           };
           createValidationHandler(showInputCommand);
           void updateInput(inputModeParams.value as string);
@@ -413,22 +413,20 @@ function getCommandIconsHtml(command: Command & { isActive: boolean }): {
   iconHtml: string;
   configIconHtml: string;
 } {
-  let iconHtml = `<i class="fas fa-fw fa-chevron-right"></i>`;
+  // C30 - an iconify id renders as bundled svg markup; anything else is a
+  // literal glyph (the theme list renders none, the FPS counter a word).
+  let iconHtml = getIconHtml();
   if (command.icon !== undefined && command.icon !== "") {
-    const faIcon = command.icon.startsWith("fa-");
-    const faType = command.iconType ?? "solid";
-    const faTypeClass = faType === "solid" ? "fas" : "far";
-    if (!faIcon) {
-      iconHtml = `<div class="textIcon">${command.icon}</div>`;
-    } else {
-      iconHtml = `<i class="${faTypeClass} fa-fw ${command.icon}"></i>`;
-    }
+    iconHtml = command.icon.includes(":")
+      ? getIconHtml(command.icon)
+      : `<div class="textIcon">${command.icon}</div>`;
   }
 
-  let configIconHtml = `<i class="fas fa-fw"></i>`;
-  if (command.isActive) {
-    configIconHtml = `<i class="fas fa-fw fa-check"></i>`;
-  }
+  // The checkmark column is always reserved so rows do not shift when the
+  // active value moves; BLANK_ICON_HTML is the empty box that reserves it.
+  const configIconHtml = command.isActive
+    ? getIconHtml("ph:check-bold")
+    : BLANK_ICON_HTML;
 
   return {
     iconHtml,
@@ -514,10 +512,8 @@ async function showCommands(): Promise<void> {
       display = (command.singleListDisplay ?? "") || command.display;
       if (command.configValue !== undefined || command.active !== undefined) {
         display = display.replace(
-          `<i class="fas fa-fw fa-chevron-right chevronIcon"></i>`,
-          `<i class="fas fa-fw fa-chevron-right chevronIcon"></i>${
-            configIconHtml
-          }`,
+          CommandlineLists.getChevronHtml(),
+          `${CommandlineLists.getChevronHtml()}${configIconHtml}`,
         );
       }
     }
@@ -541,7 +537,7 @@ async function showCommands(): Promise<void> {
       <div class="themeFavIcon ${
         command.customData["isFavorite"] === true ? "" : "hidden"
       }">
-        <i class="fas fa-star"></i>
+        ${getIconHtml("ph:star-bold")}
       </div>
       <div class="themeBubbles" style="background: ${
         command.customData["bg"]
@@ -657,9 +653,6 @@ function handleInputSubmit(): void {
     });
   }
 
-  void AnalyticsController.log("usedCommandLine", {
-    command: inputModeParams.command.id,
-  });
   hide();
 }
 
@@ -674,7 +667,7 @@ async function runActiveCommand(): Promise<void> {
       command: command,
       placeholder: escaped,
       value: command.defaultValue?.() ?? "",
-      icon: command.icon ?? "fa-chevron-right",
+      icon: command.icon ?? DEFAULT_COMMAND_ICON,
     };
     createValidationHandler(command);
 
@@ -695,7 +688,6 @@ async function runActiveCommand(): Promise<void> {
     }
     const isSticky = command.sticky ?? false;
     if (!isSticky) {
-      void AnalyticsController.log("usedCommandLine", { command: command.id });
       if (!command.opensModal) {
         hide(true);
       }
@@ -742,7 +734,7 @@ async function updateInput(setInput?: string): Promise<void> {
 
   if (mode === "input") {
     if (inputModeParams.icon !== null) {
-      iconElement.innerHTML = `<i class="fas fa-fw ${inputModeParams.icon}"></i>`;
+      iconElement.innerHTML = getIconHtml(inputModeParams.icon);
     }
     if (inputModeParams.placeholder !== null) {
       element.placeholder = inputModeParams.placeholder;
@@ -753,7 +745,7 @@ async function updateInput(setInput?: string): Promise<void> {
       element.setSelectionRange(0, element.value.length);
     }
   } else {
-    iconElement.innerHTML = '<i class="fas fa-fw fa-search"></i>';
+    iconElement.innerHTML = getIconHtml("ph:magnifying-glass-bold");
     element.placeholder = "Search...";
 
     const subgroup = await getSubgroup();

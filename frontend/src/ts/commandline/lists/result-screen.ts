@@ -1,71 +1,30 @@
 import * as TestLogic from "../../test/test-logic";
 import * as TestUI from "../../test/test-ui";
-import * as PractiseWordsModal from "../../modals/practise-words";
-import {
-  showErrorNotification,
-  showSuccessNotification,
-} from "../../states/notifications";
-import * as TestWords from "../../test/test-words";
-import { Config } from "../../config/store";
-import * as PractiseWords from "../../test/practise-words";
-import { Command, CommandsSubgroup } from "../types";
 import * as TestScreenshot from "../../test/test-screenshot";
-import { getInputHistory } from "../../test/events/stats";
-import { getLastEventLog, getResultVisible } from "../../states/test";
+import { getResultVisible } from "../../states/test";
+import { Command } from "../types";
 
-const practiceSubgroup: CommandsSubgroup = {
-  title: "Practice words...",
-  list: [
-    {
-      id: "practiseWordsMissed",
-      display: "missed",
-      exec: (): void => {
-        PractiseWords.init("words", false);
-        void TestLogic.restart({
-          practiseMissed: true,
-        });
-      },
-    },
-    {
-      id: "practiseWordsSlow",
-      display: "slow",
-      exec: (): void => {
-        PractiseWords.init("off", true);
-        void TestLogic.restart({
-          practiseMissed: true,
-        });
-      },
-    },
-    {
-      id: "practiseWordsBoth",
-      display: "both",
-      exec: (): void => {
-        PractiseWords.init("words", true);
-        void TestLogic.restart({
-          practiseMissed: true,
-        });
-      },
-    },
-    {
-      id: "practiseWordsCustom",
-      display: "custom...",
-      opensModal: true,
-      exec: (options): void => {
-        PractiseWordsModal.show({
-          animationMode: "modalOnly",
-          modalChain: options.commandlineModal,
-        });
-      },
-    },
-  ],
-};
-
+/**
+ * The result-screen palette commands, kept by SB-160.
+ *
+ * They mirror the four buttons of the results action row exactly (CP-123 as
+ * amended by master C19): `next test`, `repeat test`, `toggle task history`,
+ * `copy screenshot` — plus the download variant of the last one, because
+ * CP-123 item 5 spells the shift-click behaviour out and `test-screenshot.ts`
+ * is kept in full (INV-092).
+ *
+ * Deleted here: `practiseWords` and its whole subgroup (C19 cuts the
+ * `practise mistakes` button and INV-093 deletes `test/practise-words.ts`) and
+ * `copyWordsToClipboard` (INV-052 deletes `#copyWordsListButton`; there is no
+ * word list in croco calc, and the answered-task log is already reachable
+ * through `copyResultStats`).
+ */
 const commands: Command[] = [
   {
     id: "nextTest",
     display: "Next test",
-    alias: "restart start begin type test typing",
-    icon: "fa-chevron-right",
+    alias: "restart start begin test",
+    icon: "ph:caret-right-bold",
     available: (): boolean => {
       return getResultVisible();
     },
@@ -76,7 +35,8 @@ const commands: Command[] = [
   {
     id: "repeatTest",
     display: "Repeat test",
-    icon: "fa-sync-alt",
+    alias: "again same",
+    icon: "ph:arrows-clockwise-bold",
     exec: (): void => {
       void TestLogic.restart({
         withSameWordset: true,
@@ -87,18 +47,10 @@ const commands: Command[] = [
     },
   },
   {
-    id: "practiseWords",
-    display: "Practice words...",
-    icon: "fa-exclamation-triangle",
-    subgroup: practiceSubgroup,
-    available: (): boolean => {
-      return getResultVisible();
-    },
-  },
-  {
-    id: "toggleWordHistory",
-    display: "Toggle word history",
-    icon: "fa-align-left",
+    id: "toggleTaskHistory",
+    display: "Toggle task history",
+    alias: "tasks history answers",
+    icon: "ph:list-bullets-bold",
     exec: (): void => {
       void TestUI.toggleResultWords();
     },
@@ -109,7 +61,7 @@ const commands: Command[] = [
   {
     id: "copyScreenshot",
     display: "Copy screenshot to clipboard",
-    icon: "fa-copy",
+    icon: "ph:image-bold",
     alias: "copy image clipboard",
     exec: (): void => {
       setTimeout(() => {
@@ -123,46 +75,12 @@ const commands: Command[] = [
   {
     id: "downloadScreenshot",
     display: "Download screenshot",
-    icon: "fa-download",
+    icon: "ph:download-simple-bold",
     alias: "save image download file",
     exec: (): void => {
       setTimeout(async () => {
         void TestScreenshot.download();
       }, 500);
-    },
-    available: (): boolean => {
-      return getResultVisible();
-    },
-  },
-  {
-    id: "copyWordsToClipboard",
-    display: "Copy words to clipboard",
-    icon: "fa-copy",
-    exec: (): void => {
-      const eventLog = getLastEventLog();
-      if (eventLog === null) {
-        showErrorNotification("No event log found!");
-        return;
-      }
-
-      const inputHistory = getInputHistory(eventLog);
-      const words =
-        Config.mode === "zen"
-          ? inputHistory.join("")
-          : TestWords.words
-              .get()
-              .slice(0, inputHistory.length)
-              .map((word) => word.textWithCommit)
-              .join("");
-
-      navigator.clipboard.writeText(words).then(
-        () => {
-          showSuccessNotification("Copied to clipboard");
-        },
-        () => {
-          showErrorNotification("Failed to copy!");
-        },
-      );
     },
     available: (): boolean => {
       return getResultVisible();

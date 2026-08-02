@@ -41,8 +41,10 @@ function updateHotkeys(): Hotkeys {
       quickRestartHotkeyMap[getConfig.quickRestart],
       isOnTestPage &&
         ((wordsHaveTab() && quickRestartIsTab) ||
-          ((wordsHaveNewline() || getConfig.funbox.includes("58008")) &&
-            quickRestartIsEnter) ||
+          // The funbox clause monkeytype had here is gone with funboxes
+          // (SB-159); a long test still requires the shift modifier so an
+          // accidental Enter cannot throw away eight minutes of work.
+          (wordsHaveNewline() && quickRestartIsEnter) ||
           isLongTest()),
     ),
     commandline: shiftHotkey(
