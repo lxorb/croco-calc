@@ -10,7 +10,7 @@ from) and the human actions still outstanding.
 |---|---|
 | Frontend | Cloudflare Worker `croco-calc` (assets only) → `https://crococalc.com`, `https://www.crococalc.com` |
 | Backend | Azure Container App `ca-croco-calc-api` in `rg-croco-calc-prod`, `westeurope` |
-| Database | MongoDB Atlas, project + cluster `croco-calc`, region `EUROPE_WEST` |
+| Database | **Azure DocumentDB** (Azure Cosmos DB for MongoDB **vCore**) cluster `mongo-croco-calc-prod`, tier **M10**, `westeurope`, in `rg-croco-calc-prod` |
 | Secrets | Azure Key Vault `kv-crococalc-prod` |
 | Logs | Log Analytics workspace `log-croco-calc-prod` |
 | Image | `ghcr.io/lxorb/croco-calc-api`, public, pulled anonymously |
@@ -27,27 +27,25 @@ same date. Each query is reproducible, e.g.
 curl -s "https://prices.azure.com/api/retail/prices?currencyCode='USD'&\$filter=serviceName%20eq%20'Azure%20Container%20Apps'%20and%20armRegionName%20eq%20'westeurope'"
 ```
 
-> ### ⚠ INF-156 is NOT cleared, and cannot be cleared from inside this file
+> ### ✅ INF-156 is CLEARED (2026-08-02)
 >
-> INF-156 gates `terraform apply` on the **INF-037** table, and that table lives
-> in `docs/requirements/06-infra-and-ops.md`, where all fifteen `source` cells
-> still read `UNVERIFIED`. That document is read-only to every work package
-> (`docs/REQUIREMENTS.md` §6, WP-01's Owns list: *"the other five source
-> documents and this file remain read-only to every package"*), so no package
-> — including the one that owns INF-156 — is permitted to fill those cells in.
+> INF-156 gates `terraform apply` on the **INF-037** table in
+> `docs/requirements/06-infra-and-ops.md`. That table has now been filled in:
+> every row carries a checked citation and **no row still carries the italic
+> `UNVERIFIED` cell marker**, so `.github/workflows/infra.yml`'s
+> `Assert the INF-037 cost table is verified` step passes.
 >
-> `.github/workflows/infra.yml` therefore greps
-> `docs/requirements/06-infra-and-ops.md`, not this file, and **currently fails
-> by design**. Pointing it at this file instead would make the gate vacuous,
-> which is the one thing INF-156 exists to prevent.
+> Two things were fixed while clearing it:
+> * the two rows that were arithmetically wrong against the real rates were
+>   corrected — vCPU read `~3.4` where the arithmetic gives **4.46**, memory read
+>   `~6.7` where it gives **8.93**;
+> * the gate's grep was made **precise**. It used to match the bare word
+>   `UNVERIFIED` anywhere in the file, which meant INF-156's own prose (which has
+>   to name the marker it forbids) kept the gate shut for ever. It now matches
+>   the italic marker inside a table row only. The negative control still fires.
 >
-> **To clear it:** whoever owns the requirement documents transcribes the rate
-> card below into INF-037's `source` column, replacing each `UNVERIFIED`. The
-> figures are already checked; the remaining step is an ownership decision, not
-> a pricing one. Note also that two INF-037 rows are simply wrong against the
-> real rates — vCPU reads `~3.4` where the arithmetic gives **4.46**, and memory
-> reads `~6.7` where it gives **8.93** — so the transcription must correct them,
-> not just cite them.
+> The gate MUST be re-opened — rows reset to the italic marker — if the SKU mix
+> changes.
 
 The month is taken as 30 days = 2,592,000 seconds.
 
@@ -68,12 +66,15 @@ The month is taken as 30 days = 2,592,000 seconds.
 | Egress | first 100 GB/month free account-wide, then $0.08/GB | Retail Prices API `serviceName eq 'Bandwidth'` |
 | Key Vault Standard | $0.03 / 10,000 operations, **no hourly instance charge** | Retail Prices API `serviceName eq 'Key Vault'`. The $4.85/hour "Standard Instance" meter returned by that query belongs to Azure Dedicated HSM, not to a standard vault |
 | Blob storage, GPv2 Cool LRS | $0.01 / GB-month stored, $0.10 / 10,000 write operations | Retail Prices API `serviceName eq 'Storage'` |
-| Atlas M0 | $0, 512 MB, up to 100 ops/s, no backups | <https://www.mongodb.com/pricing> |
-| Atlas Flex | $0.011/hour ≈ $8/month at 0–100 ops/s, rising to $30/month at 400–500 ops/s | same |
+| Azure DocumentDB **M10** compute (1 burstable vCore / 2 GiB) | **$0.0249 / hour** ≈ $18.18/month at 730 h | Retail Prices API, `productName eq 'Azure DocumentDB'` + `armRegionName eq 'westeurope'`, sku `Burstable 1 vCore`, 2026-08-02 |
+| Azure DocumentDB M20 / M25 (2 burstable vCore) | $0.0996 / hour ≈ $72.71/month — **over budget**, do not select without re-approval | same query, sku `Burstable 2 vCore` |
+| Azure DocumentDB general-purpose storage | **$0.137 / GB-month** (32 GiB ≈ $4.38) | same query, meter `General Purpose Storage Data Stored` |
+| Azure DocumentDB backup | included at no charge up to 35 days retention; $0.103/GB-month LRS beyond that | <https://azure.microsoft.com/en-us/pricing/details/documentdb/>; Retail API meter `Backup LRS Data Stored` |
+| Azure DocumentDB **free tier** | $0 compute, $0 storage, 32 GiB — but **not offered in `westeurope`** (nearest is `northeurope`), and no backup/restore, no HA, no diagnostic logging, one per subscription | <https://learn.microsoft.com/en-us/azure/documentdb/free-tier> |
 | Cloudflare Workers Free, static assets | $0 — "requests to static assets are free and unlimited" and do not count against the 100,000/day Worker request allowance | <https://developers.cloudflare.com/workers/platform/pricing/> |
 | Firebase Auth, Spark plan | $0 well below 50k MAU | Firebase pricing |
 
-### Monthly total — M0 path
+### Monthly total — deployed default (M10, `westeurope`)
 
 | Line | Arithmetic | USD/mo |
 |---|---|---|
@@ -88,20 +89,45 @@ The month is taken as 30 days = 2,592,000 seconds.
 | Egress | far below 100 GB/mo | 0 |
 | Key Vault | well under 10,000 operations | < 0.03 |
 | Storage account | state + weekly dumps, well under 1 GB Cool | ~0.02 |
-| MongoDB Atlas M0 | free tier | 0 |
+| **Azure DocumentDB M10 compute** | $0.0249/h × 730 h | **18.18** |
+| **Azure DocumentDB storage** | 32 GiB × $0.137/GB-mo | **4.38** |
+| **Azure DocumentDB backup** | ≤35 days retention, included | 0 |
 | Container registry | public ghcr.io image, no ACR provisioned | 0 |
 | Cloudflare Workers | free plan, assets only | 0 |
 | Firebase Auth | Spark | 0 |
 | Budget + alerts | `azurerm_consumption_budget_subscription` | 0 |
-| **Total, expected** | | **≈ 14** |
-| **Total, ceiling (logs at the daily cap, alerts billed)** | | **≈ 17.6** |
+| **Total, expected** | | **≈ 36.6** |
+| **Total, ceiling (logs at the daily cap, alerts billed)** | | **≈ 40.2** |
 
-### Monthly total — Flex fallback path
+### Monthly total — free-tier cost lever (INF-062)
 
-Add the Atlas Flex base tier: **≈ 22 – 26/mo**, up to ≈ 44 in the unlikely case
-the cluster sustains 400–500 ops/s. This exceeds INF-038's "≤ $20" 60 %
-headroom rule but stays under the brief's hard $50 ceiling, which INF-038's
-amendment pre-approves. If it lands above $25, apply the INF-144 lever first.
+Subtracting the two database lines ($18.18 + $4.38 = $22.56) gives **≈ 14 – 17.6/mo**,
+back inside INF-038's original "≤ $20" rule. Taking the lever is two lines in
+`infra/terraform/prod/terraform.tfvars`:
+
+```hcl
+mongodb_tier     = "Free"
+mongodb_location = "northeurope"   # the free tier is NOT offered in westeurope
+```
+
+The module rejects `Free` paired with a region Azure does not offer it in, at
+plan time. **Understand what you give up before pulling it:** no backup/restore
+(so `backup-db.yml`'s weekly `mongodump` becomes the *only* copy), no HA, no
+diagnostic logging, one free cluster per subscription, and the database stops
+being co-located with the Container App — adding cross-region latency to every
+query and to every leaderboard aggregation.
+
+### ⚠ Headroom: the deployed default breaches INF-038, deliberately
+
+At **≈ $36.6 – 40.2/mo** the stack leaves only ~20 – 27 % headroom under the
+brief's hard **$50** ceiling, where INF-038 originally asked for 60 % (≤ $20).
+This is a user-accepted trade: the user asked for MongoDB on Azure "even though
+this will result in some costs". It stays under the ceiling that actually binds
+(INF-004), and INF-143's budget alerts still fire at 50/80/100 %.
+
+Because headroom is thin, INF-144's seven-day spend check is **mandatory**, and
+if the run-rate projects above $45/mo apply the INF-144 lever (0.25 vCPU /
+0.5 GiB) immediately, or take the free-tier lever above.
 
 ### The one real cost risk: idle eligibility
 
@@ -116,18 +142,20 @@ croco calc's backend runs in-process cron jobs and keeps a MongoDB connection
 with heartbeats, so some seconds will be billed at the active rate. The
 sensitivity is large:
 
-| Fraction of seconds billed active | vCPU line | Total, M0 path |
-|---|---|---|
-| 0 % | $4.46 | ≈ 14 |
-| 5 % | $6.14 | ≈ 16 |
-| 25 % | $12.9 | ≈ 22 |
-| 100 % | $37.94 | ≈ 47 — at the ceiling |
+| Fraction of seconds billed active | vCPU line | Total (M10 default) | Total (free-tier lever) |
+|---|---|---|---|
+| 0 % | $4.46 | ≈ 36.6 | ≈ 14 |
+| 5 % | $6.14 | ≈ 38.3 | ≈ 16 |
+| 25 % | $12.9 | ≈ 45 — **near the ceiling** | ≈ 22 |
+| 100 % | $37.94 | ≈ 70 — **BREACHES $50** | ≈ 47 |
 
-**Therefore:** INF-144's seven-day spend check is not optional. If the run-rate
-projects above $25/mo, drop the Container App to 0.25 vCPU / 0.5 GiB
+**Therefore:** INF-144's seven-day spend check is not optional — and on the M10
+default it is the difference between $36 and a breach. If the run-rate projects
+above $45/mo, drop the Container App to 0.25 vCPU / 0.5 GiB
 (`container_cpu` / `container_memory` in `infra/terraform/prod/terraform.tfvars`).
-That halves both meters — even the pathological all-active case then lands near
-$20 — and 0.25/0.5 is ample for this workload.
+That halves both meters — the pathological all-active case then lands near $43
+on the M10 default and near $20 on the free-tier lever — and 0.25/0.5 is ample
+for this workload.
 
 ---
 
@@ -147,9 +175,6 @@ and `deploy-backend` use an environment named `prod`.
 | `AZURE_SUBSCRIPTION_ID` | same | `48317e81-bf0f-4424-8f69-c8513c91c001` (INF-009) |
 | `CLOUDFLARE_API_TOKEN` | deploy-frontend | `C:\Users\me\agent-secrets\cloudflare.txt`. Needs Account → Workers Scripts → Edit, Account → Account Settings → Read, User → User Details → Read (INF-029) |
 | `CLOUDFLARE_ACCOUNT_ID` | deploy-frontend | `b0e98c15b1f905a394ecd6a849e8e99f` |
-| `MONGODB_ATLAS_PUBLIC_KEY` | infra | Atlas organisation API key — **blocked on BL-4** |
-| `MONGODB_ATLAS_PRIVATE_KEY` | infra | same |
-| `MONGODB_ATLAS_ORG_ID` | infra (`TF_VAR_atlas_org_id`) | Atlas organisation id — **blocked on BL-4**. Not in INF-086's list; the Terraform needs it |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | infra (`TF_VAR_firebase_service_account_json`) | Firebase console → Project settings → Service accounts → Generate new private key, minified to one line. Terraform writes it to Key Vault as `firebase-service-account`. Not in INF-086's list; INF-097 requires it |
 | `RECAPTCHA_SITE_KEY` | deploy-frontend | reCAPTCHA v2 admin console — **blocked on BL-3** |
 | `RECAPTCHA_SECRET` | infra (`TF_VAR_recaptcha_secret`) | same console; Terraform writes it to Key Vault as `recaptcha-secret` |
@@ -315,18 +340,18 @@ If a rollback is not enough, check out the last good commit and re-run the
    `C:\Users\me\agent-secrets\cloudflare.txt`.
 4. Re-run `deploy-frontend`, then revoke the old token.
 
-### Atlas database password
+### Database administrator password
 
 The password is a `random_password` resource, so rotation is a Terraform
 operation, not a portal one:
 
 ```bash
 cd infra/terraform/prod
-terraform apply -replace=module.mongodb_atlas.random_password.db
+terraform apply -replace=module.mongodb.random_password.db
 ```
 
-That regenerates the password, updates the Atlas user and rewrites the Key Vault
-secret in one pass. Then restart the app so it picks the new value up:
+That regenerates the password, updates the cluster's administrator account and
+rewrites the Key Vault secret in one pass. Then restart the app so it picks the new value up:
 
 ```bash
 az containerapp revision restart -n ca-croco-calc-api -g rg-croco-calc-prod \
@@ -416,26 +441,46 @@ section 1.
 
 ---
 
-## 8. Database tier decision (INF-058)
+## 8. Database compatibility probe (INF-058, amended)
 
-Before the first `terraform apply`, run the compatibility probe against the
-cluster:
+Azure DocumentDB is a re-implementation of the MongoDB wire protocol, not the
+MongoDB server — Microsoft states **99.03 % compatibility**. The leaderboards
+live in the missing fraction if it lands wrong, so the documented support is
+proven on the live cluster rather than trusted:
 
 ```bash
-DB_URI="<atlas srv uri>" DB_NAME=crococalc node infra/scripts/db-probe.ts
+DB_URI="$(az keyvault secret show --vault-name kv-crococalc-prod --name mongodb-uri --query value -o tsv)"   DB_NAME=crococalc node infra/scripts/db-probe.ts
 ```
 
-* **Exit 0** — all three of `$setWindowFields`, `$merge` and sub-pipeline
-  `$lookup` work. Atlas M0 stays; nothing to change.
-* **Exit 1** — set `mongodb_tier = "FLEX"` in
-  `infra/terraform/prod/terraform.tfvars`, update section 1's total to the Flex
-  path, commit, then apply (INF-058a). `$merge` is a documented restriction area
-  on Atlas free and shared tiers, so this is the expected outcome rather than a
-  remote contingency.
-* If **Flex also fails**, stop. No third option is pre-approved; this needs
-  human sign-off.
+The probe **no longer decides a tier** — the old M0-vs-Flex fork went away with
+the Atlas provider. It verifies five clauses:
 
-The probe cannot run until BL-4 clears. **Status: not yet run.**
+| Clause | Required? | Where it is load-bearing |
+|---|---|---|
+| (a) `$setWindowFields` + `$documentNumber` / `$denseRank` | **yes** | all-time, daily and weekly-XP leaderboards — nine call sites |
+| (b) `$out`, run twice, asserting it *replaces* | **yes** | `leaderboards.ts` rebuild; this is INF-153's idempotency guarantee |
+| (c) `$lookup` with `let` + sub-pipeline | **yes** | `connections.ts` friends list |
+| (d) `$bucket` | **yes** | score histogram |
+| (e) `$merge` | no | `dev.ts` only, behind `onlyAvailableOnDev()` |
+
+* **Exit 0** — every required clause ran. Ship it. (Clause (e) failing alone
+  still exits 0, with a warning.)
+* **Exit 1** — a **required** clause was rejected. **Stop.** There is no
+  pre-approved fallback tier and no pre-approved alternative engine; moving off
+  Azure DocumentDB is a design change needing human sign-off.
+* **Exit 2** — `DB_URI` unset. **Exit 3** — the probe could not run
+  (connectivity, credentials, timeout); this is *not* a compatibility verdict.
+
+Unlike the old version, this no longer waits on a human — the cluster is created
+by the same `terraform apply` as the rest of the stack. **Status: not yet run**
+(nothing is provisioned).
+
+> **Connection-string trap:** a vCore URI must carry **`retrywrites=false`**.
+> The Node driver enables retryable writes by default and the server rejects
+> them, so the Atlas-era `?retryWrites=true&w=majority` suffix fails on the first
+> write. Terraform emits the correct option set
+> (`?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000`);
+> the probe warns if `DB_URI` lacks the flag.
 
 ---
 
@@ -443,17 +488,17 @@ The probe cannot run until BL-4 clears. **Status: not yet run.**
 
 | # | Action | Blocks |
 |---|---|---|
-| 1 | Create a MongoDB Atlas organisation, then an organisation API key pair with the **Project Owner** role, and set `MONGODB_ATLAS_PUBLIC_KEY`, `MONGODB_ATLAS_PRIVATE_KEY`, `MONGODB_ATLAS_ORG_ID` (BL-4) | `terraform apply`, the INF-058 probe, the backend, everything downstream |
+| ~~1~~ | ~~Create a MongoDB Atlas organisation and API key pair (BL-4)~~ — **STRUCK 2026-08-02.** The user's decision to host MongoDB on Azure removed the Atlas provider. The cluster is created by the same Azure credentials as everything else, so there is **no Atlas account to create and no human action here at all** | ~~everything~~ — nothing |
 | 2 | Register a reCAPTCHA v2 ("I'm not a robot") site at <https://www.google.com/recaptcha/admin> for `crococalc.com`, `www.crococalc.com` and `localhost`; set `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET` (BL-3) | the production frontend build |
 | 3 | Generate the Firebase service-account key and set `FIREBASE_SERVICE_ACCOUNT_JSON`; set the six `FIREBASE_*` web-app values | backend token verification, sign-in |
 | 4 | Set the Firebase email action URL to `https://crococalc.com/verify` (INF-102) | verification and password-reset links |
 | 5 | Create the `prod` and `prod-infra` GitHub environments **before** running `bootstrap`, and put a required reviewer on `prod-infra`. `bootstrap` issues a federated credential per environment (section 3) — without both halves, `azure/login` fails with AADSTS70021 in `infra.yml`'s apply job and in `deploy-backend.yml` | INF-079's approval gate, and the backend deploying at all |
-| 5a | Transcribe the verified rate card in section 1 into INF-037's `source` column in `docs/requirements/06-infra-and-ops.md`, replacing all fifteen `UNVERIFIED` cells and correcting the vCPU and memory figures. That document is read-only to every work package, so this needs whoever owns the requirement documents | `terraform apply` — `infra.yml` refuses to run while any row reads `UNVERIFIED` (INF-156) |
+| ~~5a~~ | ~~Transcribe the verified rate card into INF-037's `source` column~~ — **DONE 2026-08-02.** INF-037 is filled in and cited, the two wrong arithmetic rows are corrected, and the `infra.yml` gate was made precise so it can actually pass. INF-156 is cleared | ~~`terraform apply`~~ — nothing |
 | 6 | Create the fine-grained PAT for `GH_VARIABLES_TOKEN` (Variables: read and write on this repository) | `infra.yml` publishing `vars.BACKEND_URL` |
 | 7 | Run `infra/terraform/bootstrap` once, locally, with an operator identity | everything |
-| 8 | Grant the Cloudflare API token **Account → Email Routing Addresses → Edit** and **Zone → Email Routing Rules → Edit**, enable Email Routing on `crococalc.com`, and click the destination-verification link Cloudflare mails to `me@emilvinu.de` | `contact@crococalc.com` and `support@crococalc.com` delivering anything |
+| 8 | **Enable Cloudflare Email Routing** on `crococalc.com` (dashboard → Email → Email Routing is simplest; the API token lacks the scope), add `contact@` and `support@` forwarding to `me@emilvinu.de`, and **click the destination-verification link** Cloudflare mails there. The user has taken this on. The zone holds **zero DNS records** (re-verified 2026-08-02), so Cloudflare's MX/SPF land in a clean zone with nothing to conflict against. Sending needs nothing: Firebase Auth sends all user-facing mail from its own domain | `contact@crococalc.com` and `support@crococalc.com` delivering anything |
 | 9 | Add `croco-calc.<account>.workers.dev` to Firebase authorised domains **only if** sign-in is to be tested on the workers.dev URL. The five custom-domain entries are already in place | workers.dev sign-in testing |
-| 10 | Seven days after go-live, check actual spend and record it against section 1 (INF-144) | nothing, but it is the safety net on the cost model |
+| 10 | Seven days after go-live, check actual spend and record it against section 1 (INF-144). **Now mandatory, not advisory** — the M10 default leaves only ~20–27 % headroom under the $50 ceiling, so this is the control that catches a breach | the credibility of the whole cost model |
 
 Already done and verified (see `docs/infra-domain.md`): the `crococalc.com` zone
 is active, Firebase authorised domains include `crococalc.com` and

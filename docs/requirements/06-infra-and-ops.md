@@ -232,38 +232,38 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
   | **Database — DocumentDB M10 compute** | 1 burstable vCore / 2 GiB, `westeurope`, no HA | $0.0249/h × 730 h | **18.18** | Retail API `Azure DocumentDB` / `Burstable 1 vCore` |
   | **Database — storage** | 32 GiB general-purpose | 32 × $0.137/GB/mo | **4.38** | Retail API `General Purpose Storage Data Stored` |
   | **Database — backup** | ≤35 days retention | included, no charge | **0** | [documentdb pricing](https://azure.microsoft.com/en-us/pricing/details/documentdb/) ("no additional charge for backups up to 35 days"); overage meter is `Backup LRS Data Stored` $0.103/GB/mo |
-  | Log Analytics ingestion | 0.2 GB/day cap (INF-140) ≈ 6 GB/mo, less the 5 GB/mo free grant | ~1 GB billable × $2.99/GB | **2.99** | Retail API `Analytics Logs Data Ingestion` |
+  | Log Analytics ingestion | expected well under the 5 GB/mo free grant; ceiling is the 0.2 GB/day cap (INF-140) ≈ 6.2 GB/mo | (6.2 − 5) GB × $2.99/GB at the cap | **0 – 3.59** | Retail API `Analytics Logs Data Ingestion` |
   | Log Analytics retention | 30 days; first 31 days included | 0 GB billable | **0** | Retail API `Analytics Logs Data Retention` $0.13/GB/mo beyond the included period |
-  | Metric alert rules | INF-142 requires **three**; billed per monitored metric per month | 3 × $0.10 | **0.30** | Retail API `Azure Monitor` / `Alerts Metric Monitored` |
+  | Metric alert rules | INF-142 requires **three**; billed per monitored metric per month, first 10 time-series free | 3 × $0.10–0.30, or $0 inside the free allowance | **0 – 0.60** | Retail API `Azure Monitor` / `Alerts Metric Monitored` |
   | Action group emails | INF-141, e-mail action; first 1,000 emails/mo free | — | **0** | Retail API `Azure Monitor` notification meters |
   | Egress / bandwidth | API responses to clients; first 100 GB/mo free tier-wide | well under 100 GB at this load | **0** | Azure bandwidth free allowance |
-  | Key Vault `kv-crococalc-prod` | Standard, well under 10k ops/mo | $0.03 per 10,000 operations | **0.03** | Retail API `Key Vault` / `Operations` |
-  | Storage `stcrococalctfstate` | StorageV2 LRS, <1 GiB (state + mongodump archives, Cool tier per INF-061) | GB-month + transactions | **0.15** | Retail API `Storage` / Cool LRS $0.015/GB/mo |
+  | Key Vault `kv-crococalc-prod` | Standard, well under 10k ops/mo; no hourly instance charge | $0.03 per 10,000 operations | **<0.03** | Retail API `Key Vault` / `Operations` |
+  | Storage `stcrococalctfstate` | StorageV2 LRS, <1 GiB (state + mongodump archives, Cool tier per INF-061) | GB-month + transactions | **~0.02** | Retail API `Storage` / GPv2 Cool LRS $0.01/GB-mo |
   | Container registry | `ghcr.io` public image — no ACR provisioned | — | **0** | INF-039 |
   | Cloudflare Workers + DNS + Email Routing | Free plan | — | **0** | Cloudflare free plan |
   | Firebase Auth | Spark plan, well under 50k MAU | — | **0** | Firebase Spark |
   | Subscription budget + alerts | `azurerm_consumption_budget_subscription` | — | **0** | — |
-  | **TOTAL — deployed default (M10, `westeurope`)** | | | **≈ 39.42** | |
-  | **TOTAL — free-tier lever (Free, `northeurope`)** | subtract $18.18 compute + $4.38 storage | | **≈ 16.86** | INF-062 |
+  | **TOTAL — deployed default (M10, `westeurope`)** | expected → ceiling (logs at the daily cap, alerts billed) | | **≈ 36.6 – 40.2** | |
+  | **TOTAL — free-tier lever (Free, `northeurope`)** | subtract $18.18 compute + $4.38 storage | | **≈ 14 – 17.6** | INF-062 |
 
   Two honest caveats on this table, neither of which is hidden by the totals:
   1. **The ACA rows assume the *idle* rate for the whole month.** A replica is billed idle only while it is
      at the minimum count, has started, is processing no HTTP request, is under 0.01 vCPU and is under
      1,000 B/s of network. The active vCPU rate is **8.5×** the idle rate ($0.000034 vs $0.000004), so a
      workload that is busy rather than idle would push the vCPU row from $4.46 toward $37.94 and the total
-     past $50. At croco calc's expected single-user-scale load idle dominates, but **this is the single
+     past $50 — `docs/RUNBOOK.md` §1 tabulates the sensitivity. At croco calc's expected single-user-scale load idle dominates, but **this is the single
      largest cost risk in the stack** and is exactly what INF-144's 7-day spend check exists to catch.
   2. Every figure is a list price excluding tax and any subscription-level credit.
 
 - **INF-038 (AMENDED 2026-08-02)** The original rule — total ≤ $20/mo, i.e. 60 % headroom under the $50
-  ceiling — is **breached by the deployed default**: $39.42 leaves only ~21 % headroom. This is recorded as a
+  ceiling — is **breached by the deployed default**: ≈ $36.6–40.2 leaves only ~20–27 % headroom. This is recorded as a
   deliberate, user-accepted trade, not an oversight:
   * the user explicitly accepted cost ("even though this will result in some costs") in exchange for the
     database being Azure-hosted;
-  * $39.42 remains **under the brief's hard $50 ceiling**, which is the requirement that actually binds
+  * ≈ $36.6–40.2 remains **under the brief's hard $50 ceiling**, which is the requirement that actually binds
     (INF-004), and INF-143's machine-enforced budget still applies;
   * the 60 % rule is recoverable at any time by one two-line change — INF-062's free-tier lever brings the
-    total to **$16.86**, back inside the original rule.
+    total to **≈ $14–17.6**, back inside the original rule.
 
   Because headroom is now thin, the following are **mandatory** rather than advisory:
   * INF-144's 7-day actual-spend check MUST be performed, and its first tuning lever (drop the Container App
