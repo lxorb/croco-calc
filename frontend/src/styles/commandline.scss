@@ -94,8 +94,9 @@
           color: var(--sub-color);
         }
 
-        .fas,
-        .far {
+        // C30 - the palette renders bundled iconify `<svg>` now, never a
+        // font awesome `<i class="fas">`.
+        svg.icon {
           margin-right: 0.5rem;
           color: var(--sub-color);
         }
@@ -107,9 +108,7 @@
         &.active {
           color: var(--bg-color) !important;
           background: var(--text-color) !important;
-          .fas,
-          .far,
-          .fab {
+          svg.icon {
             color: var(--bg-color);
           }
         }
