@@ -57,9 +57,24 @@ import { configMetadata } from "../../src/ts/config/metadata";
 import { Config } from "../../src/ts/config/store";
 import { __testing } from "../../src/ts/config/testing";
 import { getDefaultConfig } from "../../src/ts/constants/default-config";
+import { restartTestEvent } from "../../src/ts/events/test";
 
 function commandById(id: string): Command | undefined {
   return commands.list.find((it) => it.id === id);
+}
+
+/**
+ * Run a command's `exec` and wait for it.
+ *
+ * `Command.exec` is declared `(options) => void`, but several bodies are
+ * `async` — `restoreDefaultTestSettings` among them — and return a real promise
+ * at runtime. `Promise.resolve` adopts it, so the assertions run after
+ * `applyConfig` has finished, without an `await` on a `void`-typed expression.
+ */
+async function runCommand(id: string): Promise<void> {
+  await Promise.resolve(
+    commandById(id)?.exec?.({ commandlineModal: undefined as never }),
+  );
 }
 
 /** The generated command for a bar key, e.g. `changeAddition`. */
@@ -232,6 +247,38 @@ describe("SB-157 - restoreDefaultTestSettings", () => {
     for (const word of ["default", "leaderboard", "eligible"]) {
       expect(command?.alias?.split(" ")).toContain(word);
     }
+  });
+
+  it("executing it puts all eight keys back to the SB-110 defaults", async () => {
+    __testing.replaceConfig({
+      addition: "100",
+      multiplication: "12",
+      division: "off",
+      fractionAddition: "12",
+      fractionMultiplication: false,
+      decimals: false,
+      negatives: false,
+      time: 8,
+    });
+
+    await runCommand("restoreDefaultTestSettings");
+
+    const defaults = getDefaultConfig();
+    for (const key of BAR_KEYS) {
+      expect(Config[key], key).toEqual(defaults[key]);
+    }
+  });
+
+  it("SB-054 - and restarts the test, like the eight generated commands do", async () => {
+    const restartSpy = vi.spyOn(restartTestEvent, "dispatch");
+    restartSpy.mockClear();
+
+    __testing.replaceConfig({ addition: "100", time: 1 });
+
+    await runCommand("restoreDefaultTestSettings");
+
+    expect(restartSpy).toHaveBeenCalled();
+    restartSpy.mockRestore();
   });
 });
 
