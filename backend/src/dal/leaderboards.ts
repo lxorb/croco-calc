@@ -10,32 +10,44 @@ import {
 import { addLog } from "./logs";
 import { Collection, Document, ObjectId } from "mongodb";
 import { LeaderboardEntry } from "@croco-calc/schemas/leaderboards";
+import { LEADERBOARD_TIMES } from "@croco-calc/schemas/math";
 import { DBUser, getUsersCollection } from "./user";
 import CrocoError from "../utils/error";
 import { aggregateWithAcceptedConnections } from "./connections";
+import { PublicScoreStatsDB } from "./public";
 
 export type DBLeaderboardEntry = LeaderboardEntry & {
   _id: ObjectId;
 };
 
-function getCollectionName(key: {
-  language: string;
+/**
+ * There is **no language dimension** anywhere in croco calc (AC-113, INV-153):
+ * a board is identified by `(mode, mode2)` alone, and `mode2` is restricted to
+ * `"4"` and `"8"` (SB-176).
+ */
+export type LeaderboardKey = {
   mode: string;
   mode2: string;
-}): string {
-  return `leaderboards.${key.language}.${key.mode}.${key.mode2}`;
+};
+
+function getCollectionName(mode: string, mode2: string): string {
+  return `leaderboards.${mode}.${mode2}`;
 }
-export const getCollection = (key: {
-  language: string;
-  mode: string;
-  mode2: string;
-}): Collection<DBLeaderboardEntry> =>
-  db.collection<DBLeaderboardEntry>(getCollectionName(key));
+
+export const getCollection = (
+  mode: string,
+  mode2: string,
+): Collection<DBLeaderboardEntry> =>
+  db.collection<DBLeaderboardEntry>(getCollectionName(mode, mode2));
+
+/** The `lbPersonalBests` path this board is rebuilt from. */
+function personalBestKey(mode: string, mode2: string): string {
+  return `lbPersonalBests.${mode}.${mode2}`;
+}
 
 export async function get(
   mode: string,
   mode2: string,
-  language: string,
   page: number,
   pageSize: number,
   uid?: string,
@@ -60,7 +72,7 @@ export async function get(
       leaderboard = await aggregateWithAcceptedConnections(
         {
           uid,
-          collectionName: getCollectionName({ language, mode, mode2 }),
+          collectionName: getCollectionName(mode, mode2),
         },
         [
           {
@@ -73,7 +85,7 @@ export async function get(
         ],
       );
     } else {
-      leaderboard = await getCollection({ language, mode, mode2 })
+      leaderboard = await getCollection(mode, mode2)
         .aggregate<DBLeaderboardEntry>(pipeline)
         .toArray();
     }
@@ -93,19 +105,14 @@ const cachedCounts = new Map<string, number>();
 export async function getCount(
   mode: string,
   mode2: string,
-  language: string,
   uid?: string,
 ): Promise<number> {
-  const key = `${language}_${mode}_${mode2}`;
+  const key = `${mode}_${mode2}`;
   if (uid === undefined && cachedCounts.has(key)) {
     return cachedCounts.get(key) as number;
   } else {
     if (uid === undefined) {
-      const count = await getCollection({
-        language,
-        mode,
-        mode2,
-      }).estimatedDocumentCount();
+      const count = await getCollection(mode, mode2).estimatedDocumentCount();
       cachedCounts.set(key, count);
       return count;
     } else {
@@ -113,7 +120,7 @@ export async function getCount(
         total: number;
       }>(
         {
-          collectionName: getCollectionName({ language, mode, mode2 }),
+          collectionName: getCollectionName(mode, mode2),
           uid,
         },
         [{ $count: "total" }],
@@ -126,22 +133,17 @@ export async function getCount(
 export async function getRank(
   mode: string,
   mode2: string,
-  language: string,
   uid: string,
   friendsOnly: boolean = false,
 ): Promise<DBLeaderboardEntry | null | false> {
   try {
     if (!friendsOnly) {
-      const entry = await getCollection({ language, mode, mode2 }).findOne({
-        uid,
-      });
-
-      return entry;
+      return await getCollection(mode, mode2).findOne({ uid });
     } else {
       const results =
         await aggregateWithAcceptedConnections<DBLeaderboardEntry>(
           {
-            collectionName: getCollectionName({ language, mode, mode2 }),
+            collectionName: getCollectionName(mode, mode2),
             uid,
           },
           [
@@ -166,28 +168,49 @@ export async function getRank(
   }
 }
 
+/**
+ * Rebuild one all-time board (AC-119).
+ *
+ * Two deliberate divergences from monkeytype, both forced by MongoDB Atlas M0:
+ *
+ *  * the rank was assigned by a `$function` stage holding a mutable `row_number`
+ *    in server-side JavaScript. Server-side JS is **disabled** on M0 and on
+ *    Atlas Flex, so it is replaced with `$setWindowFields` + `$documentNumber`,
+ *    which is the technique INF-064 mandates and which the friends-only paths
+ *    above already use.
+ *  * the score histogram was written with `$merge`. It is now read back and
+ *    written with an ordinary upsert, so the whole pipeline needs nothing beyond
+ *    `$out` — see the note on `updateScoreHistogram` below.
+ *
+ * The rebuild is idempotent: `$out` atomically replaces the target collection,
+ * so running the job twice over the same period leaves identical state
+ * (INF-153).
+ */
 export async function update(
   mode: string,
   mode2: string,
-  language: string,
 ): Promise<{
   message: string;
   rank?: number;
 }> {
-  const key = `lbPersonalBests.${mode}.${mode2}.${language}`;
-  const lbCollectionName = getCollectionName({ language, mode, mode2 });
+  const key = personalBestKey(mode, mode2);
+  const lbCollectionName = getCollectionName(mode, mode2);
   const minTimeSpent = (await getCachedConfiguration(true)).leaderboards
     .minTimeSpent;
+
+  const sortOrder = {
+    [`${key}.score`]: -1,
+    [`${key}.acc`]: -1,
+    [`${key}.timestamp`]: -1,
+  } as const;
+
   const lb = db.collection<DBUser>("users").aggregate<LeaderboardEntry>(
     [
       {
         $match: {
-          [`${key}.wpm`]: {
-            $gt: 0,
-          },
-          [`${key}.acc`]: {
-            $gt: 0,
-          },
+          // `score` may legitimately be negative or zero, so unlike monkeytype's
+          // `wpm > 0` the only real condition is that a default-settings PB
+          // exists for this board at all.
           [`${key}.timestamp`]: {
             $gt: 0,
           },
@@ -205,63 +228,24 @@ export async function update(
           },
         },
       },
+      { $sort: sortOrder },
       {
-        $sort: {
-          [`${key}.wpm`]: -1,
-          [`${key}.acc`]: -1,
-          [`${key}.timestamp`]: -1,
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          [`${key}.wpm`]: 1,
-          [`${key}.acc`]: 1,
-          [`${key}.raw`]: 1,
-          [`${key}.consistency`]: 1,
-          [`${key}.timestamp`]: 1,
-          uid: 1,
-          name: 1,
-          discordId: 1,
-          discordAvatar: 1,
-          inventory: 1,
-          premium: 1,
-        },
-      },
-
-      {
-        $addFields: {
-          "user.uid": "$uid",
-          "user.name": "$name",
-          "user.discordId": { $ifNull: ["$discordId", "$$REMOVE"] },
-          "user.discordAvatar": { $ifNull: ["$discordAvatar", "$$REMOVE"] },
-          [`${key}.consistency`]: {
-            $ifNull: [`$${key}.consistency`, "$$REMOVE"],
-          },
-          calculated: {
-            $function: {
-              lang: "js",
-              args: [
-                "$premium.expirationTimestamp",
-                "$$NOW",
-                "$inventory.badges",
-              ],
-              body: `function(expiration, currentTime, badges) { 
-                        try {row_number+= 1;} catch (e) {row_number= 1;} 
-                        var badgeId = undefined;
-                        if(badges)for(let i=0; i<badges.length; i++){
-                            if(badges[i].selected){ badgeId = badges[i].id; break}
-                        }
-                        var isPremium = expiration !== undefined && (expiration === -1 || new Date(expiration)>currentTime) || undefined;
-                        return {rank:row_number,badgeId, isPremium};
-                      }`,
-            },
-          },
+        $setWindowFields: {
+          sortBy: sortOrder,
+          output: { rank: { $documentNumber: {} } },
         },
       },
       {
         $replaceWith: {
-          $mergeObjects: [`$${key}`, "$user", "$calculated"],
+          score: `$${key}.score`,
+          correct: `$${key}.correct`,
+          wrong: `$${key}.wrong`,
+          acc: `$${key}.acc`,
+          tpm: `$${key}.tpm`,
+          timestamp: `$${key}.timestamp`,
+          uid: "$uid",
+          name: "$name",
+          rank: "$rank",
         },
       },
       { $out: lbCollectionName },
@@ -278,63 +262,80 @@ export async function update(
   await db.collection(lbCollectionName).createIndex({ rank: 1 });
   const end2 = performance.now();
 
-  cachedCounts.delete(`${language}_${mode}_${mode2}`);
+  cachedCounts.delete(`${mode}_${mode2}`);
 
-  //update speedStats
-  const boundaries = [...Array(32).keys()].map((it) => it * 10);
-  const statsKey = `${language}_${mode}_${mode2}`;
-  const src = db.collection(lbCollectionName);
-  const histogram = src.aggregate(
-    [
-      {
-        $bucket: {
-          groupBy: "$wpm",
-          boundaries: boundaries,
-          default: "Other",
-        },
-      },
-      {
-        $replaceRoot: {
-          newRoot: {
-            $arrayToObject: [[{ k: { $toString: "$_id" }, v: "$count" }]],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: "speedStatsHistogram", //we only expect one document with type=speedStats
-          [`${statsKey}`]: {
-            $mergeObjects: "$$ROOT",
-          },
-        },
-      },
-      {
-        $merge: {
-          into: "public",
-          on: "_id",
-          whenMatched: "merge",
-          whenNotMatched: "insert",
-        },
-      },
-    ],
-    { allowDiskUse: true },
-  );
   const start3 = performance.now();
-  await histogram.toArray();
+  await updateScoreHistogram(mode, mode2);
   const end3 = performance.now();
 
   const timeToRunAggregate = (end1 - start1) / 1000;
   const timeToRunIndex = (end2 - start2) / 1000;
-  const timeToSaveHistogram = (end3 - start3) / 1000; // not sent to prometheus yet
+  const timeToSaveHistogram = (end3 - start3) / 1000;
 
   void addLog(
-    `system_lb_update_${language}_${mode}_${mode2}`,
-    `Aggregate ${timeToRunAggregate}s, loop 0s, insert 0s, index ${timeToRunIndex}s, histogram ${timeToSaveHistogram}`,
+    `system_lb_update_${mode}_${mode2}`,
+    `Aggregate ${timeToRunAggregate}s, index ${timeToRunIndex}s, histogram ${timeToSaveHistogram}s`,
   );
 
   return {
     message: "Successfully updated leaderboard",
   };
+}
+
+/** AC-090: buckets of 10 score points. */
+export const SCORE_HISTOGRAM_BUCKET_SIZE = 10;
+const SCORE_HISTOGRAM_BUCKETS = 32;
+
+/**
+ * The site-wide score histogram behind `GET /public/scoreHistogram`.
+ *
+ * monkeytype folded this into the leaderboard pipeline with `$merge` into the
+ * `public` collection. `$merge` is one of the stages whose availability on the
+ * shared Atlas tiers is not guaranteed, and it buys nothing here — the result is
+ * a single small document — so the buckets are read back and upserted normally.
+ * Nothing in this file now depends on `$merge`, `$function`, `$accumulator`,
+ * `$where` or mapReduce.
+ */
+async function updateScoreHistogram(
+  mode: string,
+  mode2: string,
+): Promise<void> {
+  const boundaries = [...Array(SCORE_HISTOGRAM_BUCKETS).keys()].map(
+    (it) => it * SCORE_HISTOGRAM_BUCKET_SIZE,
+  );
+
+  const buckets = await getCollection(mode, mode2)
+    .aggregate<{ _id: number | string; count: number }>(
+      [
+        {
+          $bucket: {
+            groupBy: "$score",
+            boundaries,
+            default: "other",
+          },
+        },
+      ],
+      { allowDiskUse: true },
+    )
+    .toArray();
+
+  const histogram: Record<string, number> = {};
+  for (const bucket of buckets) {
+    // `ScoreHistogramSchema` keys are digit strings, so the catch-all bucket
+    // (negative scores and anything past the last boundary) is dropped rather
+    // than emitted under a key the response schema would reject.
+    if (typeof bucket._id !== "number") continue;
+    histogram[bucket._id.toString()] = bucket.count;
+  }
+
+  const statsKey = `${mode}_${mode2}` as keyof PublicScoreStatsDB;
+  await db
+    .collection<PublicScoreStatsDB>("public")
+    .updateOne(
+      { _id: "scoreStatsHistogram" },
+      { $set: { [statsKey]: histogram } },
+      { upsert: true },
+    );
 }
 
 async function createIndex(
@@ -343,25 +344,20 @@ async function createIndex(
   dropIfMismatch = true,
 ): Promise<void> {
   const index = {
-    [`${key}.wpm`]: -1,
+    [`${key}.score`]: -1,
     [`${key}.acc`]: -1,
     [`${key}.timestamp`]: -1,
-    [`${key}.raw`]: -1,
-    [`${key}.consistency`]: -1,
+    [`${key}.tpm`]: -1,
     banned: 1,
     lbOptOut: 1,
     needsToChangeName: 1,
     timeSpent: 1,
     uid: 1,
     name: 1,
-    discordId: 1,
-    discordAvatar: 1,
-    inventory: 1,
-    premium: 1,
   };
   const partial = {
     partialFilterExpression: {
-      [`${key}.wpm`]: {
+      [`${key}.timestamp`]: {
         $gt: 0,
       },
       timeSpent: {
@@ -397,12 +393,14 @@ async function createIndex(
 
 export async function createIndicies(): Promise<void> {
   const minTimeSpent = (await getLiveConfiguration()).leaderboards.minTimeSpent;
-  await createIndex("lbPersonalBests.time.15.english", minTimeSpent);
-  await createIndex("lbPersonalBests.time.60.english", minTimeSpent);
+  for (const time of LEADERBOARD_TIMES) {
+    await createIndex(personalBestKey("time", `${time}`), minTimeSpent);
+  }
 
   if (isDevEnvironment()) {
     Logger.info("Updating leaderboards in dev mode...");
-    await update("time", "15", "english");
-    await update("time", "60", "english");
+    for (const time of LEADERBOARD_TIMES) {
+      await update("time", `${time}`);
+    }
   }
 }

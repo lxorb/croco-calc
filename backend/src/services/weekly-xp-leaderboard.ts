@@ -1,135 +1,109 @@
+/**
+ * The weekly XP leaderboard, on MongoDB (INF-064, master C23).
+ *
+ * Same story as the daily board: monkeytype ran it on a Redis sorted set with
+ * Lua, Redis is gone (INF-063), so it is a collection keyed
+ * `{ periodTimestamp, uid }` ranked with `$setWindowFields`.
+ *
+ * The weekly board has **no mode axis at all** — AC-112 hides the time group for
+ * it — so unlike the daily board there is no `modeKey`. AC-123 is why the
+ * eligibility rules differ too: the default-settings gate (AC-121.3) and the
+ * 4/8-minute gate (AC-121.2) deliberately do **not** apply here, because the
+ * weekly totals have to agree with the XP shown on the user's own profile.
+ */
+
+import { Collection, Document, ObjectId } from "mongodb";
+import * as db from "../init/db";
 import { Configuration } from "@croco-calc/schemas/configuration";
-import * as RedisClient from "../init/redis";
-import LaterQueue from "../queues/later-queue";
 import {
-  RedisXpLeaderboardEntry,
-  RedisXpLeaderboardEntrySchema,
-  RedisXpLeaderboardScore,
   XpLeaderboardEntry,
+  XpLeaderboardEntryBase,
 } from "@croco-calc/schemas/leaderboards";
-import { getCurrentWeekTimestamp } from "@croco-calc/util/date-and-time";
+import {
+  getCurrentWeekTimestamp,
+  MILLISECONDS_IN_DAY,
+} from "@croco-calc/util/date-and-time";
 import CrocoError from "../utils/error";
-import { parseWithSchema as parseJsonWithSchema } from "@croco-calc/util/json";
-import { omit } from "../utils/misc";
+
+export const WEEKLY_XP_LEADERBOARD_COLLECTION = "weeklyXpLeaderboards";
 
 export type AddResultOpts = {
-  entry: RedisXpLeaderboardEntry;
-  xpGained: RedisXpLeaderboardScore;
+  entry: XpLeaderboardEntryBase;
+  xpGained: number;
 };
 
-const weeklyXpLeaderboardLeaderboardNamespace =
-  "monkeytype:weekly-xp-leaderboard";
-const scoresNamespace = `${weeklyXpLeaderboardLeaderboardNamespace}:scores`;
-const resultsNamespace = `${weeklyXpLeaderboardLeaderboardNamespace}:results`;
+export type DBXpLeaderboardEntry = XpLeaderboardEntryBase & {
+  _id: ObjectId;
+  /** INF-064's period key — start-of-week (Monday) UTC, epoch ms. */
+  periodTimestamp: number;
+  totalXp: number;
+  /** Drives the TTL index. */
+  expiresAt: Date;
+};
+
+export const getWeeklyXpLeaderboardCollection =
+  (): Collection<DBXpLeaderboardEntry> =>
+    db.collection<DBXpLeaderboardEntry>(WEEKLY_XP_LEADERBOARD_COLLECTION);
+
+const RANK_SORT = { totalXp: -1, lastActivityTimestamp: 1 } as const;
 
 export class WeeklyXpLeaderboard {
-  private weeklyXpLeaderboardResultsKeyName: string;
-  private weeklyXpLeaderboardScoresKeyName: string;
-  private customTime: number;
+  private readonly customTime: number;
 
   constructor(customTime = -1) {
-    this.weeklyXpLeaderboardResultsKeyName = resultsNamespace;
-    this.weeklyXpLeaderboardScoresKeyName = scoresNamespace;
     this.customTime = customTime;
   }
 
-  private getThisWeeksXpLeaderboardKeys(): {
-    currentWeekTimestamp: number;
-    weeklyXpLeaderboardScoresKey: string;
-    weeklyXpLeaderboardResultsKey: string;
-  } {
-    const currentWeekTimestamp =
-      this.customTime === -1 ? getCurrentWeekTimestamp() : this.customTime;
-
-    const weeklyXpLeaderboardScoresKey = `${this.weeklyXpLeaderboardScoresKeyName}:${currentWeekTimestamp}`;
-    const weeklyXpLeaderboardResultsKey = `${this.weeklyXpLeaderboardResultsKeyName}:${currentWeekTimestamp}`;
-
-    return {
-      currentWeekTimestamp,
-      weeklyXpLeaderboardScoresKey,
-      weeklyXpLeaderboardResultsKey,
-    };
+  public getPeriodTimestamp(): number {
+    return this.customTime === -1 ? getCurrentWeekTimestamp() : this.customTime;
   }
 
   public async addResult(
     weeklyXpLeaderboardConfig: Configuration["leaderboards"]["weeklyXp"],
     opts: AddResultOpts,
   ): Promise<number> {
+    if (!weeklyXpLeaderboardConfig.enabled) return -1;
+
+    await ensureIndexes();
+
     const { entry, xpGained } = opts;
-
-    const connection = RedisClient.getConnection();
-    if (!connection || !weeklyXpLeaderboardConfig.enabled) {
-      return -1;
-    }
-
-    const {
-      currentWeekTimestamp,
-      weeklyXpLeaderboardScoresKey,
-      weeklyXpLeaderboardResultsKey,
-    } = this.getThisWeeksXpLeaderboardKeys();
-
-    const { expirationTimeInDays } = weeklyXpLeaderboardConfig;
-    const weeklyXpLeaderboardExpirationDurationInMilliseconds =
-      expirationTimeInDays * 24 * 60 * 60 * 1000;
-
-    const weeklyXpLeaderboardExpirationTimeInSeconds = Math.floor(
-      (currentWeekTimestamp +
-        weeklyXpLeaderboardExpirationDurationInMilliseconds) /
-        1000,
+    const periodTimestamp = this.getPeriodTimestamp();
+    const expiresAt = new Date(
+      periodTimestamp +
+        weeklyXpLeaderboardConfig.expirationTimeInDays * MILLISECONDS_IN_DAY,
     );
 
-    const currentEntry = await connection.hget(
-      weeklyXpLeaderboardResultsKey,
-      entry.uid,
+    await getWeeklyXpLeaderboardCollection().updateOne(
+      { periodTimestamp, uid: entry.uid },
+      {
+        $inc: {
+          totalXp: xpGained,
+          timeSpentSeconds: entry.timeSpentSeconds,
+        },
+        $set: {
+          name: entry.name,
+          lastActivityTimestamp: entry.lastActivityTimestamp,
+          expiresAt,
+        },
+        $setOnInsert: { periodTimestamp, uid: entry.uid },
+      },
+      { upsert: true },
     );
 
-    const currentEntryTimeTypedSeconds =
-      currentEntry !== null
-        ? parseJsonWithSchema(currentEntry, RedisXpLeaderboardEntrySchema)
-            ?.timeTypedSeconds
-        : undefined;
-
-    const totalTimeTypedSeconds =
-      entry.timeTypedSeconds + (currentEntryTimeTypedSeconds ?? 0);
-
-    const [rank] = await Promise.all([
-      connection.addResultIncrement(
-        2,
-        weeklyXpLeaderboardScoresKey,
-        weeklyXpLeaderboardResultsKey,
-        weeklyXpLeaderboardExpirationTimeInSeconds,
-        entry.uid,
-        xpGained,
-        JSON.stringify(
-          RedisXpLeaderboardEntrySchema.parse({
-            ...entry,
-            timeTypedSeconds: totalTimeTypedSeconds,
-          }),
-        ),
-      ),
-      LaterQueue.scheduleForNextWeek(
-        "weekly-xp-leaderboard-results",
-        "weekly-xp",
-      ),
-    ]);
-
-    return rank + 1;
+    const rank = await this.getRank(entry.uid, weeklyXpLeaderboardConfig);
+    return rank?.rank ?? -1;
   }
 
   public async getResults(
     page: number,
     pageSize: number,
     weeklyXpLeaderboardConfig: Configuration["leaderboards"]["weeklyXp"],
-    premiumFeaturesEnabled: boolean,
     userIds?: string[],
   ): Promise<{
     entries: XpLeaderboardEntry[];
     count: number;
   } | null> {
-    const connection = RedisClient.getConnection();
-    if (!connection || !weeklyXpLeaderboardConfig.enabled) {
-      return null;
-    }
+    if (!weeklyXpLeaderboardConfig.enabled) return null;
 
     if (page < 0 || pageSize < 0) {
       throw new CrocoError(500, "Invalid page or pageSize");
@@ -140,72 +114,42 @@ export class WeeklyXpLeaderboard {
     }
 
     const isFriends = userIds !== undefined;
-    const minRank = page * pageSize;
-    const maxRank = minRank + pageSize - 1;
+    const skip = page * pageSize;
 
-    const { weeklyXpLeaderboardScoresKey, weeklyXpLeaderboardResultsKey } =
-      this.getThisWeeksXpLeaderboardKeys();
+    const ranked = await getWeeklyXpLeaderboardCollection()
+      .aggregate<DBXpLeaderboardEntry & { rank: number; friendsRank?: number }>(
+        [
+          ...this.rankPipeline(),
+          ...(isFriends
+            ? [
+                { $match: { uid: { $in: userIds } } },
+                {
+                  $setWindowFields: {
+                    sortBy: { rank: 1 },
+                    output: { friendsRank: { $documentNumber: {} } },
+                  },
+                },
+              ]
+            : []),
+          { $skip: skip },
+          { $limit: pageSize },
+        ],
+        { allowDiskUse: true },
+      )
+      .toArray();
 
-    const [results, scores, count, _, ranks] = await connection.getResults(
-      2,
-      weeklyXpLeaderboardScoresKey,
-      weeklyXpLeaderboardResultsKey,
-      minRank,
-      maxRank,
-      "true",
-      userIds?.join(",") ?? "",
-    );
+    const countResult = await getWeeklyXpLeaderboardCollection()
+      .aggregate<{ total: number }>([
+        { $match: this.periodMatch() },
+        ...(isFriends ? [{ $match: { uid: { $in: userIds } } }] : []),
+        { $count: "total" },
+      ])
+      .toArray();
 
-    if (results === undefined) {
-      throw new Error(
-        "Redis returned undefined when getting weekly leaderboard results",
-      );
-    }
-
-    if (scores === undefined) {
-      throw new Error(
-        "Redis returned undefined when getting weekly leaderboard scores",
-      );
-    }
-
-    let resultsWithRanks: XpLeaderboardEntry[] = results.map(
-      (resultJSON: string, index: number) => {
-        try {
-          const parsed = parseJsonWithSchema(
-            resultJSON,
-            RedisXpLeaderboardEntrySchema,
-          );
-          const scoreValue = scores[index];
-
-          if (typeof scoreValue !== "string") {
-            throw new Error(
-              `Invalid score value at index ${index}: ${scoreValue}`,
-            );
-          }
-
-          return {
-            ...parsed,
-            rank: isFriends
-              ? new Number(ranks[index]).valueOf() + 1
-              : minRank + index + 1,
-            friendsRank: isFriends ? minRank + index + 1 : undefined,
-            totalXp: parseInt(scoreValue, 10),
-          };
-        } catch (error) {
-          throw new Error(
-            `Failed to parse leaderboard entry at index ${index}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
-        }
-      },
-    );
-
-    if (!premiumFeaturesEnabled) {
-      resultsWithRanks = resultsWithRanks.map((it) => omit(it, ["isPremium"]));
-    }
-
-    return { entries: resultsWithRanks, count: parseInt(count) };
+    return {
+      entries: ranked.map(toEntry),
+      count: countResult[0]?.total ?? 0,
+    };
   }
 
   public async getRank(
@@ -213,57 +157,76 @@ export class WeeklyXpLeaderboard {
     weeklyXpLeaderboardConfig: Configuration["leaderboards"]["weeklyXp"],
     userIds?: string[],
   ): Promise<XpLeaderboardEntry | null> {
-    const connection = RedisClient.getConnection();
-    if (!connection || !weeklyXpLeaderboardConfig.enabled) {
-      throw new Error("Redis connection is unavailable");
-    }
-    if (userIds?.length === 0) {
-      return null;
-    }
+    if (!weeklyXpLeaderboardConfig.enabled) return null;
+    if (userIds?.length === 0) return null;
 
-    const { weeklyXpLeaderboardScoresKey, weeklyXpLeaderboardResultsKey } =
-      this.getThisWeeksXpLeaderboardKeys();
+    const isFriends = userIds !== undefined;
 
-    const [rank, score, result, friendsRank] = await connection.getRank(
-      2,
-      weeklyXpLeaderboardScoresKey,
-      weeklyXpLeaderboardResultsKey,
-      uid,
-      "true",
-      userIds?.join(",") ?? "",
-    );
+    const results = await getWeeklyXpLeaderboardCollection()
+      .aggregate<DBXpLeaderboardEntry & { rank: number; friendsRank?: number }>(
+        [
+          ...this.rankPipeline(),
+          ...(isFriends
+            ? [
+                { $match: { uid: { $in: userIds } } },
+                {
+                  $setWindowFields: {
+                    sortBy: { rank: 1 },
+                    output: { friendsRank: { $documentNumber: {} } },
+                  },
+                },
+              ]
+            : []),
+          { $match: { uid } },
+          { $limit: 1 },
+        ],
+        { allowDiskUse: true },
+      )
+      .toArray();
 
-    if (rank === null || result === null) {
-      return null;
-    }
-
-    try {
-      return {
-        ...parseJsonWithSchema(result ?? "null", RedisXpLeaderboardEntrySchema),
-        rank: rank + 1,
-        friendsRank: friendsRank !== undefined ? friendsRank + 1 : undefined,
-        totalXp: parseInt(score, 10),
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to parse leaderboard entry: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
+    const entry = results[0];
+    return entry === undefined ? null : toEntry(entry);
   }
+
+  private periodMatch(): Document {
+    return { periodTimestamp: this.getPeriodTimestamp() };
+  }
+
+  private rankPipeline(): Document[] {
+    return [
+      { $match: this.periodMatch() },
+      {
+        $setWindowFields: {
+          sortBy: RANK_SORT,
+          output: { rank: { $documentNumber: {} } },
+        },
+      },
+      { $sort: { rank: 1 } },
+    ];
+  }
+}
+
+function toEntry(
+  doc: DBXpLeaderboardEntry & { rank: number; friendsRank?: number },
+): XpLeaderboardEntry {
+  return {
+    uid: doc.uid,
+    name: doc.name,
+    lastActivityTimestamp: doc.lastActivityTimestamp,
+    timeSpentSeconds: doc.timeSpentSeconds,
+    totalXp: doc.totalXp,
+    rank: doc.rank,
+    ...(doc.friendsRank !== undefined ? { friendsRank: doc.friendsRank } : {}),
+  };
 }
 
 export function get(
   weeklyXpLeaderboardConfig: Configuration["leaderboards"]["weeklyXp"],
   customTimestamp?: number,
 ): WeeklyXpLeaderboard | null {
-  const { enabled } = weeklyXpLeaderboardConfig;
-
-  if (!enabled) {
+  if (!weeklyXpLeaderboardConfig.enabled) {
     return null;
   }
-
   return new WeeklyXpLeaderboard(customTimestamp);
 }
 
@@ -271,18 +234,46 @@ export async function purgeUserFromXpLeaderboards(
   uid: string,
   weeklyXpLeaderboardConfig: Configuration["leaderboards"]["weeklyXp"],
 ): Promise<void> {
-  const connection = RedisClient.getConnection();
-  if (!connection || !weeklyXpLeaderboardConfig.enabled) {
-    return;
-  }
+  if (!weeklyXpLeaderboardConfig.enabled) return;
+  await getWeeklyXpLeaderboardCollection().deleteMany({ uid });
+}
 
-  await connection.purgeResults(
-    0,
-    uid,
-    weeklyXpLeaderboardLeaderboardNamespace,
+export async function createIndicies(): Promise<void> {
+  const collection = getWeeklyXpLeaderboardCollection();
+  await collection.createIndex(
+    { periodTimestamp: 1, totalXp: -1 },
+    { name: "weekly_xp_rank" },
+  );
+  await collection.createIndex(
+    { periodTimestamp: 1, uid: 1 },
+    { name: "weekly_xp_key", unique: true },
+  );
+  await collection.createIndex(
+    { expiresAt: 1 },
+    { name: "weekly_xp_ttl", expireAfterSeconds: 0 },
   );
 }
 
+/**
+ * `weekly_xp_key`'s uniqueness is load-bearing: `addResult` `$inc`s a running
+ * total, so two documents for one `(periodTimestamp, uid)` would split a user's
+ * week in half and under-report them. Boot-time index creation lives in
+ * `server.ts`, which this package does not own, so the write path ensures its
+ * own preconditions, memoised to one round-trip per process.
+ */
+let indexesReady: Promise<void> | undefined;
+
+export async function ensureIndexes(): Promise<void> {
+  indexesReady ??= createIndicies().catch((e: unknown) => {
+    indexesReady = undefined;
+    throw e;
+  });
+  await indexesReady;
+}
+
 export const __testing = {
-  namespace: weeklyXpLeaderboardLeaderboardNamespace,
+  RANK_SORT,
+  resetIndexMemo: (): void => {
+    indexesReady = undefined;
+  },
 };

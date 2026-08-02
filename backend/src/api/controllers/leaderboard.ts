@@ -20,6 +20,7 @@ import {
   GetWeeklyXpLeaderboardResponse,
 } from "@croco-calc/contracts/leaderboards";
 import { Configuration } from "@croco-calc/schemas/configuration";
+import { isValidLeaderboard } from "@croco-calc/schemas/leaderboards";
 import {
   getCurrentDayTimestamp,
   getCurrentWeekTimestamp,
@@ -31,15 +32,13 @@ import { omit } from "../../utils/misc";
 export async function getLeaderboard(
   req: CrocoRequest<GetLeaderboardQuery>,
 ): Promise<GetLeaderboardResponse> {
-  const { language, mode, mode2, page, pageSize, friendsOnly } = req.query;
+  const { mode, mode2, page, pageSize, friendsOnly } = req.query;
   const { uid } = req.ctx.decodedToken;
   const connectionsConfig = req.ctx.configuration.connections;
 
-  if (
-    mode !== "time" ||
-    (mode2 !== "15" && mode2 !== "60") ||
-    language !== "english"
-  ) {
+  // AC-114: `time 4` and `time 8` and nothing else. The matrix lives in
+  // `packages/schemas` so the sidebar, the URL parser and the server agree.
+  if (!isValidLeaderboard("allTime", mode, mode2)) {
     throw new CrocoError(404, "There is no leaderboard for this mode");
   }
 
@@ -48,10 +47,8 @@ export async function getLeaderboard(
   const leaderboard = await LeaderboardsDAL.get(
     mode,
     mode2,
-    language,
     page,
     pageSize,
-    req.ctx.configuration.users.premium.enabled,
     friendsOnlyUid,
   );
 
@@ -62,12 +59,7 @@ export async function getLeaderboard(
     );
   }
 
-  const count = await LeaderboardsDAL.getCount(
-    mode,
-    mode2,
-    language,
-    friendsOnlyUid,
-  );
+  const count = await LeaderboardsDAL.getCount(mode, mode2, friendsOnlyUid);
   const normalizedLeaderboard = leaderboard.map((it) => omit(it, ["_id"]));
 
   return new CrocoResponse("Leaderboard retrieved", {
@@ -80,14 +72,13 @@ export async function getLeaderboard(
 export async function getRankFromLeaderboard(
   req: CrocoRequest<GetLeaderboardRankQuery>,
 ): Promise<GetLeaderboardRankResponse> {
-  const { language, mode, mode2, friendsOnly } = req.query;
+  const { mode, mode2, friendsOnly } = req.query;
   const { uid } = req.ctx.decodedToken;
   const connectionsConfig = req.ctx.configuration.connections;
 
   const data = await LeaderboardsDAL.getRank(
     mode,
     mode2,
-    language,
     uid,
     getFriendsOnlyUid(uid, friendsOnly, connectionsConfig) !== undefined,
   );
@@ -106,7 +97,7 @@ export async function getRankFromLeaderboard(
 }
 
 function getDailyLeaderboardWithError(
-  { language, mode, mode2, daysBefore }: DailyLeaderboardQuery,
+  { mode, mode2, daysBefore }: DailyLeaderboardQuery,
   config: Configuration["dailyLeaderboards"],
 ): DailyLeaderboards.DailyLeaderboard {
   const customTimestamp =
@@ -115,7 +106,6 @@ function getDailyLeaderboardWithError(
       : getCurrentDayTimestamp() - daysBefore * MILLISECONDS_IN_DAY;
 
   const dailyLeaderboard = DailyLeaderboards.getDailyLeaderboard(
-    language,
     mode,
     mode2,
     config,
@@ -150,14 +140,14 @@ export async function getDailyLeaderboard(
     page,
     pageSize,
     req.ctx.configuration.dailyLeaderboards,
-    req.ctx.configuration.users.premium.enabled,
     friendUids,
   );
 
   return new CrocoResponse("Daily leaderboard retrieved", {
     entries: results?.entries ?? [],
     count: results?.count ?? 0,
-    minWpm: results?.minWpm ?? 0,
+    // AC-130: croco calc exposes `minScore` where monkeytype exposed `minWpm`.
+    minScore: results?.minScore ?? 0,
     pageSize,
   });
 }
@@ -228,7 +218,6 @@ export async function getWeeklyXpLeaderboard(
     page,
     pageSize,
     req.ctx.configuration.leaderboards.weeklyXp,
-    req.ctx.configuration.users.premium.enabled,
     friendUids,
   );
 
