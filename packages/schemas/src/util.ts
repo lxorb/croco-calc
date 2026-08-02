@@ -34,9 +34,6 @@ export const nameWithSeparators = (): ZodString =>
 export const IdSchema = token();
 export type Id = z.infer<typeof IdSchema>;
 
-export const TagSchema = token().max(50);
-export type Tag = z.infer<typeof TagSchema>;
-
 export const NullableStringSchema = z
   .string()
   .nullable()
@@ -47,14 +44,17 @@ export type NullableString = z.infer<typeof NullableStringSchema>;
 export const PercentageSchema = z.number().nonnegative().max(100);
 export type Percentage = z.infer<typeof PercentageSchema>;
 
-export const WpmSchema = z.number().nonnegative().max(420);
-export type Wpm = z.infer<typeof WpmSchema>;
+/**
+ * The headline croco calc metric, `correct - wrong` (AC-003, ME-161 as renamed by
+ * master C40). It is an integer and MAY be negative, which is why it replaces
+ * monkeytype's nonnegative-and-capped speed schema rather than reusing it.
+ */
+export const ScoreSchema = z.number().int();
+export type Score = z.infer<typeof ScoreSchema>;
 
-export const CustomTextModeSchema = z.enum(["repeat", "random", "shuffle"]);
-export type CustomTextMode = z.infer<typeof CustomTextModeSchema>;
-
-export const CustomTextLimitModeSchema = z.enum(["word", "time", "section"]);
-export type CustomTextLimitMode = z.infer<typeof CustomTextLimitModeSchema>;
+/** Tasks per minute — responses per minute, so it is never negative (AC-005). */
+export const TasksPerMinuteSchema = z.number().nonnegative();
+export type TasksPerMinute = z.infer<typeof TasksPerMinuteSchema>;
 
 export function customEnumErrorHandler(message: string): ZodErrorMap {
   return (issue, _ctx) => ({
