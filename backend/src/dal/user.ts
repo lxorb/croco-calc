@@ -26,17 +26,17 @@ import {
   User,
   CountByYearAndDay,
   Friend,
-} from "@monkeytype/schemas/users";
+} from "@croco-calc/schemas/users";
 import {
   Mode,
   Mode2,
   PersonalBest,
   PersonalBests,
-} from "@monkeytype/schemas/shared";
+} from "@croco-calc/schemas/shared";
 import { addImportantLog } from "./logs";
-import { Result as ResultType } from "@monkeytype/schemas/results";
-import { Configuration } from "@monkeytype/schemas/configuration";
-import { isToday, isYesterday } from "@monkeytype/util/date-and-time";
+import { Result as ResultType } from "@croco-calc/schemas/results";
+import { Configuration } from "@croco-calc/schemas/configuration";
+import { isToday, isYesterday } from "@croco-calc/util/date-and-time";
 import GeorgeQueue from "../queues/george-queue";
 import { aggregateWithAcceptedConnections } from "./connections";
 

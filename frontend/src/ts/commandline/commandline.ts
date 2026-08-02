@@ -21,7 +21,7 @@ import {
 import { areSortedArraysEqual, areUnsortedArraysEqual } from "../utils/arrays";
 import { parseIntOptional } from "../utils/numbers";
 import { debounce } from "throttle-debounce";
-import { intersect } from "@monkeytype/util/arrays";
+import { intersect } from "@croco-calc/util/arrays";
 import { createInputEventHandler } from "../elements/input-validation";
 import { isInputElementFocused } from "../input/input-element";
 import { qs } from "../utils/dom";

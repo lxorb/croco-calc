@@ -1,6 +1,6 @@
 import { Collection, ObjectId, UpdateResult } from "mongodb";
 import * as db from "../init/db";
-import { Config, PartialConfig } from "@monkeytype/schemas/configs";
+import { Config, PartialConfig } from "@croco-calc/schemas/configs";
 
 const configLegacyProperties: Record<string, ""> = {
   "config.swapEscAndTab": "",

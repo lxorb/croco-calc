@@ -1,7 +1,7 @@
-import { PartialConfig } from "@monkeytype/schemas/configs";
+import { PartialConfig } from "@croco-calc/schemas/configs";
 import * as ConfigDAL from "../../dal/config";
 import { MonkeyResponse } from "../../utils/monkey-response";
-import { GetConfigResponse } from "@monkeytype/contracts/configs";
+import { GetConfigResponse } from "@croco-calc/contracts/configs";
 import { MonkeyRequest } from "../types";
 
 export async function getConfig(

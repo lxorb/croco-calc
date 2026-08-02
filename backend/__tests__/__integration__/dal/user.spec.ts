@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CustomThemeColors } from "@monkeytype/schemas/configs";
-import { PersonalBest, PersonalBests } from "@monkeytype/schemas/shared";
-import { MonkeyMail, ResultFilters } from "@monkeytype/schemas/users";
+import { CustomThemeColors } from "@croco-calc/schemas/configs";
+import { PersonalBest, PersonalBests } from "@croco-calc/schemas/shared";
+import { MonkeyMail, ResultFilters } from "@croco-calc/schemas/users";
 import { ObjectId } from "mongodb";
 import * as UserDAL from "../../../src/dal/user";
 import { createConnection as createFriend } from "../../__testData__/connections";

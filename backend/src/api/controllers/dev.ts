@@ -9,18 +9,18 @@ import { ObjectId } from "mongodb";
 import * as LeaderboardDal from "../../dal/leaderboards";
 import MonkeyError from "../../utils/error";
 
-import { Mode, PersonalBest, PersonalBests } from "@monkeytype/schemas/shared";
+import { Mode, PersonalBest, PersonalBests } from "@croco-calc/schemas/shared";
 import {
   AddDebugInboxItemRequest,
   GenerateDataRequest,
   GenerateDataResponse,
-} from "@monkeytype/contracts/dev";
+} from "@croco-calc/contracts/dev";
 import { buildMonkeyMail } from "../../utils/monkey-mail";
-import { roundTo2 } from "@monkeytype/util/numbers";
+import { roundTo2 } from "@croco-calc/util/numbers";
 import { MonkeyRequest } from "../types";
 import { DBResult } from "../../utils/result";
 import { LbPersonalBests } from "../../utils/pb";
-import { Language } from "@monkeytype/schemas/languages";
+import { Language } from "@croco-calc/schemas/languages";
 
 const CREATE_RESULT_DEFAULT_OPTIONS = {
   firstTestTimestamp: DateUtils.startOfDay(new UTCDate(Date.now())).valueOf(),

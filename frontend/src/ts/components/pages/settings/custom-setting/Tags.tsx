@@ -1,4 +1,4 @@
-import { TagNameSchema } from "@monkeytype/schemas/users";
+import { TagNameSchema } from "@croco-calc/schemas/users";
 import { For, JSXElement } from "solid-js";
 import { z } from "zod";
 

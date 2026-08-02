@@ -1,8 +1,8 @@
 import { ZodIssue } from "zod";
-import { isZodError } from "@monkeytype/util/zod";
+import { isZodError } from "@croco-calc/util/zod";
 import { showErrorNotification } from "../states/notifications";
-import { tryCatchSync } from "@monkeytype/util/trycatch";
-import { parseWithSchema as parseJsonWithSchema } from "@monkeytype/util/json";
+import { tryCatchSync } from "@croco-calc/util/trycatch";
+import { parseWithSchema as parseJsonWithSchema } from "@croco-calc/util/json";
 
 export class LocalStorageWithSchema<T> {
   private key: string;

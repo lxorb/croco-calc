@@ -13,13 +13,13 @@ import {
   setLastGeneratedApeKey,
 } from "../states/account-settings";
 import { applyIdWorkaround, tempId } from "./utils/misc";
-import { ApeKey } from "@monkeytype/schemas/ape-keys";
+import { ApeKey } from "@croco-calc/schemas/ape-keys";
 import { showSuccessNotification } from "../states/notifications";
 import {
   replaceSpacesWithUnderscores,
   replaceUnderscoresWithSpaces,
 } from "../utils/strings";
-import { typedEntries } from "@monkeytype/util/objects";
+import { typedEntries } from "@croco-calc/util/objects";
 
 export type ApeKeyEntry = ApeKey & { _id: string };
 const queryKeys = {

@@ -8,7 +8,7 @@ import { recordEmail } from "../utils/prometheus";
 import type { EmailTaskContexts, EmailType } from "../queues/email-queue";
 import { isDevEnvironment } from "../utils/misc";
 import { getErrorMessage } from "../utils/error";
-import { tryCatch } from "@monkeytype/util/trycatch";
+import { tryCatch } from "@croco-calc/util/trycatch";
 
 type EmailMetadata = {
   subject: string;

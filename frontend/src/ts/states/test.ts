@@ -5,8 +5,8 @@ import { useLocalStorage } from "../hooks/useLocalStorage";
 import { EventLog } from "../test/events/types";
 
 import { Challenge } from "@monkeytype/challenges";
-import { LayoutObject } from "@monkeytype/schemas/layouts";
-import { CompletedEvent, IncompleteTest } from "@monkeytype/schemas/results";
+import { LayoutObject } from "@croco-calc/schemas/layouts";
+import { CompletedEvent, IncompleteTest } from "@croco-calc/schemas/results";
 import { createStore } from "solid-js/store";
 import { keymapEvent } from "../events/keymap";
 import { createSignalWithSetters } from "../hooks/createSignalWithSetters";

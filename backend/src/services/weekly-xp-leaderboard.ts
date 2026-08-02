@@ -1,4 +1,4 @@
-import { Configuration } from "@monkeytype/schemas/configuration";
+import { Configuration } from "@croco-calc/schemas/configuration";
 import * as RedisClient from "../init/redis";
 import LaterQueue from "../queues/later-queue";
 import {
@@ -6,10 +6,10 @@ import {
   RedisXpLeaderboardEntrySchema,
   RedisXpLeaderboardScore,
   XpLeaderboardEntry,
-} from "@monkeytype/schemas/leaderboards";
-import { getCurrentWeekTimestamp } from "@monkeytype/util/date-and-time";
+} from "@croco-calc/schemas/leaderboards";
+import { getCurrentWeekTimestamp } from "@croco-calc/util/date-and-time";
 import MonkeyError from "../utils/error";
-import { parseWithSchema as parseJsonWithSchema } from "@monkeytype/util/json";
+import { parseWithSchema as parseJsonWithSchema } from "@croco-calc/util/json";
 import { omit } from "../utils/misc";
 
 export type AddResultOpts = {

@@ -1,4 +1,4 @@
-import { UserNameSchema } from "@monkeytype/schemas/users";
+import { UserNameSchema } from "@croco-calc/schemas/users";
 import { z } from "zod";
 
 import Ape from "../../../ape";

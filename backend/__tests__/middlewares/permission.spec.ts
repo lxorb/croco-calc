@@ -1,4 +1,4 @@
-import { EndpointMetadata } from "@monkeytype/contracts/util/api";
+import { EndpointMetadata } from "@croco-calc/contracts/util/api";
 import { Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TsRestRequestWithContext } from "../../src/api/types";

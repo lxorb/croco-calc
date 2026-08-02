@@ -18,13 +18,13 @@ import {
   GetWeeklyXpLeaderboardRankQuery,
   GetWeeklyXpLeaderboardRankResponse,
   GetWeeklyXpLeaderboardResponse,
-} from "@monkeytype/contracts/leaderboards";
-import { Configuration } from "@monkeytype/schemas/configuration";
+} from "@croco-calc/contracts/leaderboards";
+import { Configuration } from "@croco-calc/schemas/configuration";
 import {
   getCurrentDayTimestamp,
   getCurrentWeekTimestamp,
   MILLISECONDS_IN_DAY,
-} from "@monkeytype/util/date-and-time";
+} from "@croco-calc/util/date-and-time";
 import { MonkeyRequest } from "../types";
 import { omit } from "../../utils/misc";
 

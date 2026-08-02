@@ -1,4 +1,4 @@
-import { ResultFilters } from "@monkeytype/schemas/users";
+import { ResultFilters } from "@croco-calc/schemas/users";
 import { LanguageList } from "./languages";
 import { getFunboxNames } from "@monkeytype/funbox";
 

@@ -1,4 +1,4 @@
-import { UserNameWithoutFilterSchema } from "@monkeytype/schemas/users";
+import { UserNameWithoutFilterSchema } from "@croco-calc/schemas/users";
 import { createForm } from "@tanstack/solid-form";
 import { createEffect, createSignal, JSXElement } from "solid-js";
 

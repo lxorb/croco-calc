@@ -1,7 +1,7 @@
-import type { Language } from "@monkeytype/schemas/languages";
-import type { LayoutObject } from "@monkeytype/schemas/layouts";
+import type { Language } from "@croco-calc/schemas/languages";
+import type { LayoutObject } from "@croco-calc/schemas/layouts";
 
-import { tryCatch } from "@monkeytype/util/trycatch";
+import { tryCatch } from "@croco-calc/util/trycatch";
 import { createForm } from "@tanstack/solid-form";
 import {
   createMemo,

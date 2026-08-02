@@ -1,5 +1,5 @@
-import { Difficulty } from "@monkeytype/schemas/configs";
-import { Mode } from "@monkeytype/schemas/shared";
+import { Difficulty } from "@croco-calc/schemas/configs";
+import { Mode } from "@croco-calc/schemas/shared";
 import { createColumnHelper } from "@tanstack/solid-table";
 import { format as dateFormat } from "date-fns/format";
 import { Accessor, createMemo, createSignal, JSXElement, Show } from "solid-js";

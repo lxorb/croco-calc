@@ -1,8 +1,8 @@
-import { PersonalBest, PersonalBests } from "@monkeytype/schemas/shared";
+import { PersonalBest, PersonalBests } from "@croco-calc/schemas/shared";
 import {
   RankAndCount,
   UserProfile as UserProfileType,
-} from "@monkeytype/schemas/users";
+} from "@croco-calc/schemas/users";
 import { formatDate } from "date-fns/format";
 import { createMemo, For, JSXElement, Show } from "solid-js";
 

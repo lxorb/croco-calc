@@ -1,19 +1,19 @@
 import * as RedisClient from "../init/redis";
 import LaterQueue from "../queues/later-queue";
 import { matchesAPattern, kogascore, omit } from "./misc";
-import { parseWithSchema as parseJsonWithSchema } from "@monkeytype/util/json";
+import { parseWithSchema as parseJsonWithSchema } from "@croco-calc/util/json";
 import {
   Configuration,
   ValidModeRule,
-} from "@monkeytype/schemas/configuration";
+} from "@croco-calc/schemas/configuration";
 import {
   LeaderboardEntry,
   RedisDailyLeaderboardEntry,
   RedisDailyLeaderboardEntrySchema,
-} from "@monkeytype/schemas/leaderboards";
+} from "@croco-calc/schemas/leaderboards";
 import MonkeyError from "./error";
-import { Mode, Mode2 } from "@monkeytype/schemas/shared";
-import { getCurrentDayTimestamp } from "@monkeytype/util/date-and-time";
+import { Mode, Mode2 } from "@croco-calc/schemas/shared";
+import { getCurrentDayTimestamp } from "@croco-calc/util/date-and-time";
 
 const dailyLeaderboardNamespace = "monkeytype:dailyleaderboard";
 const scoresNamespace = `${dailyLeaderboardNamespace}:scores`;

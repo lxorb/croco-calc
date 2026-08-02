@@ -10,7 +10,7 @@ import {
   SubgroupProps,
 } from "./commandline-metadata";
 import { Command } from "./types";
-import * as ConfigSchemas from "@monkeytype/schemas/configs";
+import * as ConfigSchemas from "@croco-calc/schemas/configs";
 import { ZodSchema, ZodFirstPartySchemaTypes } from "zod";
 import { getOptions } from "../utils/zod";
 

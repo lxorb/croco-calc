@@ -16,8 +16,8 @@ import { AppRoute, AppRouter } from "@ts-rest/core";
 import {
   EndpointMetadata,
   RequestAuthenticationOptions,
-} from "@monkeytype/contracts/util/api";
-import { Configuration } from "@monkeytype/schemas/configuration";
+} from "@croco-calc/contracts/util/api";
+import { Configuration } from "@croco-calc/schemas/configuration";
 import { AsyncTsRestRequestHandler, getMetadata } from "./utility";
 import { TsRestRequestWithContext } from "../api/types";
 

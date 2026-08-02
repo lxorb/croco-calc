@@ -1,4 +1,4 @@
-import { MaxLineWidthSchema } from "@monkeytype/schemas/configs";
+import { MaxLineWidthSchema } from "@croco-calc/schemas/configs";
 import { createForm } from "@tanstack/solid-form";
 import { JSXElement } from "solid-js";
 

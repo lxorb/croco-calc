@@ -1,5 +1,5 @@
-import { ConfigSchema } from "@monkeytype/schemas/configs";
-import { FontNameSchema } from "@monkeytype/schemas/fonts";
+import { ConfigSchema } from "@croco-calc/schemas/configs";
+import { FontNameSchema } from "@croco-calc/schemas/fonts";
 import { createResource, For, JSXElement, Show } from "solid-js";
 import { z } from "zod";
 

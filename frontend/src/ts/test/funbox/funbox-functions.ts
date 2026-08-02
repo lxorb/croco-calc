@@ -4,7 +4,7 @@ import { Config } from "../../config/store";
 import { setConfig, toggleFunbox } from "../../config/setters";
 import * as Misc from "../../utils/misc";
 import * as Strings from "../../utils/strings";
-import { randomIntFromRange } from "@monkeytype/util/numbers";
+import { randomIntFromRange } from "@croco-calc/util/numbers";
 import * as Arrays from "../../utils/arrays";
 import { save } from "./funbox-memory";
 import { ttsEvent } from "../../events/tts";
@@ -25,8 +25,8 @@ import * as WeakSpot from "../weak-spot";
 import * as IPAddresses from "../../utils/ip-addresses";
 import { getActiveWordIndex } from "../../states/test";
 import { WordGenError } from "../../utils/word-gen-error";
-import { FunboxName, KeymapLayout, Layout } from "@monkeytype/schemas/configs";
-import { Language, LanguageObject } from "@monkeytype/schemas/languages";
+import { FunboxName, KeymapLayout, Layout } from "@croco-calc/schemas/configs";
+import { Language, LanguageObject } from "@croco-calc/schemas/languages";
 import { qs } from "../../utils/dom";
 
 export type FunboxFunctions = {

@@ -1,5 +1,5 @@
 import { checkForcedConfig, getFunbox } from "@monkeytype/funbox";
-import { Config, ConfigValue, FunboxName } from "@monkeytype/schemas/configs";
+import { Config, ConfigValue, FunboxName } from "@croco-calc/schemas/configs";
 
 export function canSetConfigWithCurrentFunboxes(
   key: string,

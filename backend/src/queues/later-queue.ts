@@ -1,11 +1,11 @@
 import { LRUCache } from "lru-cache";
 import Logger from "../utils/logger";
 import { MonkeyQueue } from "./monkey-queue";
-import { ValidModeRule } from "@monkeytype/schemas/configuration";
+import { ValidModeRule } from "@croco-calc/schemas/configuration";
 import {
   getCurrentDayTimestamp,
   getCurrentWeekTimestamp,
-} from "@monkeytype/util/date-and-time";
+} from "@croco-calc/util/date-and-time";
 
 const QUEUE_NAME = "later";
 

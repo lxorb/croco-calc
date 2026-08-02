@@ -1,5 +1,5 @@
-import { Language } from "@monkeytype/schemas/languages";
-import { QuoteDataQuote } from "@monkeytype/schemas/quotes";
+import { Language } from "@croco-calc/schemas/languages";
+import { QuoteDataQuote } from "@croco-calc/schemas/quotes";
 import { RequiredProperties } from "../utils/misc";
 
 export type Quote = QuoteDataQuote & {

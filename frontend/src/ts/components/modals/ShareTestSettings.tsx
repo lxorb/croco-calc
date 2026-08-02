@@ -1,6 +1,6 @@
-import type { Difficulty, FunboxName } from "@monkeytype/schemas/configs";
-import type { CustomTextSettings } from "@monkeytype/schemas/results";
-import type { Mode, Mode2 } from "@monkeytype/schemas/shared";
+import type { Difficulty, FunboxName } from "@croco-calc/schemas/configs";
+import type { CustomTextSettings } from "@croco-calc/schemas/results";
+import type { Mode, Mode2 } from "@croco-calc/schemas/shared";
 
 import { createForm } from "@tanstack/solid-form";
 import { compressToURI } from "lz-ts";

@@ -1,4 +1,4 @@
-import { Mode } from "@monkeytype/schemas/shared";
+import { Mode } from "@croco-calc/schemas/shared";
 import { createMemo, createSignal, JSXElement, Show } from "solid-js";
 
 import {

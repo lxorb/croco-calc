@@ -1,4 +1,4 @@
-import { UserNameSchema } from "@monkeytype/schemas/users";
+import { UserNameSchema } from "@croco-calc/schemas/users";
 import { createSignal, For, JSXElement } from "solid-js";
 import { envConfig } from "virtual:env-config";
 import { z } from "zod";

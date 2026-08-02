@@ -10,8 +10,8 @@ import {
   ApeKeySchema,
   ApeKeysSchema,
   ApeKeyUserDefinedSchema,
-} from "@monkeytype/schemas/ape-keys";
-import { IdSchema } from "@monkeytype/schemas/util";
+} from "@croco-calc/schemas/ape-keys";
+import { IdSchema } from "@croco-calc/schemas/util";
 
 export const GetApeKeyResponseSchema = responseWithData(ApeKeysSchema);
 export type GetApeKeyResponse = z.infer<typeof GetApeKeyResponseSchema>;

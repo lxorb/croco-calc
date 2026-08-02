@@ -2,9 +2,9 @@ import type {
   Config as ConfigSchema,
   FunboxName,
   PartialConfig,
-} from "@monkeytype/schemas/configs";
-import * as ConfigSchemas from "@monkeytype/schemas/configs";
-import { typedKeys } from "@monkeytype/util/objects";
+} from "@croco-calc/schemas/configs";
+import * as ConfigSchemas from "@croco-calc/schemas/configs";
+import { typedKeys } from "@croco-calc/util/objects";
 import { getDefaultConfig } from "../constants/default-config";
 import { sanitize } from "../utils/sanitize";
 import { Config } from "./store";

@@ -1,4 +1,4 @@
-import { UserEmailSchema, UserNameSchema } from "@monkeytype/schemas/users";
+import { UserEmailSchema, UserNameSchema } from "@croco-calc/schemas/users";
 import { createForm } from "@tanstack/solid-form";
 import { JSXElement } from "solid-js";
 

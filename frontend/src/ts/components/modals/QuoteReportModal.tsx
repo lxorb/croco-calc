@@ -1,4 +1,4 @@
-import { QuoteReportReason } from "@monkeytype/schemas/quotes";
+import { QuoteReportReason } from "@croco-calc/schemas/quotes";
 import { createForm } from "@tanstack/solid-form";
 import { JSXElement, createSignal } from "solid-js";
 

@@ -1,7 +1,7 @@
 import {
   ConfigSchema,
   PaceCaretCustomSpeedSchema,
-} from "@monkeytype/schemas/configs";
+} from "@croco-calc/schemas/configs";
 import { createForm } from "@tanstack/solid-form";
 import { For, JSXElement } from "solid-js";
 

@@ -5,7 +5,7 @@ import {
 } from "@monkeytype/funbox";
 
 import { FunboxFunctions, getFunboxFunctions } from "./funbox-functions";
-import { FunboxName } from "@monkeytype/schemas/configs";
+import { FunboxName } from "@croco-calc/schemas/configs";
 import {
   getActiveFunboxNames,
   isFunboxActive,

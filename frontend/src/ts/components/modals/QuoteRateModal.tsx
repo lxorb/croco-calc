@@ -1,4 +1,4 @@
-import { isSafeNumber } from "@monkeytype/util/numbers";
+import { isSafeNumber } from "@croco-calc/util/numbers";
 import { JSXElement, createSignal, For } from "solid-js";
 
 import Ape from "../../ape";

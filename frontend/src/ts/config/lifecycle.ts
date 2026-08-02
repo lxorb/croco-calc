@@ -1,5 +1,5 @@
-import * as ConfigSchemas from "@monkeytype/schemas/configs";
-import { parseWithSchema as parseJsonWithSchema } from "@monkeytype/util/json";
+import * as ConfigSchemas from "@croco-calc/schemas/configs";
+import { parseWithSchema as parseJsonWithSchema } from "@croco-calc/util/json";
 import {
   showSuccessNotification,
   showErrorNotification,
@@ -16,7 +16,7 @@ import { migrateConfig } from "./utils";
 import { promiseWithResolvers } from "../utils/misc";
 import { setConfig } from "./setters";
 import { deleteConfig } from "../ape/config";
-import { typedKeys } from "@monkeytype/util/objects";
+import { typedKeys } from "@croco-calc/util/objects";
 
 export async function applyConfigFromJson(json: string): Promise<void> {
   try {

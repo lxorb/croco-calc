@@ -1,4 +1,4 @@
-import { CustomTextSettings } from "@monkeytype/schemas/results";
+import { CustomTextSettings } from "@croco-calc/schemas/results";
 
 export function canQuickRestart(
   mode: string,

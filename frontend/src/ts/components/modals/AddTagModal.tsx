@@ -1,4 +1,4 @@
-import { TagNameSchema } from "@monkeytype/schemas/users";
+import { TagNameSchema } from "@croco-calc/schemas/users";
 import { z } from "zod";
 
 import { insertTag } from "../../collections/tags";

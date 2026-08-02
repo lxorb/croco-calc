@@ -1,5 +1,5 @@
-import { XpBreakdown } from "@monkeytype/schemas/results";
-import { isSafeNumber } from "@monkeytype/util/numbers";
+import { XpBreakdown } from "@croco-calc/schemas/results";
+import { isSafeNumber } from "@croco-calc/util/numbers";
 import {
   createSignal,
   For,

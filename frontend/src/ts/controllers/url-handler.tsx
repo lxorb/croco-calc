@@ -8,16 +8,16 @@ import {
   CustomThemeColorsSchema,
   FunboxName,
   FunboxSchema,
-} from "@monkeytype/schemas/configs";
-import { Language } from "@monkeytype/schemas/languages";
-import { CustomTextSettingsSchema } from "@monkeytype/schemas/results";
+} from "@croco-calc/schemas/configs";
+import { Language } from "@croco-calc/schemas/languages";
+import { CustomTextSettingsSchema } from "@croco-calc/schemas/results";
 import {
   DifficultySchema,
   Mode2Schema,
   ModeSchema,
-} from "@monkeytype/schemas/shared";
-import { parseWithSchema as parseJsonWithSchema } from "@monkeytype/util/json";
-import { tryCatchSync } from "@monkeytype/util/trycatch";
+} from "@croco-calc/schemas/shared";
+import { parseWithSchema as parseJsonWithSchema } from "@croco-calc/util/json";
+import { tryCatchSync } from "@croco-calc/util/trycatch";
 import { decompressFromURI } from "lz-ts";
 import { z } from "zod";
 

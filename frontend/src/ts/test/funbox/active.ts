@@ -1,6 +1,6 @@
 import { Config } from "../../config/store";
 import { FunboxProperty, getFunboxObject } from "@monkeytype/funbox";
-import { FunboxName } from "@monkeytype/schemas/configs";
+import { FunboxName } from "@croco-calc/schemas/configs";
 
 const metadata = getFunboxObject();
 

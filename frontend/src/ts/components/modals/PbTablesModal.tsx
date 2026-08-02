@@ -1,4 +1,4 @@
-import { Mode2, Mode, PersonalBest } from "@monkeytype/schemas/shared";
+import { Mode2, Mode, PersonalBest } from "@croco-calc/schemas/shared";
 import { createColumnHelper } from "@tanstack/solid-table";
 import { format as formatDate } from "date-fns/format";
 import { createMemo, createSignal, JSXElement } from "solid-js";

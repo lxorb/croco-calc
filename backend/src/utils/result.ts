@@ -3,11 +3,11 @@ import {
   CompletedEvent,
   OldChartData,
   Result,
-} from "@monkeytype/schemas/results";
-import { Mode } from "@monkeytype/schemas/shared";
+} from "@croco-calc/schemas/results";
+import { Mode } from "@croco-calc/schemas/shared";
 import { ObjectId } from "mongodb";
 import { WithObjectId } from "./misc";
-import { FunboxName } from "@monkeytype/schemas/configs";
+import { FunboxName } from "@croco-calc/schemas/configs";
 
 export type DBResult = WithObjectId<Result<Mode>> & {
   //legacy values

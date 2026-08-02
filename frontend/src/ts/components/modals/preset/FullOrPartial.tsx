@@ -1,5 +1,5 @@
-import { ConfigGroupNameSchema } from "@monkeytype/schemas/configs";
-import { PresetType } from "@monkeytype/schemas/presets";
+import { ConfigGroupNameSchema } from "@croco-calc/schemas/configs";
+import { PresetType } from "@croco-calc/schemas/presets";
 import { For, JSXElement, Show } from "solid-js";
 
 import { camelCaseToWords } from "../../../utils/strings";

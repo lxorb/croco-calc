@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { Mode, Mode2 } from "@monkeytype/schemas/shared";
+import { Mode, Mode2 } from "@croco-calc/schemas/shared";
 import * as DailyLeaderboards from "../../../src/utils/daily-leaderboards";
 import { cleanupKeys, redisSetup } from "../redis";
-import { Language } from "@monkeytype/schemas/languages";
+import { Language } from "@croco-calc/schemas/languages";
 
-import { RedisDailyLeaderboardEntry } from "@monkeytype/schemas/leaderboards";
+import { RedisDailyLeaderboardEntry } from "@croco-calc/schemas/leaderboards";
 import { ObjectId } from "mongodb";
-import { Configuration } from "@monkeytype/schemas/configuration";
+import { Configuration } from "@croco-calc/schemas/configuration";
 
 const dailyLeaderboardsConfig: Configuration["dailyLeaderboards"] = {
   enabled: true,

@@ -1,4 +1,4 @@
-import { CustomTheme } from "@monkeytype/schemas/users";
+import { CustomTheme } from "@croco-calc/schemas/users";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import {
   createCollection,

@@ -1,4 +1,4 @@
-import { Config, ConfigKey, ConfigSchema } from "@monkeytype/schemas/configs";
+import { Config, ConfigKey, ConfigSchema } from "@croco-calc/schemas/configs";
 import { createForm } from "@tanstack/solid-form";
 import { For, JSXElement } from "solid-js";
 import { z } from "zod";

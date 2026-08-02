@@ -1,5 +1,5 @@
-import { Mode, PersonalBest, PersonalBests } from "@monkeytype/schemas/shared";
-import { Result as ResultType } from "@monkeytype/schemas/results";
+import { Mode, PersonalBest, PersonalBests } from "@croco-calc/schemas/shared";
+import { Result as ResultType } from "@croco-calc/schemas/results";
 import { getFunbox } from "@monkeytype/funbox";
 
 export type LbPersonalBests = {

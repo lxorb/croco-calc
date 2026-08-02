@@ -6,7 +6,7 @@ import {
   EndpointMetadata,
   RequestAuthenticationOptions,
   PermissionId,
-} from "@monkeytype/contracts/util/api";
+} from "@croco-calc/contracts/util/api";
 import { isDevEnvironment } from "../utils/misc";
 import { AsyncTsRestRequestHandler, getMetadata } from "./utility";
 import { TsRestRequestWithContext } from "../api/types";

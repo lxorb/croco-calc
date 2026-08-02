@@ -7,21 +7,21 @@ import {
   ModifiableTestActivityCalendar,
 } from "./elements/test-activity-calendar";
 import { showLoaderBar, hideLoaderBar } from "./states/loader-bar";
-import { Badge } from "@monkeytype/schemas/users";
-import { Difficulty } from "@monkeytype/schemas/configs";
+import { Badge } from "@croco-calc/schemas/users";
+import { Difficulty } from "@croco-calc/schemas/configs";
 import {
   Mode,
   Mode2,
   PersonalBest,
   PersonalBests,
-} from "@monkeytype/schemas/shared";
+} from "@croco-calc/schemas/shared";
 import {
   getDefaultSnapshot,
   Snapshot,
   SnapshotResult,
 } from "./constants/default-snapshot";
 import { getFirstDayOfTheWeek } from "./utils/date-and-time";
-import { Language } from "@monkeytype/schemas/languages";
+import { Language } from "@croco-calc/schemas/languages";
 import { authEvent } from "./events/auth";
 import { configurationPromise } from "./ape/server-configuration";
 import { insertLocalResult } from "./collections/results";
@@ -29,7 +29,7 @@ import {
   setLastResult,
   _setSnapshot as setSolidSnapshot,
 } from "./states/snapshot";
-import { XpBreakdown } from "@monkeytype/schemas/results";
+import { XpBreakdown } from "@croco-calc/schemas/results";
 import { setXpBarData } from "./states/header";
 import { FunboxMetadata } from "@monkeytype/funbox";
 import { __nonReactive } from "./collections/tags";

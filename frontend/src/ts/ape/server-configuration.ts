@@ -1,4 +1,4 @@
-import { Configuration } from "@monkeytype/schemas/configuration";
+import { Configuration } from "@croco-calc/schemas/configuration";
 import { promiseWithResolvers } from "../utils/misc";
 import { queryClient } from "../queries";
 import { getServerConfigurationQueryOptions } from "../queries/server-configuration";

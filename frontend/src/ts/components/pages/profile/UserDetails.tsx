@@ -2,13 +2,13 @@ import {
   TypingStats as TypingStatsType,
   UserProfile,
   UserProfileDetails,
-} from "@monkeytype/schemas/users";
+} from "@croco-calc/schemas/users";
 import {
   isToday as dateIsToday,
   isYesterday as dateIsYesterday,
   getCurrentDayTimestamp,
-} from "@monkeytype/util/date-and-time";
-import { isSafeNumber } from "@monkeytype/util/numbers";
+} from "@croco-calc/util/date-and-time";
+import { isSafeNumber } from "@croco-calc/util/numbers";
 import { differenceInDays } from "date-fns/differenceInDays";
 import { formatDate } from "date-fns/format";
 import { formatDistanceToNowStrict } from "date-fns/formatDistanceToNowStrict";

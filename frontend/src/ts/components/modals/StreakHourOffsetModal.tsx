@@ -1,4 +1,4 @@
-import { StreakHourOffsetSchema } from "@monkeytype/schemas/users";
+import { StreakHourOffsetSchema } from "@croco-calc/schemas/users";
 import { createForm } from "@tanstack/solid-form";
 
 import Ape from "../../ape";

@@ -1,4 +1,4 @@
-import { ResultFilters, ResultFiltersKeys } from "@monkeytype/schemas/users";
+import { ResultFilters, ResultFiltersKeys } from "@croco-calc/schemas/users";
 import { useLiveQuery } from "@tanstack/solid-db";
 import { Accessor, createMemo, JSXElement } from "solid-js";
 

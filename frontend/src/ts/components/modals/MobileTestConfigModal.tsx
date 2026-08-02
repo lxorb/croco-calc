@@ -1,8 +1,8 @@
 import type {
   QuoteLength,
   QuoteLengthConfig,
-} from "@monkeytype/schemas/configs";
-import type { Mode } from "@monkeytype/schemas/shared";
+} from "@croco-calc/schemas/configs";
+import type { Mode } from "@croco-calc/schemas/shared";
 
 import { For, JSXElement, Show } from "solid-js";
 

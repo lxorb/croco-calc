@@ -28,7 +28,7 @@ import {
   requestDebouncedAnimationFrame,
 } from "../utils/debounced-animation-frame";
 import * as SoundController from "../controllers/sound-controller";
-import * as Numbers from "@monkeytype/util/numbers";
+import * as Numbers from "@croco-calc/util/numbers";
 import { highlight } from "../events/keymap";
 import * as Focus from "../test/focus";
 import {

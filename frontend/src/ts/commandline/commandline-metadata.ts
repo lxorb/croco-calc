@@ -1,4 +1,4 @@
-import * as ConfigSchemas from "@monkeytype/schemas/configs";
+import * as ConfigSchemas from "@croco-calc/schemas/configs";
 import * as SoundController from "../controllers/sound-controller";
 import * as TestLogic from "../test/test-logic";
 import {
@@ -11,10 +11,10 @@ import { Config } from "../config/store";
 import { get as getTypingSpeedUnit } from "../utils/typing-speed-units";
 import { getActivePage, isAuthenticated } from "../states/core";
 import { Fonts } from "../constants/fonts";
-import { KnownFontName } from "@monkeytype/schemas/fonts";
+import { KnownFontName } from "@croco-calc/schemas/fonts";
 import * as UI from "../ui";
 import { Validation } from "../types/validation";
-import { typedKeys } from "@monkeytype/util/objects";
+import { typedKeys } from "@croco-calc/util/objects";
 
 //TODO: remove display property and instead use optionsMetadata from configMetadata
 // eventually this file should be fully merged into config metadata, probably under the 'commandline' property

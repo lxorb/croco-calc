@@ -11,8 +11,8 @@ import {
 } from "../../config/setters";
 import * as MemoryTimer from "./memory-funbox-timer";
 import * as FunboxMemory from "./funbox-memory";
-import { HighlightMode, FunboxName } from "@monkeytype/schemas/configs";
-import { Mode } from "@monkeytype/schemas/shared";
+import { HighlightMode, FunboxName } from "@croco-calc/schemas/configs";
+import { Mode } from "@croco-calc/schemas/shared";
 import { checkCompatibility, checkForcedConfig } from "@monkeytype/funbox";
 import {
   getAllFunboxes,
@@ -22,7 +22,7 @@ import {
   isFunboxActiveWithProperty,
   getActiveFunboxesWithProperty,
 } from "./list";
-import { tryCatch } from "@monkeytype/util/trycatch";
+import { tryCatch } from "@croco-calc/util/trycatch";
 import { qs, qsa } from "../../utils/dom";
 import { configEvent } from "../../events/config";
 

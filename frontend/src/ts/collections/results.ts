@@ -1,6 +1,6 @@
-import { ResultMinified } from "@monkeytype/schemas/results";
-import { Difficulty, Mode, Mode2 } from "@monkeytype/schemas/shared";
-import { ResultFilters } from "@monkeytype/schemas/users";
+import { ResultMinified } from "@croco-calc/schemas/results";
+import { Difficulty, Mode, Mode2 } from "@croco-calc/schemas/shared";
+import { ResultFilters } from "@croco-calc/schemas/users";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import {
   avg,

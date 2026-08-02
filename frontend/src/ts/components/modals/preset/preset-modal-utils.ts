@@ -3,8 +3,8 @@ import {
   ConfigGroupNameSchema,
   ConfigKey,
   Config as ConfigType,
-} from "@monkeytype/schemas/configs";
-import { PresetType } from "@monkeytype/schemas/presets";
+} from "@croco-calc/schemas/configs";
+import { PresetType } from "@croco-calc/schemas/presets";
 
 import { __nonReactive as __nonReactiveTags } from "../../../collections/tags";
 import { configMetadata } from "../../../config/metadata";

@@ -10,7 +10,7 @@ import {
 
 import { addLog } from "./logs";
 import { Collection, Document, ObjectId } from "mongodb";
-import { LeaderboardEntry } from "@monkeytype/schemas/leaderboards";
+import { LeaderboardEntry } from "@croco-calc/schemas/leaderboards";
 import { DBUser, getUsersCollection } from "./user";
 import MonkeyError from "../utils/error";
 import { aggregateWithAcceptedConnections } from "./connections";

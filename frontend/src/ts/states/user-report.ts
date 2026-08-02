@@ -1,4 +1,4 @@
-import { UserProfile } from "@monkeytype/schemas/users";
+import { UserProfile } from "@croco-calc/schemas/users";
 import { createSignal } from "solid-js";
 
 export const [getUserToReport, setUserToReport] =

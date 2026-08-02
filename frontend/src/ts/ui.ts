@@ -11,7 +11,7 @@ import {
 } from "./states/core";
 import { isDevEnvironment } from "./utils/env";
 import { canQuickRestart } from "./utils/quick-restart";
-import { FontName } from "@monkeytype/schemas/fonts";
+import { FontName } from "@croco-calc/schemas/fonts";
 import { qs, qsr } from "./utils/dom";
 import { createEffect } from "solid-js";
 import fileStorage from "./utils/file-storage";

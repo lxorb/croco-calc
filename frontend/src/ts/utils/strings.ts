@@ -1,4 +1,4 @@
-import { Language } from "@monkeytype/schemas/languages";
+import { Language } from "@croco-calc/schemas/languages";
 
 /**
  * Removes accents from a string.

@@ -1,4 +1,4 @@
-import { Config } from "@monkeytype/schemas/configs";
+import { Config } from "@croco-calc/schemas/configs";
 import { createEvent } from "../hooks/createEvent";
 
 export type ConfigEventKey =

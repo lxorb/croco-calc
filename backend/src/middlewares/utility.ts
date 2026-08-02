@@ -1,4 +1,4 @@
-import { EndpointMetadata } from "@monkeytype/contracts/util/api";
+import { EndpointMetadata } from "@croco-calc/contracts/util/api";
 import { AppRoute, AppRouter } from "@ts-rest/core";
 import { TsRestRequestHandler } from "@ts-rest/express";
 import type { NextFunction, Request, RequestHandler, Response } from "express";

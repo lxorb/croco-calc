@@ -1,6 +1,6 @@
 import { initContract } from "@ts-rest/core";
 import { z } from "zod";
-import { PartialConfigSchema } from "@monkeytype/schemas/configs";
+import { PartialConfigSchema } from "@croco-calc/schemas/configs";
 import {
   CommonResponses,
   meta,

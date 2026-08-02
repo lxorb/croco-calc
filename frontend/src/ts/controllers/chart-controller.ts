@@ -66,7 +66,7 @@ import { Theme } from "../constants/themes";
 import { createDebouncedEffectOn } from "../hooks/effects";
 import { getWordIndexesForSecond } from "../test/events/stats";
 import { getLastEventLog } from "../states/test";
-import { typedKeys } from "@monkeytype/util/objects";
+import { typedKeys } from "@croco-calc/util/objects";
 
 export class ChartWithUpdateColors<
   TType extends ChartType = ChartType,

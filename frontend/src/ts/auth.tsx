@@ -1,6 +1,6 @@
-import { NewPasswordSchema, PasswordSchema } from "@monkeytype/schemas/users";
-import { typedKeys } from "@monkeytype/util/objects";
-import { tryCatch } from "@monkeytype/util/trycatch";
+import { NewPasswordSchema, PasswordSchema } from "@croco-calc/schemas/users";
+import { typedKeys } from "@croco-calc/util/objects";
+import { tryCatch } from "@croco-calc/util/trycatch";
 import { FirebaseError } from "firebase/app";
 import {
   AuthProvider,

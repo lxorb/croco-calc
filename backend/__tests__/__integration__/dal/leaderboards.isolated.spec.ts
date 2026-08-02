@@ -4,7 +4,7 @@ import * as UserDal from "../../../src/dal/user";
 import * as LeaderboardsDal from "../../../src/dal/leaderboards";
 import * as PublicDal from "../../../src/dal/public";
 import type { DBLeaderboardEntry } from "../../../src/dal/leaderboards";
-import type { PersonalBest } from "@monkeytype/schemas/shared";
+import type { PersonalBest } from "@croco-calc/schemas/shared";
 
 import * as DB from "../../../src/init/db";
 import { LbPersonalBests } from "../../../src/utils/pb";
@@ -12,7 +12,7 @@ import { LbPersonalBests } from "../../../src/utils/pb";
 import { pb } from "../../__testData__/users";
 import { createConnection } from "../../__testData__/connections";
 import { omit } from "../../../src/utils/misc";
-import { LeaderboardEntry } from "@monkeytype/schemas/leaderboards";
+import { LeaderboardEntry } from "@croco-calc/schemas/leaderboards";
 
 describe("LeaderboardsDal", () => {
   afterEach(async () => {

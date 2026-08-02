@@ -27,15 +27,15 @@ import {
   UserEmailSchema,
   UserNameSchema,
   FriendSchema,
-} from "@monkeytype/schemas/users";
+} from "@croco-calc/schemas/users";
 import {
   Mode2Schema,
   ModeSchema,
   PersonalBestSchema,
-} from "@monkeytype/schemas/shared";
-import { IdSchema, StringNumberSchema } from "@monkeytype/schemas/util";
-import { LanguageSchema } from "@monkeytype/schemas/languages";
-import { CustomThemeColorsSchema } from "@monkeytype/schemas/configs";
+} from "@croco-calc/schemas/shared";
+import { IdSchema, StringNumberSchema } from "@croco-calc/schemas/util";
+import { LanguageSchema } from "@croco-calc/schemas/languages";
+import { CustomThemeColorsSchema } from "@croco-calc/schemas/configs";
 
 export const GetUserResponseSchema = responseWithData(
   UserSchema.extend({

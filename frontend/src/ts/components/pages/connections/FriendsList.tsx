@@ -1,6 +1,6 @@
-import { PersonalBest } from "@monkeytype/schemas/shared";
-import { Friend, UserNameSchema } from "@monkeytype/schemas/users";
-import { isSafeNumber } from "@monkeytype/util/numbers";
+import { PersonalBest } from "@croco-calc/schemas/shared";
+import { Friend, UserNameSchema } from "@croco-calc/schemas/users";
+import { isSafeNumber } from "@croco-calc/util/numbers";
 import { useQuery } from "@tanstack/solid-query";
 import { createColumnHelper } from "@tanstack/solid-table";
 import { format as dateFormat } from "date-fns/format";

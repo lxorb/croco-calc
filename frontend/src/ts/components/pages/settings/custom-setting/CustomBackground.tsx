@@ -1,7 +1,7 @@
 import {
   ConfigSchema,
   CustomBackgroundSchema,
-} from "@monkeytype/schemas/configs";
+} from "@croco-calc/schemas/configs";
 import { createForm } from "@tanstack/solid-form";
 import { createResource, JSXElement, For, Show } from "solid-js";
 

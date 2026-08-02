@@ -1,9 +1,9 @@
 import { get as getTypingSpeedUnit } from "../utils/typing-speed-units";
-import * as Numbers from "@monkeytype/util/numbers";
+import * as Numbers from "@croco-calc/util/numbers";
 import {
   Config as ConfigType,
   TypingSpeedUnit,
-} from "@monkeytype/schemas/configs";
+} from "@croco-calc/schemas/configs";
 
 export type FormatOptions = {
   showDecimalPlaces?: boolean;

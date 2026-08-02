@@ -1,4 +1,4 @@
-import { Language as LanguageSchema } from "@monkeytype/schemas/languages";
+import { Language as LanguageSchema } from "@croco-calc/schemas/languages";
 import { Optgroup } from "slim-select/store";
 import { JSXElement } from "solid-js";
 

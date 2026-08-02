@@ -14,9 +14,9 @@ import {
   QuoteRatingSchema,
   QuoteReportReasonSchema,
   QuoteSchema,
-} from "@monkeytype/schemas/quotes";
-import { IdSchema, NullableStringSchema } from "@monkeytype/schemas/util";
-import { LanguageSchema } from "@monkeytype/schemas/languages";
+} from "@croco-calc/schemas/quotes";
+import { IdSchema, NullableStringSchema } from "@croco-calc/schemas/util";
+import { LanguageSchema } from "@croco-calc/schemas/languages";
 
 export const GetQuotesResponseSchema = responseWithData(z.array(QuoteSchema));
 export type GetQuotesResponse = z.infer<typeof GetQuotesResponseSchema>;

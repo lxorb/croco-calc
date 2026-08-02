@@ -1,5 +1,5 @@
-import { RequireConfiguration } from "@monkeytype/contracts/require-configuration/index";
-import { Configuration } from "@monkeytype/schemas/configuration";
+import { RequireConfiguration } from "@croco-calc/contracts/require-configuration/index";
+import { Configuration } from "@croco-calc/schemas/configuration";
 import { Response } from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TsRestRequestWithContext } from "../../src/api/types";

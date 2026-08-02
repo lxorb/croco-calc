@@ -1,4 +1,4 @@
-import { CustomTheme, CustomThemeNameSchema } from "@monkeytype/schemas/users";
+import { CustomTheme, CustomThemeNameSchema } from "@croco-calc/schemas/users";
 import { For, JSXElement, Show, untrack } from "solid-js";
 import { debounce } from "throttle-debounce";
 import { z } from "zod";

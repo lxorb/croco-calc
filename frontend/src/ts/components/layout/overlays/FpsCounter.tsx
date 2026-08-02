@@ -1,4 +1,4 @@
-import { roundTo2 } from "@monkeytype/util/numbers";
+import { roundTo2 } from "@croco-calc/util/numbers";
 import { JSX, createSignal, createEffect, onCleanup, Show } from "solid-js";
 
 const [isVisible, setVisible] = createSignal(false);

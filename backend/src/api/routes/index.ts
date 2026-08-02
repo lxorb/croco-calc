@@ -1,4 +1,4 @@
-import { contract } from "@monkeytype/contracts/index";
+import { contract } from "@croco-calc/contracts/index";
 import psas from "./psas";
 import publicStats from "./public";
 import users from "./users";

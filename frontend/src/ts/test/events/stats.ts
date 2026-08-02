@@ -1,7 +1,7 @@
 import { CharCounts, countChars, isSpace } from "../../utils/strings";
 import { getEventsForWord, getEventsPerWord, getInputFromDom } from "./helpers";
 import { calculateWpm } from "../../utils/numbers";
-import { roundTo2 } from "@monkeytype/util/numbers";
+import { roundTo2 } from "@croco-calc/util/numbers";
 import { EventLog, TestEventNoMs } from "./types";
 import Hangul from "hangul-js";
 

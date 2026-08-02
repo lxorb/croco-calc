@@ -5,7 +5,7 @@ import {
   ConfigurationSchemaResponse,
   GetConfigurationResponse,
   PatchConfigurationRequest,
-} from "@monkeytype/contracts/configuration";
+} from "@croco-calc/contracts/configuration";
 import MonkeyError from "../../utils/error";
 import { MonkeyRequest } from "../types";
 

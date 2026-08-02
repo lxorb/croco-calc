@@ -1,10 +1,10 @@
-import { QuoteLength } from "@monkeytype/schemas/configs";
-import { PresetNameSchema } from "@monkeytype/schemas/presets";
+import { QuoteLength } from "@croco-calc/schemas/configs";
+import { PresetNameSchema } from "@croco-calc/schemas/presets";
 import {
   ResultFilters,
   ResultFiltersGroupItem,
   ResultFiltersKeys,
-} from "@monkeytype/schemas/users";
+} from "@croco-calc/schemas/users";
 import { createMemo, createSignal, For, JSXElement, Show } from "solid-js";
 import { SetStoreFunction, unwrap } from "solid-js/store";
 import { z } from "zod";

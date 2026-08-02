@@ -1,4 +1,4 @@
-import { ThemeName } from "@monkeytype/schemas/configs";
+import { ThemeName } from "@croco-calc/schemas/configs";
 import { JSXElement, Show } from "solid-js";
 
 import { configMetadata } from "../../../../config/metadata";

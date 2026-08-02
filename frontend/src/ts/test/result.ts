@@ -22,7 +22,7 @@ import * as SlowTimer from "../legacy-states/slow-timer";
 import * as DateTime from "../utils/date-and-time";
 import * as Misc from "../utils/misc";
 import * as Strings from "../utils/strings";
-import * as Numbers from "@monkeytype/util/numbers";
+import * as Numbers from "@croco-calc/util/numbers";
 import * as Arrays from "../utils/arrays";
 import { get as getTypingSpeedUnit } from "../utils/typing-speed-units";
 import * as PbCrown from "./pb-crown";
@@ -39,7 +39,7 @@ import type {
   LabelPosition,
 } from "chartjs-plugin-annotation";
 import Ape from "../ape";
-import { CompletedEvent } from "@monkeytype/schemas/results";
+import { CompletedEvent } from "@croco-calc/schemas/results";
 import { getActiveFunboxes, isFunboxActiveWithProperty } from "./funbox/list";
 import { getFunbox } from "@monkeytype/funbox";
 import {
@@ -48,7 +48,7 @@ import {
   type TagItem,
   __nonReactive,
 } from "../collections/tags";
-import { Language } from "@monkeytype/schemas/languages";
+import { Language } from "@croco-calc/schemas/languages";
 import { canQuickRestart as canQuickRestartFn } from "../utils/quick-restart";
 import { LocalStorageWithSchema } from "../utils/local-storage-with-schema";
 import { z } from "zod";

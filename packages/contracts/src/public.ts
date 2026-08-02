@@ -4,9 +4,9 @@ import { CommonResponses, meta, responseWithData } from "./util/api";
 import {
   SpeedHistogramSchema,
   TypingStatsSchema,
-} from "@monkeytype/schemas/public";
-import { Mode2Schema, ModeSchema } from "@monkeytype/schemas/shared";
-import { LanguageSchema } from "@monkeytype/schemas/languages";
+} from "@croco-calc/schemas/public";
+import { Mode2Schema, ModeSchema } from "@croco-calc/schemas/shared";
+import { LanguageSchema } from "@croco-calc/schemas/languages";
 
 export const GetSpeedHistogramQuerySchema = z
   .object({

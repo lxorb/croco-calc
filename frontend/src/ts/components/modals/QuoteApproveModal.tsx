@@ -1,4 +1,4 @@
-import { Quote } from "@monkeytype/schemas/quotes";
+import { Quote } from "@croco-calc/schemas/quotes";
 import { createForm } from "@tanstack/solid-form";
 import { format } from "date-fns/format";
 import { JSXElement, createSignal, For, Show } from "solid-js";

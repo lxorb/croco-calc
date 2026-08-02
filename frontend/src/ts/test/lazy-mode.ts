@@ -1,4 +1,4 @@
-import { LanguageObject } from "@monkeytype/schemas/languages";
+import { LanguageObject } from "@croco-calc/schemas/languages";
 export type Accents = LanguageObject["additionalAccents"];
 
 const accents: Accents = [

@@ -1,4 +1,4 @@
-import { Connection } from "@monkeytype/schemas/connections";
+import { Connection } from "@croco-calc/schemas/connections";
 import { createColumnHelper } from "@tanstack/solid-table";
 import { format as dateFormat } from "date-fns/format";
 import { createMemo, Show } from "solid-js";

@@ -1,5 +1,5 @@
-import { QuoteTextSchema } from "@monkeytype/contracts/quotes";
-import { Language } from "@monkeytype/schemas/languages";
+import { QuoteTextSchema } from "@croco-calc/contracts/quotes";
+import { Language } from "@croco-calc/schemas/languages";
 import { createForm } from "@tanstack/solid-form";
 import { JSXElement } from "solid-js";
 

@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { Mode } from "@monkeytype/schemas/shared";
+import { Mode } from "@croco-calc/schemas/shared";
 
 import { showModal } from "./modals";
 

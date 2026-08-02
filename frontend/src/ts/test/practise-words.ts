@@ -5,8 +5,8 @@ import { Config } from "../config/store";
 import { setConfig } from "../config/setters";
 import * as CustomText from "./custom-text";
 import { configEvent } from "../events/config";
-import { Mode } from "@monkeytype/schemas/shared";
-import { CustomTextSettings } from "@monkeytype/schemas/results";
+import { Mode } from "@croco-calc/schemas/shared";
+import { CustomTextSettings } from "@croco-calc/schemas/results";
 import {
   getInputHistory,
   getMissedWords,

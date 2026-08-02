@@ -1,14 +1,14 @@
 import { generateOpenApi } from "@ts-rest/open-api";
-import { COMPATIBILITY_CHECK, contract } from "@monkeytype/contracts/index";
+import { COMPATIBILITY_CHECK, contract } from "@croco-calc/contracts/index";
 import { writeFileSync, mkdirSync } from "fs";
-import { EndpointMetadata, PermissionId } from "@monkeytype/contracts/util/api";
+import { EndpointMetadata, PermissionId } from "@croco-calc/contracts/util/api";
 import type { OpenAPIObject, OperationObject } from "openapi3-ts";
 import {
   RateLimitIds,
   getLimits,
   RateLimiterId,
   Window,
-} from "@monkeytype/contracts/rate-limit/index";
+} from "@croco-calc/contracts/rate-limit/index";
 import { formatDuration } from "date-fns";
 
 type SecurityRequirementObject = {

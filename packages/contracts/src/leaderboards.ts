@@ -9,11 +9,11 @@ import {
 import {
   LeaderboardEntrySchema,
   XpLeaderboardEntrySchema,
-} from "@monkeytype/schemas/leaderboards";
-import { Mode2Schema, ModeSchema } from "@monkeytype/schemas/shared";
+} from "@croco-calc/schemas/leaderboards";
+import { Mode2Schema, ModeSchema } from "@croco-calc/schemas/shared";
 import { initContract } from "@ts-rest/core";
-import { LanguageSchema } from "@monkeytype/schemas/languages";
-import { PageNumberSchema } from "@monkeytype/schemas/util";
+import { LanguageSchema } from "@croco-calc/schemas/languages";
+import { PageNumberSchema } from "@croco-calc/schemas/util";
 
 const LanguageAndModeQuerySchema = z.object({
   language: LanguageSchema,

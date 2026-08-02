@@ -1,13 +1,13 @@
-import { User, UserProfileDetails } from "@monkeytype/schemas/users";
+import { User, UserProfileDetails } from "@croco-calc/schemas/users";
 import { getDefaultConfig } from "./default-config";
-import { Mode } from "@monkeytype/schemas/shared";
-import { Result } from "@monkeytype/schemas/results";
-import { Difficulty, FunboxName } from "@monkeytype/schemas/configs";
+import { Mode } from "@croco-calc/schemas/shared";
+import { Result } from "@croco-calc/schemas/results";
+import { Difficulty, FunboxName } from "@croco-calc/schemas/configs";
 import {
   ModifiableTestActivityCalendar,
   TestActivityCalendar,
 } from "../elements/test-activity-calendar";
-import { Language } from "@monkeytype/schemas/languages";
+import { Language } from "@croco-calc/schemas/languages";
 
 export type SnapshotResult<M extends Mode> = Omit<
   Result<M>,

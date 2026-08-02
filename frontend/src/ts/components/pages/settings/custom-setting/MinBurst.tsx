@@ -1,4 +1,4 @@
-import { MinimumBurstCustomSpeedSchema } from "@monkeytype/schemas/configs";
+import { MinimumBurstCustomSpeedSchema } from "@croco-calc/schemas/configs";
 import { createForm } from "@tanstack/solid-form";
 import { JSXElement } from "solid-js";
 

@@ -1,4 +1,4 @@
-import { Configuration } from "@monkeytype/schemas/configuration";
+import { Configuration } from "@croco-calc/schemas/configuration";
 
 type BooleanPaths<T, P extends string = ""> = {
   [K in keyof T]: T[K] extends boolean

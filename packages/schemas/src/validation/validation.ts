@@ -1,5 +1,5 @@
 import { replaceHomoglyphs } from "./homoglyphs";
-import { sanitizeString } from "@monkeytype/util/strings";
+import { sanitizeString } from "@croco-calc/util/strings";
 import { ZodEffects, ZodString } from "zod";
 
 // Sorry for the bad words

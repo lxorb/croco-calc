@@ -1,9 +1,9 @@
 import { lastElementFromArray } from "./arrays";
-import { Config } from "@monkeytype/schemas/configs";
-import { Mode, Mode2, PersonalBests } from "@monkeytype/schemas/shared";
-import { Result } from "@monkeytype/schemas/results";
-import { RankAndCount } from "@monkeytype/schemas/users";
-import { roundTo2 } from "@monkeytype/util/numbers";
+import { Config } from "@croco-calc/schemas/configs";
+import { Mode, Mode2, PersonalBests } from "@croco-calc/schemas/shared";
+import { Result } from "@croco-calc/schemas/results";
+import { RankAndCount } from "@croco-calc/schemas/users";
+import { roundTo2 } from "@croco-calc/util/numbers";
 import { animate, AnimationParams } from "animejs";
 import { ElementWithUtils } from "./dom";
 import { isDevEnvironment } from "./env";

@@ -18,7 +18,7 @@ import {
   get as getServerConfiguration,
 } from "../ape/server-configuration";
 import { getSnapshot } from "../states/snapshot";
-import { Connection } from "@monkeytype/schemas/connections";
+import { Connection } from "@croco-calc/schemas/connections";
 import { showNoticeNotification } from "../states/notifications";
 import { invalidateFriendsList } from "../queries/friends";
 

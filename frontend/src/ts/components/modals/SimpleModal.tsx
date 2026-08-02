@@ -1,4 +1,4 @@
-import { typedEntries } from "@monkeytype/util/objects";
+import { typedEntries } from "@croco-calc/util/objects";
 import { AnyFieldApi, createForm } from "@tanstack/solid-form";
 import {
   Accessor,

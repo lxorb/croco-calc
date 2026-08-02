@@ -3,18 +3,18 @@ import { ObjectId } from "mongodb";
 import Logger from "../utils/logger";
 import { identity, isPlainObject, omit } from "../utils/misc";
 import { BASE_CONFIGURATION } from "../constants/base-configuration";
-import { Configuration } from "@monkeytype/schemas/configuration";
+import { Configuration } from "@croco-calc/schemas/configuration";
 import { addLog } from "../dal/logs";
 import {
   PartialConfiguration,
   PartialConfigurationSchema,
-} from "@monkeytype/contracts/configuration";
+} from "@croco-calc/contracts/configuration";
 import { getErrorMessage } from "../utils/error";
 import { join } from "path";
 import { existsSync, readFileSync } from "fs";
-import { parseWithSchema as parseJsonWithSchema } from "@monkeytype/util/json";
+import { parseWithSchema as parseJsonWithSchema } from "@croco-calc/util/json";
 import { z } from "zod";
-import { intersect } from "@monkeytype/util/arrays";
+import { intersect } from "@croco-calc/util/arrays";
 
 const CONFIG_UPDATE_INTERVAL = 10 * 60 * 1000; // 10 Minutes
 const SERVER_CONFIG_FILE_PATH = join(

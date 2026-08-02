@@ -1,8 +1,8 @@
 import {
   ConfigGroupName,
   ConfigGroupNameSchema,
-} from "@monkeytype/schemas/configs";
-import { PresetNameSchema, PresetType } from "@monkeytype/schemas/presets";
+} from "@croco-calc/schemas/configs";
+import { PresetNameSchema, PresetType } from "@croco-calc/schemas/presets";
 import { createForm } from "@tanstack/solid-form";
 import { createSignal, JSXElement } from "solid-js";
 

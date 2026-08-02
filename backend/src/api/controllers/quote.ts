@@ -19,10 +19,10 @@ import {
   IsSubmissionEnabledResponse,
   RejectQuoteRequest,
   ReportQuoteRequest,
-} from "@monkeytype/contracts/quotes";
+} from "@croco-calc/contracts/quotes";
 import { replaceObjectId, replaceObjectIds } from "../../utils/misc";
 import { MonkeyRequest } from "../types";
-import { Language } from "@monkeytype/schemas/languages";
+import { Language } from "@croco-calc/schemas/languages";
 
 async function verifyCaptcha(captcha: string): Promise<void> {
   if (!(await verify(captcha))) {

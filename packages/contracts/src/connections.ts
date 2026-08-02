@@ -4,7 +4,7 @@ import {
   ConnectionSchema,
   ConnectionStatusSchema,
   ConnectionTypeSchema,
-} from "@monkeytype/schemas/connections";
+} from "@croco-calc/schemas/connections";
 import { z } from "zod";
 import {
   CommonResponses,
@@ -12,7 +12,7 @@ import {
   MonkeyResponseSchema,
   responseWithData,
 } from "./util/api";
-import { IdSchema } from "@monkeytype/schemas/util";
+import { IdSchema } from "@croco-calc/schemas/util";
 
 const c = initContract();
 

@@ -29,7 +29,7 @@ import { buildCommandForConfigKey } from "./util";
 import { CommandlineConfigMetadataObject } from "./commandline-metadata";
 import { isAuthAvailable, signOut } from "../firebase";
 import { isAuthenticated } from "../states/core";
-import { ConfigKey } from "@monkeytype/schemas/configs";
+import { ConfigKey } from "@croco-calc/schemas/configs";
 import {
   hideFpsCounter,
   showFpsCounter,

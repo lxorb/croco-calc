@@ -1,5 +1,5 @@
-import { CompletedEvent } from "@monkeytype/schemas/results";
-import { Mode } from "@monkeytype/schemas/shared";
+import { CompletedEvent } from "@croco-calc/schemas/results";
+import { Mode } from "@croco-calc/schemas/shared";
 import objectHash from "object-hash";
 import { createMemo, JSX } from "solid-js";
 

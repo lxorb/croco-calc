@@ -15,12 +15,12 @@ import * as SlowTimer from "../legacy-states/slow-timer";
 import { timerEvent } from "../events/timer";
 import { highlight } from "../events/keymap";
 import * as LayoutfluidFunboxTimer from "../test/funbox/layoutfluid-funbox-timer";
-import { KeymapLayout, Layout } from "@monkeytype/schemas/configs";
+import { KeymapLayout, Layout } from "@croco-calc/schemas/configs";
 import * as SoundController from "../controllers/sound-controller";
 import { clearLowFpsMode, setLowFpsMode } from "../anim";
 import { createTimer } from "animejs";
 import { buildEventLog, getCurrentInput, logTestEvent } from "./events/data";
-import { roundTo2 } from "@monkeytype/util/numbers";
+import { roundTo2 } from "@croco-calc/util/numbers";
 import {
   getLiveCachedAccuracy,
   getLiveCachedTestDurationMs,

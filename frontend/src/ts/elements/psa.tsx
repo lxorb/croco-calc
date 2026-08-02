@@ -1,7 +1,7 @@
-import { PSA } from "@monkeytype/schemas/psas";
-import { IdSchema } from "@monkeytype/schemas/util";
-import { isSafeNumber } from "@monkeytype/util/numbers";
-import { tryCatch } from "@monkeytype/util/trycatch";
+import { PSA } from "@croco-calc/schemas/psas";
+import { IdSchema } from "@croco-calc/schemas/util";
+import { isSafeNumber } from "@croco-calc/util/numbers";
+import { tryCatch } from "@croco-calc/util/trycatch";
 import { format } from "date-fns/format";
 import { z } from "zod";
 

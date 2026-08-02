@@ -1,4 +1,4 @@
-import { KeymapLayout as KeymapLayoutSchema } from "@monkeytype/schemas/configs";
+import { KeymapLayout as KeymapLayoutSchema } from "@croco-calc/schemas/configs";
 import { JSXElement } from "solid-js";
 
 import { configMetadata } from "../../../../config/metadata";
