@@ -1,15 +1,22 @@
 import { z } from "zod";
 import { createSignal } from "solid-js";
 import { LocalStorageWithSchema } from "./utils/local-storage-with-schema";
-import { activateAnalytics } from "./controllers/analytics-controller";
-import { activateSentry } from "./sentry";
-import { isProfilerMode } from "./utils/profiler-mode";
 
+/**
+ * The persisted cookie consent (INV-118h).
+ *
+ * Only the strictly necessary category survives: the `analytics` and `sentry`
+ * flags went with `analytics-controller` (INV-118e) and `sentry.ts` (INV-118d,
+ * A-08), and ads are not built in this stage (CP-006).
+ *
+ * The schema is `.strict()` and there is deliberately no migration — a stored
+ * value carrying the old keys fails to parse, `LocalStorageWithSchema` falls
+ * back to `null`, and the modal asks again. That is the correct behaviour when
+ * the set of things being consented to changes.
+ */
 const AcceptedCookiesSchema = z
   .object({
     security: z.boolean(),
-    analytics: z.boolean(),
-    sentry: z.boolean(),
   })
   .strict()
   .nullable();
@@ -35,12 +42,12 @@ export function setAcceptedCookies(accepted: AcceptedCookies): void {
   activateWhatsAccepted();
 }
 
+/**
+ * Kept as the single place consent is acted on. Nothing is gated on consent
+ * today — the only retained category is required — so this is a no-op, but the
+ * call sites (`index.ts` boot, `setAcceptedCookies`) stay wired up so adding an
+ * optional category later is a one-line change here rather than a hunt.
+ */
 export function activateWhatsAccepted(): void {
-  const accepted = getAcceptedCookies();
-  if (accepted?.analytics) {
-    activateAnalytics();
-  }
-  if (accepted?.sentry && !isProfilerMode()) {
-    void activateSentry();
-  }
+  // nothing optional to activate
 }

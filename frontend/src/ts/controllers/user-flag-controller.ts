@@ -1,30 +1,28 @@
-import { FaSolidIcon } from "../types/font-awesome";
-
 const flags: UserFlag[] = [
   {
-    name: "Prime Ape",
+    name: "Premium",
     description: "Paying for a monthly subscription",
-    icon: "fa-dollar-sign",
+    icon: "ph:currency-dollar-bold",
     test: (it) => it.isPremium === true,
   },
   {
     name: "Banned",
     description: "This account is banned",
-    icon: "fa-gavel",
+    icon: "ph:gavel-bold",
     color: "var(--error-color)",
     test: (it) => it.banned === true,
   },
   {
     name: "LbOptOut",
     description: "This account has opted out of leaderboards",
-    icon: "fa-crown",
+    icon: "ph:crown-bold",
     color: "var(--error-color)",
     test: (it) => it.lbOptOut === true,
   },
   {
     name: "Friend",
     description: "Friend :)",
-    icon: "fa-user-friends",
+    icon: "ph:users-bold",
     test: (it) => it.isFriend === true,
   },
 ];
@@ -39,7 +37,8 @@ export type SupportsFlags = {
 export type UserFlag = {
   readonly name: string;
   readonly description: string;
-  readonly icon: FaSolidIcon;
+  /** An iconify `set:name` id (CP-002, C10). */
+  readonly icon: string;
   readonly color?: string;
   readonly background?: string;
   test(source: SupportsFlags): boolean;
@@ -58,11 +57,16 @@ export function getMatchingFlags(source: SupportsFlags): UserFlag[] {
   const result = flags.filter((it) => it.test(source));
   return result;
 }
+/**
+ * The string form used by the screenshot watermark, which composes raw HTML and
+ * therefore cannot mount the solid `Icon` component. Font awesome's `<i>` glyph
+ * is gone (CP-001), so the flag renders as its name instead of an icon.
+ */
 function toHtml(flag: UserFlag, formatOptions: UserFlagOptions): string {
-  const icon = `<i class="fas ${flag.icon}"></i>`;
+  const label = `<span class="flag-name">${flag.name}</span>`;
 
   if (formatOptions.iconsOnly) {
-    return icon;
+    return label;
   }
 
   const style = [];
@@ -75,7 +79,7 @@ function toHtml(flag: UserFlag, formatOptions: UserFlagOptions): string {
 
   const balloon = `aria-label="${flag.description}" data-balloon-pos="right"`;
 
-  return `<div class="flag" ${balloon} style="${style.join("")}">${icon}</div>`;
+  return `<div class="flag" ${balloon} style="${style.join("")}">${label}</div>`;
 }
 
 export function getHtmlByUserFlags(

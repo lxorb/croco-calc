@@ -55,6 +55,5 @@ export const [getCustomTextIndicator, setCustomTextIndicator] = createSignal<
 export const getFormatting = createMemo(() => {
   return new Formatting({
     alwaysShowDecimalPlaces: getConfig.alwaysShowDecimalPlaces,
-    typingSpeedUnit: getConfig.typingSpeedUnit,
   });
 });

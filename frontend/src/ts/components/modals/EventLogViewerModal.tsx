@@ -832,7 +832,7 @@ function PreviewContent(props: {
         <Button
           variant="text"
           onClick={props.onBack}
-          fa={{ icon: "fa-arrow-left" }}
+          icon={{ icon: "ph:arrow-left-bold" }}
           text="Back"
         />
         <Show when={isSynced()}>
@@ -845,7 +845,7 @@ function PreviewContent(props: {
         </Show>
       </div>
 
-      {/* SIDE-BY-SIDE: video | words | events */}
+      {/* SIDE-BY-SIDE: video | prompts | events */}
       <div class="flex min-h-0 flex-1 gap-3">
         {/* VIDEO VIEWER PANEL */}
         <div class="bg-bg-secondary flex min-h-0 w-0 flex-1 flex-col gap-2 overflow-auto rounded-lg p-3">
@@ -916,19 +916,21 @@ function PreviewContent(props: {
                 <Button
                   variant="text"
                   balloon={{ text: "Previous frame" }}
-                  fa={{ icon: "fa-step-backward" }}
+                  icon={{ icon: "ph:arrow-left-bold" }}
                   onClick={() => videoStepFrame(-1)}
                 />
                 <Button
                   variant="button"
                   balloon={{ text: videoPlayState() ? "Pause" : "Play" }}
-                  fa={{ icon: videoPlayState() ? "fa-pause" : "fa-play" }}
+                  icon={{
+                    icon: videoPlayState() ? "ph:pause-bold" : "ph:play-bold",
+                  }}
                   onClick={toggleVideoPlay}
                 />
                 <Button
                   variant="text"
                   balloon={{ text: "Next frame" }}
-                  fa={{ icon: "fa-step-forward" }}
+                  icon={{ icon: "ph:arrow-right-bold" }}
                   onClick={() => videoStepFrame(1)}
                 />
               </div>
@@ -1024,9 +1026,9 @@ function PreviewContent(props: {
           </Show>
         </div>
 
-        {/* INSPECTOR: words */}
+        {/* INSPECTOR: prompts */}
         <div class="bg-bg-secondary flex min-h-0 w-0 flex-1 flex-col gap-2 rounded-lg p-3">
-          <div class="text-xs tracking-wider text-sub uppercase">Words</div>
+          <div class="text-xs tracking-wider text-sub uppercase">Prompts</div>
           <div
             ref={(el) => (wordsScrollEl = el)}
             class="min-h-0 flex-1 overflow-auto rounded bg-bg"
@@ -1041,7 +1043,7 @@ function PreviewContent(props: {
               </thead>
               <tbody>
                 <For each={props.ctx.context.targetWords}>
-                  {(word, i) => (
+                  {(prompt, i) => (
                     <tr
                       data-row={i()}
                       class={cn(
@@ -1050,7 +1052,9 @@ function PreviewContent(props: {
                       )}
                     >
                       <td class="p-2 text-right font-mono text-sub">{i()}</td>
-                      <td class="p-2 font-mono">{visualizeWhitespace(word)}</td>
+                      <td class="p-2 font-mono">
+                        {visualizeWhitespace(prompt)}
+                      </td>
                       <td class="p-2 font-mono">
                         {visualizeWhitespace(finalInputs[i()] ?? "")}
                       </td>
@@ -1212,55 +1216,55 @@ function PreviewContent(props: {
           <Button
             variant="text"
             balloon={{ text: "Go to start" }}
-            fa={{ icon: "fa-fast-backward" }}
+            icon={{ icon: "ph:skip-back-bold" }}
             onClick={goToStart}
           />
           <Button
             variant="text"
             balloon={{ text: "-10ms" }}
-            fa={{ icon: "fa-backward" }}
+            icon={{ icon: "ph:rewind-bold" }}
             onClick={() => step(-10)}
           />
           <Button
             variant="text"
             balloon={{ text: "-1ms" }}
-            fa={{ icon: "fa-chevron-left" }}
+            icon={{ icon: "ph:caret-left-bold" }}
             onClick={() => step(-1)}
           />
           <Button
             variant="text"
             balloon={{ text: "Previous event" }}
-            fa={{ icon: "fa-step-backward" }}
+            icon={{ icon: "ph:arrow-left-bold" }}
             onClick={goPrevEvent}
           />
           <Button
             variant="button"
             balloon={{ text: playing() ? "Pause" : "Play" }}
-            fa={{ icon: playing() ? "fa-pause" : "fa-play" }}
+            icon={{ icon: playing() ? "ph:pause-bold" : "ph:play-bold" }}
             onClick={togglePlay}
           />
           <Button
             variant="text"
             balloon={{ text: "Next event" }}
-            fa={{ icon: "fa-step-forward" }}
+            icon={{ icon: "ph:arrow-right-bold" }}
             onClick={goNextEvent}
           />
           <Button
             variant="text"
             balloon={{ text: "+1ms" }}
-            fa={{ icon: "fa-chevron-right" }}
+            icon={{ icon: "ph:caret-right-bold" }}
             onClick={() => step(1)}
           />
           <Button
             variant="text"
             balloon={{ text: "+10ms" }}
-            fa={{ icon: "fa-forward" }}
+            icon={{ icon: "ph:fast-forward-bold" }}
             onClick={() => step(10)}
           />
           <Button
             variant="text"
             balloon={{ text: "Go to end" }}
-            fa={{ icon: "fa-fast-forward" }}
+            icon={{ icon: "ph:skip-forward-bold" }}
             onClick={goToEnd}
           />
         </div>

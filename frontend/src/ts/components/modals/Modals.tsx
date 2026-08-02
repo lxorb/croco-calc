@@ -10,7 +10,6 @@ import { PbTablesModal } from "./PbTablesModal";
 import { RegisterCaptchaModal } from "./RegisterCaptchaModal";
 import { ShareTestSettings } from "./ShareTestSettings";
 import { SimpleModal } from "./SimpleModal";
-import { StreakHourOffsetModal } from "./StreakHourOffsetModal";
 import { SupportModal } from "./SupportModal";
 import { ThemeModal } from "./ThemeModal";
 import { UserReportModal } from "./UserReportModal";
@@ -19,10 +18,10 @@ import { VersionHistoryModal } from "./VersionHistoryModal";
 /**
  * The mounted modal set (INV-114 KEEP / INV-115 DELETE, CP-190).
  *
- * The quote system, custom text, word-count and duration pickers, the word
- * filter, tags and config presets are all cut (INV-115), so nothing from those
- * trees is mounted here any more. `ThemeModal` is new UI extracted from the
- * deleted settings page (INV-116, C9).
+ * The prose-prompt pickers, the custom-text tree, the item-count and duration
+ * dialogs, tags and config presets are all cut (INV-115), so nothing from
+ * those trees is mounted here any more. `ThemeModal` is new UI extracted from
+ * the deleted settings page (INV-116, C9).
  */
 export function Modals(): JSXElement {
   return (
@@ -38,7 +37,6 @@ export function Modals(): JSXElement {
       <MobileTestConfigModal />
       <CookiesModal />
       <LastSignedOutResultModal />
-      <StreakHourOffsetModal />
       <GoogleSignupModal />
       <ForgotPasswordModal />
       <UserReportModal />

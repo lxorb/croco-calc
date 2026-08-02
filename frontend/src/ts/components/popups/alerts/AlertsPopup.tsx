@@ -51,7 +51,7 @@ function MobileClose(): JSXElement {
       class="mb-8 hidden w-full pointer-coarse:flex"
       onClick={() => hideModalAndClearChain("Alerts")}
       text="Close"
-      fa={{ icon: "fa-times" }}
+      icon={{ icon: "ph:x-bold" }}
     />
   );
 }

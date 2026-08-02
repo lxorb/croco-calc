@@ -8,7 +8,6 @@ import {
 import * as PageTest from "../pages/test";
 import * as PageLoading from "../pages/loading";
 import * as PageTransition from "../legacy-states/page-transition";
-import * as AdController from "../controllers/ad-controller";
 import * as Focus from "../test/focus";
 import Page, {
   PageName,
@@ -48,32 +47,6 @@ type ChangeOptions = {
 const pages = {
   loading: PageLoading.page,
   test: PageTest.page,
-  settings: solidPage("settings", {
-    beforeShow: async () => {
-      // clear any previous highlight
-      const prev = document.querySelector<HTMLElement>(
-        '[data-component="settingspage"] .settings-highlight',
-      );
-      if (prev !== null) {
-        prev.classList.remove("settings-highlight");
-      }
-
-      const highlight = new URLSearchParams(window.location.search).get(
-        "highlight",
-      );
-      if (highlight === null) return;
-
-      const element = document.querySelector<HTMLElement>(
-        `[data-component="settingspage"] [data-setting-key="${CSS.escape(highlight)}"]`,
-      );
-      if (element === null) return;
-
-      setTimeout(() => {
-        element.scrollIntoView({ block: "center", behavior: "auto" });
-        element.classList.add("settings-highlight");
-      }, 250);
-    },
-  }),
   about: solidPage("about"),
   account: solidPage("account", {
     loadingOptions: {
@@ -176,8 +149,8 @@ function updateTitle(nextPage: { id: string; display?: string }): void {
     Misc.updateTitle();
   } else {
     const titleString =
-      nextPage.display ?? Strings.capitalizeFirstLetterOfEachWord(nextPage.id);
-    Misc.updateTitle(`${titleString} | Monkeytype`);
+      nextPage.display ?? Strings.capitalizeEachSegment(nextPage.id);
+    Misc.updateTitle(`${titleString} | croco calc`);
   }
 }
 
@@ -405,7 +378,6 @@ export async function change(
 
   //wrapup
   PageTransition.set(false);
-  void AdController.reinstate();
   return true;
 }
 

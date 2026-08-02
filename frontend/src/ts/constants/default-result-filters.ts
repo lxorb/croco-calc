@@ -13,7 +13,7 @@ import { Mode2Schema } from "@croco-calc/schemas/shared";
  *
  * Keys are the C2 canonical **stored** literals, never the display labels — a
  * filter keyed on `100x100` could never match a result storing `"100"`
- * (master §2.31, gap 4). `difficulty`, `mode`, `words`, `quoteLength`,
+ * (master §2.31, gap 4). The upstream prose-mode filter groups,
  * `punctuation`, `numbers`, `tags`, `language` and `funbox` are gone (AC-079).
  */
 function allTrue<T extends string>(values: readonly T[]): Record<T, boolean> {

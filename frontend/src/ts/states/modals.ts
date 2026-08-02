@@ -6,7 +6,7 @@ export type ModalId =
   | "Support"
   | "Commandline"
   /**
-   * The theme picker (C9, CP-164 … CP-177). The monkeytype settings page is
+   * The theme picker (C9, CP-164 … CP-177). The upstream settings page is
    * deleted, so `custom-setting/Theme.tsx` was extracted into a modal of its
    * own, opened by the `settings` nav item and by the footer theme indicator.
    */
@@ -24,7 +24,6 @@ export type ModalId =
   | "Cookies"
   | "EditProfile"
   | "LastSignedOutResult"
-  | "StreakHourOffset"
   | "GoogleSignup"
   | "ForgotPassword"
   | "UserReport";

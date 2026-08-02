@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getLatestReleaseFromGitHub } from "./json-data";
+import { getLatestReleaseFromGitHub } from "./static-data";
 import { LocalStorageWithSchema } from "./local-storage-with-schema";
 import { tryCatch } from "@croco-calc/util/trycatch";
 import { isDevEnvironment } from "./env";

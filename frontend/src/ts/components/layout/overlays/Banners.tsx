@@ -12,7 +12,6 @@ import {
 import { setGlobalOffsetTop } from "../../../states/core";
 import { getSnapshot } from "../../../states/snapshot";
 import { cn } from "../../../utils/cn";
-import { isProfilerMode } from "../../../utils/profiler-mode";
 import { Icon } from "../../common/Icon";
 import { showUpdateNameModal } from "../../modals/account-settings/UpdateNameModal";
 
@@ -22,7 +21,7 @@ function Banner(props: BannerType): JSXElement {
     removeBanner(props.id);
     // });
   };
-  // `Banner.icon` is an iconify id (CP-002); monkeytype passed font awesome
+  // `Banner.icon` is an iconify id (CP-002); upstream passed font awesome
   // class strings straight into a bare `<i>`.
   const icon = (): string =>
     props.icon === undefined || props.icon === ""
@@ -114,14 +113,6 @@ export function Banners(): JSXElement {
 
   onMount(() => {
     window.addEventListener("resize", debouncedMarginUpdate);
-    if (isProfilerMode()) {
-      addBanner({
-        level: "error",
-        icon: "ph:timer-bold",
-        text: "Profiler mode enabled",
-        important: true,
-      });
-    }
   });
 
   onCleanup(() => {

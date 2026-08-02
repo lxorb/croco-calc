@@ -12,11 +12,12 @@ import {
  * normalisation time so the table, the charts and the aggregations can sort and
  * group on them directly.
  *
- * monkeytype's `words` (an estimate derived from wpm) becomes `tasks`
- * (`correct + wrong`, exact — AC-092/AC-093), and `timeTyping` becomes
- * `timeSpent` (AC-013, AC-014). `bailedOut`, `blindMode`, `lazyMode`,
- * `difficulty`, `funbox`, `language`, `numbers`, `punctuation`, `quoteLength`
- * and `tags` are all gone (master C15, C38, C41; AC-016, AC-079, AC-187).
+ * The upstream item count (an estimate derived from the speed metric) becomes
+ * `tasks` (`correct + wrong`, exact — AC-092/AC-093), and the time-on-task
+ * field becomes `timeSpent` (AC-013, AC-014). Every prose-mode field —
+ * `bailedOut`, `blindMode`, `lazyMode`, `difficulty`, `funbox`, `language`,
+ * `numbers`, `punctuation`, the prompt-length field — and `tags` are all gone
+ * (master C15, C38, C41; AC-016, AC-079, AC-187).
  */
 export type SnapshotResult<M extends Mode> = Omit<
   Result<M>,
@@ -40,8 +41,8 @@ export type SnapshotResult<M extends Mode> = Omit<
  *
  * Streaks (master C17), badges/`inventory` (master C16), premium (AC-017),
  * tags (master C15), config presets (master C18) and every Discord field
- * (AC-047, AC-167) are removed. `typingStats` becomes `testStats` with
- * `timeSpent` (AC-013, AC-014).
+ * (AC-047, AC-167) are removed. The upstream aggregate stats block becomes
+ * `testStats`, carrying `timeSpent` (AC-013, AC-014).
  */
 export type Snapshot = Omit<
   User,

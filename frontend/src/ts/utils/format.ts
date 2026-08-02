@@ -1,9 +1,5 @@
-import { get as getTypingSpeedUnit } from "../utils/typing-speed-units";
 import * as Numbers from "@croco-calc/util/numbers";
-import {
-  Config as ConfigType,
-  TypingSpeedUnit,
-} from "@croco-calc/schemas/configs";
+import { Config as ConfigType } from "@croco-calc/schemas/configs";
 
 export type FormatOptions = {
   showDecimalPlaces?: boolean;
@@ -22,10 +18,7 @@ export type FallbackOptions = {
   fallback?: string;
 };
 
-type FormatConfig = Pick<
-  ConfigType,
-  "typingSpeedUnit" | "alwaysShowDecimalPlaces"
->;
+type FormatConfig = Pick<ConfigType, "alwaysShowDecimalPlaces">;
 
 export class Formatting {
   private config: FormatConfig;
@@ -34,16 +27,32 @@ export class Formatting {
     this.config = config;
   }
 
-  typingSpeed(
-    wpm: number | null | undefined,
+  /**
+   * CP-142 — `score`: correct tasks minus wrong tasks. Can be negative, and is
+   * always a whole number, so it ignores `alwaysShowDecimalPlaces`.
+   */
+  score(
+    score: number | null | undefined,
     formatOptions: FormatOptions = {},
   ): string {
     const options = { ...FORMAT_DEFAULT_OPTIONS, ...formatOptions };
-    if (wpm === undefined || wpm === null) return options.fallback ?? "";
+    if (score === undefined || score === null) return options.fallback ?? "";
 
-    const result = getTypingSpeedUnit(this.config.typingSpeedUnit).fromWpm(wpm);
+    return this.number(score, { ...options, showDecimalPlaces: false });
+  }
 
-    return this.number(result, options);
+  /**
+   * CP-142 — `tpm`: tasks per minute. Replaces the deleted keystroke-rate unit
+   * system (INV-118c), so croco calc has exactly one speed unit.
+   */
+  tpm(
+    tpm: number | null | undefined,
+    formatOptions: FormatOptions = {},
+  ): string {
+    const options = { ...FORMAT_DEFAULT_OPTIONS, ...formatOptions };
+    if (tpm === undefined || tpm === null) return options.fallback ?? "";
+
+    return this.number(tpm, options);
   }
 
   percentage(
@@ -72,10 +81,6 @@ export class Formatting {
   ): string {
     const options = { ...FORMAT_DEFAULT_OPTIONS, ...formatOptions };
     return this.number(value, options);
-  }
-
-  get typingSpeedUnit(): TypingSpeedUnit {
-    return this.config.typingSpeedUnit;
   }
 
   private number(

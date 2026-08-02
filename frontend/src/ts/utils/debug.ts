@@ -58,7 +58,7 @@ function logTiming(start: number, funcName: string): void {
     start,
     end,
     funcName,
-    "monkeytype",
+    "croco calc",
   );
   console.timeStamp(
     `#${arr.length} profiling overhead`,
@@ -66,6 +66,6 @@ function logTiming(start: number, funcName: string): void {
     end,
     endOverhead,
     funcName,
-    "monkeytype",
+    "croco calc",
   );
 }

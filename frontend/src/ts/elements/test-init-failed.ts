@@ -1,5 +1,8 @@
 const elem = document.querySelector<HTMLElement>(".pageTest #testInitFailed");
-const testElem = document.querySelector<HTMLElement>(".pageTest #typingTest");
+// The test wrapper's id is `tasksTest` (CP-020 renamed the prose-era ids on
+// this page). WP-06 owns `frontend/src/html/pages/test.html`, where the id
+// itself lives.
+const testElem = document.querySelector<HTMLElement>(".pageTest #tasksTest");
 const errorElem = document.querySelector<HTMLElement>(
   ".pageTest #testInitFailed .error",
 );

@@ -2,7 +2,7 @@ import { AnyFieldApi } from "@tanstack/solid-form";
 import { Accessor, JSXElement } from "solid-js";
 
 import { cn } from "../../../utils/cn";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 
 export function Checkbox(props: {
   field: Accessor<AnyFieldApi>;
@@ -37,8 +37,8 @@ export function Checkbox(props: {
             props.disabled && "opacity-[0.33]",
           )}
         >
-          <Fa
-            icon="fa-check"
+          <Icon
+            icon="ph:check-bold"
             class={cn(
               "text-em-xs transition-[color] duration-125",
               checked()

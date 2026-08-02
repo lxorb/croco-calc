@@ -5,7 +5,7 @@ import { AnimatedModal } from "../common/AnimatedModal";
 import { Button } from "../common/Button";
 
 /**
- * CP-151 … CP-156. Mirrors monkeytype's contact modal; the second
+ * CP-151 … CP-156. Mirrors the upstream contact modal; the second
  * business-inquiry address is gone (CP-154) — croco calc routes everything
  * through `CONTACT_EMAIL`, with bug and account traffic going to
  * `SUPPORT_EMAIL`.

@@ -4,86 +4,9 @@ import {
   escapeHTML,
   promiseWithResolvers,
 } from "../../src/ts/utils/misc";
-import {
-  getLanguageDisplayString,
-  removeLanguageSize,
-} from "../../src/ts/utils/strings";
-import { Language } from "@croco-calc/schemas/languages";
 import { getErrorMessage } from "../../src/ts/utils/error";
 
 describe("misc.ts", () => {
-  describe("getLanguageDisplayString", () => {
-    it("should return correctly formatted strings", () => {
-      const tests: {
-        input: Language;
-        noSizeString: boolean;
-        expected: string;
-      }[] = [
-        {
-          input: "english",
-          noSizeString: false,
-          expected: "english",
-        },
-        {
-          input: "english_1k",
-          noSizeString: false,
-          expected: "english 1k",
-        },
-        {
-          input: "english_1k",
-          noSizeString: true,
-          expected: "english",
-        },
-        {
-          input: "english_medical",
-          noSizeString: false,
-          expected: "english medical",
-        },
-        {
-          input: "arabic_egypt_1k",
-          noSizeString: false,
-          expected: "arabic egypt 1k",
-        },
-        {
-          input: "arabic_egypt_1k",
-          noSizeString: true,
-          expected: "arabic egypt",
-        },
-      ];
-
-      tests.forEach((test) => {
-        const result = getLanguageDisplayString(test.input, test.noSizeString);
-        expect(result).toBe(test.expected);
-      });
-    });
-  });
-  describe("removeLanguageSize", () => {
-    it("should remove language size", () => {
-      const tests: { input: Language; expected: Language }[] = [
-        {
-          input: "english",
-          expected: "english",
-        },
-        {
-          input: "english_1k",
-          expected: "english",
-        },
-        {
-          input: "arabic_egypt",
-          expected: "arabic_egypt",
-        },
-        {
-          input: "arabic_egypt_1k",
-          expected: "arabic_egypt",
-        },
-      ];
-
-      tests.forEach((test) => {
-        const result = removeLanguageSize(test.input);
-        expect(result).toBe(test.expected);
-      });
-    });
-  });
   describe("isObject", () => {
     it("should correctly identify objects", () => {
       const tests = [

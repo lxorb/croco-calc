@@ -1,7 +1,7 @@
 import { createSignal, JSXElement, onCleanup } from "solid-js";
 
 import { AnimeShow } from "../components/common/anime";
-import { Fa } from "../components/common/Fa";
+import { Icon } from "../components/common/Icon";
 
 export function useSavedIndicator(): {
   component: () => JSXElement;
@@ -36,7 +36,7 @@ export function useSavedIndicator(): {
     return (
       <AnimeShow when={show()}>
         <div class="absolute top-0 right-0 rounded bg-sub-alt p-[0.5em] text-main">
-          <Fa icon="fa-save" fixedWidth />
+          <Icon icon="ph:floppy-disk-bold" fixedWidth />
         </div>
       </AnimeShow>
     );

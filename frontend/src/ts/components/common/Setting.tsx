@@ -8,12 +8,12 @@ import {
 } from "../../states/notifications";
 import { cn } from "../../utils/cn";
 import { Button } from "./Button";
-import { FaProps } from "./Fa";
 import { H3 } from "./Headers";
+import { IconProps } from "./Icon";
 
 export type SettingProps = {
   title: string;
-  fa: FaProps;
+  icon: IconProps;
   description: string | JSXElement;
   inputs?: JSXElement;
   fullWidthInputs?: JSXElement;
@@ -59,7 +59,7 @@ export function Setting(props: SettingProps): JSXElement {
         : {})}
     >
       <div class="flex gap-2">
-        <H3 text={props.title} fa={props.fa} class="pb-0" />
+        <H3 text={props.title} icon={props.icon} class="pb-0" />
         <Show when={props.showDeepLink !== false}>
           <DeepLinkButton key={(props as { key: string }).key} />
         </Show>
@@ -105,7 +105,7 @@ function DeepLinkButton(props: { key: string }) {
     <Button
       class="-m-2 p-2 opacity-0 group-hover:opacity-100"
       variant="text"
-      fa={{ icon: "fa-link" }}
+      icon={{ icon: "ph:link-bold" }}
       onClick={() => {
         const urlParams = serialize({
           schema: z.object({

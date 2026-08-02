@@ -155,8 +155,8 @@ export const buildSearchService = <T>(
 
             const scoreForToken = score * idf * termFrequency;
 
-            const quote = documents[document.id] as InternalDocument;
-            if (ids.length === 0 || ids.includes(quote?.id)) {
+            const doc = documents[document.id] as InternalDocument;
+            if (ids.length === 0 || ids.includes(doc?.id)) {
               results.set(document.id, currentScore + scoreForToken);
             }
           });

@@ -14,8 +14,8 @@ import { getModalVisibility } from "../../../states/modals";
 import { cn } from "../../../utils/cn";
 import AsyncContent from "../../common/AsyncContent";
 import { Button } from "../../common/Button";
-import { Fa } from "../../common/Fa";
 import { H3 } from "../../common/Headers";
+import { Icon } from "../../common/Icon";
 import { LoadingCircle } from "../../common/LoadingCircle";
 import { AlertsSection } from "./AlertsSection";
 
@@ -38,7 +38,7 @@ export function Inbox(): JSXElement {
     <AlertsSection
       title={
         <>
-          <H3 fa={{ icon: "fa-inbox" }} text="Inbox" />
+          <H3 icon={{ icon: "ph:tray-bold" }} text="Inbox" />
           <InboxCounter
             size={inboxSize()}
             maxSize={maxMailboxSize()}
@@ -57,7 +57,7 @@ export function Inbox(): JSXElement {
                 when={inboxQueryData().some((it) => it.status === "unclaimed")}
               >
                 <Button
-                  fa={{ icon: "fa-gift", fixedWidth: true }}
+                  icon={{ icon: "ph:gift-bold", fixedWidth: true }}
                   text="Claim all"
                   onClick={() => claimAllInboxItems()}
                 />
@@ -71,7 +71,7 @@ export function Inbox(): JSXElement {
                 }
               >
                 <Button
-                  fa={{ icon: "fa-trash", fixedWidth: true }}
+                  icon={{ icon: "ph:trash-bold", fixedWidth: true }}
                   text="Delete all"
                   onClick={() => deleteAllInboxItems()}
                 />
@@ -134,7 +134,7 @@ function Entry(props: {
               // "bg-sub-alt w-max px-2 py-1 rounded",
             )}
           >
-            <Fa icon="fa-gift" fixedWidth />
+            <Icon icon="ph:gift-bold" fixedWidth />
             {props.entry.rewards.length}
           </div>
         </Show>
@@ -143,7 +143,7 @@ function Entry(props: {
         <Show when={props.entry.status === "unclaimed"}>
           <Button
             variant="text"
-            fa={{ icon: "fa-gift", fixedWidth: true }}
+            icon={{ icon: "ph:gift-bold", fixedWidth: true }}
             balloon={{ text: "Claim", position: "left" }}
             onClick={() => {
               props.mutate({ id: props.entry.id, status: "read" });
@@ -154,7 +154,7 @@ function Entry(props: {
         <Show when={props.entry.status !== "unclaimed"}>
           <Button
             variant="text"
-            fa={{ icon: "fa-trash", fixedWidth: true }}
+            icon={{ icon: "ph:trash-bold", fixedWidth: true }}
             balloon={{ text: "Delete", position: "left" }}
             onClick={() =>
               props.mutate({ id: props.entry.id, status: "deleted" })

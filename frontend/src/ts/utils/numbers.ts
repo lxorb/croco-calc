@@ -150,10 +150,19 @@ export function parseIntOptional<T extends string | null | undefined>(
   ) as T extends string ? number : undefined;
 }
 
-export function calculateWpm(
-  charCount: number,
+/**
+ * AC-005 / CP-142 — tasks per minute: every answer submitted, right or wrong,
+ * over the length of the test in minutes.
+ *
+ * This replaces the upstream speed helper, which divided a count by five to
+ * turn keystrokes into a rate. croco calc counts whole answers, so there is no
+ * divisor: the unit *is* the thing being counted (INV-118c deletes the whole
+ * unit-conversion module, so this is the only rate helper left).
+ */
+export function calculateTpm(
+  taskCount: number,
   durationSeconds: number,
 ): number {
   if (durationSeconds <= 0) return 0;
-  return charCount / 5 / (durationSeconds / 60);
+  return taskCount / (durationSeconds / 60);
 }

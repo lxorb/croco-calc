@@ -3,9 +3,11 @@ import { IdSchema } from "@croco-calc/schemas/util";
 import { isSafeNumber } from "@croco-calc/util/numbers";
 import { tryCatch } from "@croco-calc/util/trycatch";
 import { format } from "date-fns/format";
+import { Show } from "solid-js";
 import { z } from "zod";
 
 import Ape from "../ape";
+import { STATUS_PAGE_URL } from "../constants/links";
 import { authEvent } from "../events/auth";
 import { addBanner } from "../states/banners";
 import { addPsa } from "../states/psas";
@@ -72,19 +74,24 @@ async function getLatest(): Promise<PSA[] | null> {
           | undefined;
       };
 
-      const { data: instatus, error } = await tryCatch(
-        fetch("https://monkeytype.instatus.com/summary.json"),
-      );
-
       let maintenanceData: undefined | InstatusSummary["activeMaintenances"];
 
-      if (error) {
-        console.log("Failed to fetch Instatus summary", error);
-      } else {
-        const instatusData =
-          (await instatus.json()) as unknown as InstatusSummary;
+      // No status page is provisioned yet (`STATUS_PAGE_URL` is null), so there
+      // is nothing to ask. Skipping the request keeps a dead host off the boot
+      // path; the generic outage banner below still fires.
+      if (STATUS_PAGE_URL !== null) {
+        const { data: summary, error } = await tryCatch(
+          fetch(`${STATUS_PAGE_URL}/summary.json`),
+        );
 
-        maintenanceData = instatusData.activeMaintenances;
+        if (error) {
+          console.log("Failed to fetch the status summary", error);
+        } else {
+          const summaryData =
+            (await summary.json()) as unknown as InstatusSummary;
+
+          maintenanceData = summaryData.activeMaintenances;
+        }
       }
 
       if (
@@ -103,21 +110,30 @@ async function getLatest(): Promise<PSA[] | null> {
               for more info.
             </>
           ),
-          icon: "fas fa-bullhorn",
+          icon: "ph:megaphone-bold",
         });
       } else {
         addBanner({
           level: "error",
-          icon: "fas fa-exclamation-triangle",
+          icon: "ph:warning-bold",
           customContent: (
             <>
               Looks like the server is experiencing unexpected down time.
               <br />
-              Check the{" "}
-              <a target="_blank" href="https://monkeytype.instatus.com/">
-                status page
-              </a>{" "}
-              for more information.
+              <Show
+                when={STATUS_PAGE_URL}
+                fallback={<>Please try again in a few minutes.</>}
+              >
+                {(url) => (
+                  <>
+                    Check the{" "}
+                    <a target="_blank" href={url()}>
+                      status page
+                    </a>{" "}
+                    for more information.
+                  </>
+                )}
+              </Show>
             </>
           ),
         });
@@ -127,14 +143,20 @@ async function getLatest(): Promise<PSA[] | null> {
   } else if (response.status === 503) {
     addBanner({
       level: "error",
-      icon: "fas fa-bullhorn",
+      icon: "ph:megaphone-bold",
       customContent: (
         <>
           Server is currently under maintenance.{" "}
-          <a target="_blank" href="https://monkeytype.instatus.com/">
-            Check the status page
-          </a>{" "}
-          for more info.
+          <Show when={STATUS_PAGE_URL} fallback={<>Please try again later.</>}>
+            {(url) => (
+              <>
+                <a target="_blank" href={url()}>
+                  Check the status page
+                </a>{" "}
+                for more info.
+              </>
+            )}
+          </Show>
         </>
       ),
     });

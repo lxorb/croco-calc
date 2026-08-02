@@ -7,23 +7,17 @@ import {
   SupportsFlags,
   UserFlagOptions,
 } from "../../controllers/user-flag-controller";
-import { BreakpointKey } from "../../states/breakpoints";
 import { cn } from "../../utils/cn";
 import { Anime } from "./anime";
 import { AnimePresence } from "./anime/AnimePresence";
 import { Button } from "./Button";
-import { DiscordAvatar } from "./DiscordAvatar";
-import { Fa } from "./Fa";
+import { Icon } from "./Icon";
 import { NotificationBubble } from "./NotificationBubble";
-import { UserBadge } from "./UserBadge";
 import { UserFlags } from "./UserFlags";
 
 type Props = {
   class?: string;
-  user: SupportsFlags &
-    Pick<UserType, "uid" | "name" | "discordId" | "discordAvatar" | "xp"> & {
-      badgeId?: number;
-    };
+  user: SupportsFlags & Pick<UserType, "uid" | "name" | "xp">;
   showAvatar?: boolean;
   avatarFallback?: "user" | "user-circle";
   avatarColor?: "text" | "sub";
@@ -34,7 +28,6 @@ type Props = {
   showSpinner?: boolean;
   showNotificationBubble?: boolean;
   fontClass?: "text-em-xs" | "text-em-sm" | "text-em-md" | "text-em-lg";
-  hideBadgeTextOnWidth?: BreakpointKey;
 } & UserFlagOptions;
 
 export function User(props: Props): JSXElement {
@@ -96,11 +89,13 @@ export function User(props: Props): JSXElement {
                     animate={{ opacity: 1, duration: 125 }}
                     exit={{ opacity: 0, duration: 125 }}
                   >
-                    <DiscordAvatar
-                      size={64}
-                      discordId={props.user.discordId}
-                      discordAvatar={props.user.discordAvatar}
-                      fallbackIcon={props.avatarFallback ?? "user"}
+                    <Icon
+                      icon={
+                        props.avatarFallback === "user-circle"
+                          ? "ph:user-circle-bold"
+                          : "ph:user-bold"
+                      }
+                      fixedWidth
                       class={cn(
                         props.avatarColor === "text" && "text-text",
                         props.avatarColor === "sub" && "text-sub",
@@ -114,7 +109,7 @@ export function User(props: Props): JSXElement {
                   animate={{ opacity: 1, duration: 125 }}
                   exit={{ opacity: 0, duration: 125 }}
                 >
-                  <Fa icon={"fa-circle-notch"} spin={true} />
+                  <Icon icon="ph:circle-notch-bold" spin={true} />
                 </Anime>
               </Show>
             </AnimePresence>
@@ -158,12 +153,6 @@ export function User(props: Props): JSXElement {
             iconsOnly={props.iconsOnly}
           />
         </div>
-      </Show>
-      <Show when={props.user.badgeId !== undefined}>
-        <UserBadge
-          id={props.user.badgeId}
-          hideTextOnWidth={props.hideBadgeTextOnWidth}
-        />
       </Show>
       <Show when={props.level !== undefined}>
         <Anime

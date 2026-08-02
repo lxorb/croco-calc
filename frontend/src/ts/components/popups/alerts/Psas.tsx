@@ -14,7 +14,7 @@ function levelClass(level: number): string {
 export function Psas(): JSXElement {
   return (
     <AlertsSection
-      title={<H3 fa={{ icon: "fa-bullhorn" }} text="Announcements" />}
+      title={<H3 icon={{ icon: "ph:megaphone-bold" }} text="Announcements" />}
       body={
         <Show
           when={getPsas().length > 0}
@@ -38,7 +38,7 @@ function Psa(props: { psa: AlertPsa }): JSXElement {
           levelClass(props.psa.level),
         )}
       ></div>
-      <div class="text-xs wrap-break-word text-text">{props.psa.message}</div>
+      <div class="text-xs wrap-anywhere text-text">{props.psa.message}</div>
     </div>
   );
 }

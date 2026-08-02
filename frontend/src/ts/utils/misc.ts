@@ -8,50 +8,6 @@ import { animate, AnimationParams } from "animejs";
 import { ElementWithUtils } from "./dom";
 import { isDevEnvironment } from "./env";
 
-export function whorf(speed: number, wordlen: number): number {
-  return Math.min(
-    speed,
-    Math.floor(speed * Math.pow(1.03, -2 * (wordlen - 3))),
-  );
-}
-
-//convert numbers to arabic-indic
-export function convertNumberToArabic(numString: string): string {
-  const arabicIndic = "٠١٢٣٤٥٦٧٨٩";
-  let ret = "";
-  for (const char of numString) {
-    ret += arabicIndic[parseInt(char)];
-  }
-  return ret;
-}
-
-export function convertNumberToBangla(numString: string): string {
-  const banglaIndic = "০১২৩৪৫৬৭৮৯";
-  let ret = "";
-  for (const char of numString) {
-    ret += banglaIndic[parseInt(char)];
-  }
-  return ret;
-}
-
-export function convertNumberToNepali(numString: string): string {
-  const nepaliIndic = "०१२३४५६७८९";
-  let ret = "";
-  for (const char of numString) {
-    ret += nepaliIndic[parseInt(char)];
-  }
-  return ret;
-}
-
-export function convertNumberToHindi(numString: string): string {
-  const hindiIndic = "०१२३४५६७८९";
-  let ret = "";
-  for (const char of numString) {
-    ret += hindiIndic[parseInt(char)];
-  }
-  return ret;
-}
-
 export function findGetParameter(
   parameterName: string,
   getOverride?: string,
@@ -234,82 +190,77 @@ export async function swapElements(
   return;
 }
 
+/**
+ * C31 — croco calc has exactly one mode, `time`, so `mode2` is always the
+ * configured length in minutes as a string (`"1" | "2" | "4" | "8"`). The
+ * upstream branches for the deleted modes are gone with them, and so is the
+ * second parameter they needed.
+ */
 export function getMode2<M extends keyof PersonalBests>(
   config: Config,
-  randomQuote: { id: number } | null,
 ): Mode2<M> {
-  const mode = config.mode;
-  let retVal: string;
-
-  if (mode === "time") {
-    retVal = config.time.toString();
-  } else if (mode === "words") {
-    retVal = config.words.toString();
-  } else if (mode === "custom") {
-    retVal = "custom";
-  } else if (mode === "zen") {
-    retVal = "zen";
-  } else if (mode === "quote") {
-    retVal = `${randomQuote?.id ?? -1}`;
-  } else {
-    throw new Error("Invalid mode");
-  }
-
-  return retVal as Mode2<M>;
+  return config.time.toString() as Mode2<M>;
 }
+
+/**
+ * AC-100 — the results export. The header row is a WP-03-owned contract and is
+ * normative: exactly these columns, in exactly this order.
+ *
+ * Two amendments over the upstream header (master §2.31): `idleDuration` is
+ * persisted as `afkDuration` (C37) and `bailedOut` is replaced by `settingsId`
+ * (C38 — a fixed-duration test cannot be bailed out of, while `settingsId` is
+ * the field every eligibility question turns on). The seven setting columns
+ * carry the C2 canonical **stored** literals, never the display labels, so a
+ * re-imported CSV round-trips.
+ */
+const RESULTS_CSV_COLUMNS = [
+  "_id",
+  "isPb",
+  "score",
+  "correct",
+  "wrong",
+  "acc",
+  "tpm",
+  "spm",
+  "mode2",
+  "testDuration",
+  "afkDuration",
+  "restartCount",
+  "addition",
+  "multiplication",
+  "division",
+  "fractionAddition",
+  "fractionMultiplication",
+  "decimals",
+  "negatives",
+  "settingsId",
+  "timestamp",
+] as const;
 
 export async function downloadResultsCSV(array: Result<Mode>[]): Promise<void> {
   const csvString = [
-    [
-      "_id",
-      "isPb",
-      "wpm",
-      "acc",
-      "rawWpm",
-      "consistency",
-      "charStats",
-      "mode",
-      "mode2",
-      "quoteLength",
-      "restartCount",
-      "testDuration",
-      "afkDuration",
-      "incompleteTestSeconds",
-      "punctuation",
-      "numbers",
-      "language",
-      "funbox",
-      "difficulty",
-      "lazyMode",
-      "blindMode",
-      "bailedOut",
-      "tags",
-      "timestamp",
-    ],
+    RESULTS_CSV_COLUMNS,
     ...array.map((item) => [
       item._id,
       item.isPb,
-      item.wpm,
+      item.score,
+      item.correct,
+      item.wrong,
       item.acc,
-      item.rawWpm,
-      item.consistency,
-      item.charStats.join(";"),
-      item.mode,
+      item.tpm,
+      item.spm,
       item.mode2,
-      item.quoteLength,
-      item.restartCount,
       item.testDuration,
       item.afkDuration,
-      item.incompleteTestSeconds,
-      item.punctuation,
-      item.numbers,
-      item.language,
-      item.funbox,
-      item.difficulty,
-      item.lazyMode,
-      item.blindMode,
-      item.bailedOut,
-      item.tags?.join(";"),
+      item.restartCount,
+      item.settings.addition,
+      item.settings.multiplication,
+      item.settings.division,
+      item.settings.fractionAddition,
+      item.settings.fractionMultiplication,
+      item.settings.decimals,
+      item.settings.negatives,
+      item.settingsId,
       item.timestamp,
     ]),
   ]
@@ -482,7 +433,7 @@ export function updateTitle(title?: string): void {
   const local = isDevEnvironment() ? "localhost - " : "";
 
   if (title === undefined || title === "") {
-    document.title = `${local}Monkeytype | A minimalistic, customizable typing test`;
+    document.title = `${local}croco calc | A minimalistic, customizable mental-arithmetic trainer`;
   } else {
     document.title = local + title;
   }
@@ -701,7 +652,12 @@ export function formatTopPercentage(lbRank?: RankAndCount): string {
   return `Top ${roundTo2((lbRank.rank / lbRank.count) * 100)}%`;
 }
 
-export function formatTypingStatsRatio(stats: {
+/**
+ * AC-014 — the snapshot exposes `testStats`, so this is the `testStats`
+ * ratio: how many started tests were finished, and how many restarts each
+ * finished test cost.
+ */
+export function formatTestStatsRatio(stats: {
   startedTests?: number;
   completedTests?: number;
 }): {

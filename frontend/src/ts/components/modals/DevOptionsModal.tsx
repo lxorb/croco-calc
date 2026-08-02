@@ -19,9 +19,7 @@ import {
 import { showSimpleModal } from "../../states/simple-modal";
 import { toggleUserFakeChartData } from "../../test/result";
 import { disableSlowTimerFail } from "../../test/test-timer";
-import { FaSolidIcon } from "../../types/font-awesome";
 import { setMediaQueryDebugLevel } from "../../ui";
-import { isProfilerMode, setProfilerMode } from "../../utils/profiler-mode";
 import { remoteValidation } from "../../utils/remote-validation";
 import { AnimatedModal } from "../common/AnimatedModal";
 import { Button } from "../common/Button";
@@ -29,7 +27,7 @@ import { Button } from "../common/Button";
 const [mediaQueryDebugLevel, setLocalMediaQueryDebugLevel] = createSignal(0);
 
 type DevButton = {
-  icon: FaSolidIcon;
+  icon: string;
   label: () => string;
   onClick: () => void;
 };
@@ -37,12 +35,12 @@ type DevButton = {
 export function DevOptionsModal(): JSXElement {
   const buttons: DevButton[] = [
     {
-      icon: "fa-database",
+      icon: "ph:database-bold",
       label: () => "Generate Data",
       onClick: () => showGenerateDataModal(),
     },
     {
-      icon: "fa-bell",
+      icon: "ph:bell-bold",
       label: () => "Test Notifications",
       onClick: () => {
         showSuccessNotification("This is a test", { durationMs: 0 });
@@ -59,7 +57,7 @@ export function DevOptionsModal(): JSXElement {
       },
     },
     {
-      icon: "fa-ruler",
+      icon: "ph:ruler-bold",
       label: () => `Media Query Debug (${mediaQueryDebugLevel()})`,
       onClick: () => {
         const next =
@@ -70,8 +68,8 @@ export function DevOptionsModal(): JSXElement {
       },
     },
     {
-      icon: "fa-eye",
-      label: () => "Show Real Words Input",
+      icon: "ph:eye-bold",
+      label: () => "Show Real Answer Input",
       onClick: () => {
         const el = getInputElement();
         el.style.opacity = "1";
@@ -81,7 +79,7 @@ export function DevOptionsModal(): JSXElement {
       },
     },
     {
-      icon: "fa-sign-in-alt",
+      icon: "ph:sign-in-bold",
       label: () => "Quick Login",
       onClick: () => {
         if (
@@ -114,7 +112,7 @@ export function DevOptionsModal(): JSXElement {
       },
     },
     {
-      icon: "fa-star",
+      icon: "ph:star-bold",
       label: () => "XP Simple Test",
       onClick: () => {
         setTimeout(() => {
@@ -124,17 +122,15 @@ export function DevOptionsModal(): JSXElement {
       },
     },
     {
-      icon: "fa-star",
+      icon: "ph:star-bold",
       label: () => "XP with breakdown Test",
       onClick: () => {
         setTimeout(() => {
+          // AC-036 — exactly the six keys the XP bar renders, in order.
           const fakeBreakdown = {
             base: 100,
-            quote: 10,
-            corrected: 5,
-            funbox: 5,
-            streak: 10,
-            incomplete: 10,
+            fullAccuracy: 10,
+            modes: 20,
             accPenalty: 5,
             configMultiplier: 2,
             daily: 10000,
@@ -146,44 +142,36 @@ export function DevOptionsModal(): JSXElement {
       },
     },
     {
-      icon: "fa-inbox",
+      icon: "ph:tray-bold",
       label: () => "Add Debug Inbox Item",
       onClick: () => {
         showModal("DevInboxPicker");
       },
     },
     {
-      icon: "fa-chart-bar",
+      icon: "ph:chart-bar-bold",
       label: () => "Toggle Fake Chart Data",
       onClick: toggleUserFakeChartData,
     },
     {
-      icon: "fa-i-cursor",
+      icon: "ph:cursor-text-bold",
       label: () => "Toggle Caret Debug",
       onClick: toggleCaretDebug,
     },
     {
-      icon: "fa-clock",
+      icon: "ph:clock-bold",
       label: () => "Disable Slow Timer Fail",
       onClick: disableSlowTimerFail,
     },
     {
-      icon: "fa-vials",
+      icon: "ph:test-tube-bold",
       label: () => "Event Log Viewer",
       onClick: () => showModal("EventLogViewer"),
     },
-    {
-      icon: "fa-stopwatch",
-      label: () => `Profiler Mode (${isProfilerMode() ? "ON" : "OFF"})`,
-      onClick: () => {
-        setProfilerMode(!isProfilerMode());
-        showNoticeNotification("Profiler mode toggled, reloading...");
-        setTimeout(() => location.reload(), 500);
-      },
-    },
   ];
 
-  const addDebugInboxItem = (rewardType: "xp" | "badge" | "none"): void => {
+  // C16 deletes badges, so the contract only offers the two reward types.
+  const addDebugInboxItem = (rewardType: "xp" | "none"): void => {
     hideModal("DevInboxPicker");
     void Ape.dev
       .addDebugInboxItem({ body: { rewardType } })
@@ -208,7 +196,7 @@ export function DevOptionsModal(): JSXElement {
               <Button
                 variant="button"
                 onClick={btn.onClick}
-                fa={{ icon: btn.icon, fixedWidth: true }}
+                icon={{ icon: btn.icon, fixedWidth: true }}
                 text={btn.label()}
               />
             )}
@@ -220,19 +208,13 @@ export function DevOptionsModal(): JSXElement {
           <Button
             variant="button"
             onClick={() => addDebugInboxItem("xp")}
-            fa={{ icon: "fa-star", fixedWidth: true }}
+            icon={{ icon: "ph:star-bold", fixedWidth: true }}
             text="XP Reward (1000)"
           />
           <Button
             variant="button"
-            onClick={() => addDebugInboxItem("badge")}
-            fa={{ icon: "fa-certificate", fixedWidth: true }}
-            text="Badge Reward"
-          />
-          <Button
-            variant="button"
             onClick={() => addDebugInboxItem("none")}
-            fa={{ icon: "fa-envelope", fixedWidth: true }}
+            icon={{ icon: "ph:envelope-simple-bold", fixedWidth: true }}
             text="No Reward"
           />
         </div>

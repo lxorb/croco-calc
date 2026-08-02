@@ -1,34 +1,17 @@
-import { CustomTextSettings } from "@croco-calc/schemas/results";
-
-export function canQuickRestart(
-  mode: string,
-  words: number,
-  time: number,
-  CustomText: CustomTextSettings,
-  customTextIsLong: boolean,
-): boolean {
-  const wordsLong = mode === "words" && (words >= 1000 || words === 0);
-  const timeLong = mode === "time" && (time >= 900 || time === 0);
-  const customTextLong = mode === "custom" && customTextIsLong;
-
-  const customTextRandomWordsLong =
-    mode === "custom" &&
-    (CustomText.limit.mode === "word" || CustomText.limit.mode === "section") &&
-    (CustomText.limit.value >= 1000 || CustomText.limit.value === 0);
-  const customTextRandomTimeLong =
-    mode === "custom" &&
-    CustomText.limit.mode === "time" &&
-    (CustomText.limit.value >= 900 || CustomText.limit.value === 0);
-
-  if (
-    wordsLong ||
-    timeLong ||
-    customTextLong ||
-    customTextRandomWordsLong ||
-    customTextRandomTimeLong
-  ) {
-    return false;
-  } else {
-    return true;
-  }
+/**
+ * Whether pressing the quick-restart key may restart immediately, without the
+ * "are you sure" confirmation step.
+ *
+ * Upstream this was a real decision: the guard refused a silent restart when a
+ * run was long enough that losing it by accident would hurt — 1000+ items, 900+
+ * seconds, or a long custom text. croco calc has exactly one mode and its
+ * longest test is 8 minutes (480 s, C2 / ME-119), comfortably under that
+ * threshold, and the custom-text and item-count modes it also guarded are gone.
+ * Every branch therefore evaluates the same way.
+ *
+ * It is kept as a named predicate rather than inlined at the five call sites so
+ * the decision stays in one place if a longer test length is ever added.
+ */
+export function canQuickRestart(): boolean {
+  return true;
 }

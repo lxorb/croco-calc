@@ -17,7 +17,7 @@ import { VersionButton } from "./VersionButton";
 
 /**
  * CP-012 — exactly seven buttons, in this order, each with a fixed-width
- * leading icon. monkeytype's `twitter` button is gone (CP-013).
+ * leading icon. The upstream `twitter` button is gone (CP-013).
  */
 export function Footer(): JSXElement {
   const discordUrl = (): string | null => SOCIAL_LINKS.discord;

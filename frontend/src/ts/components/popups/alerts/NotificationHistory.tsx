@@ -41,7 +41,7 @@ export function NotificationHistory(): JSXElement {
 
   return (
     <AlertsSection
-      title={<H3 fa={{ icon: "fa-comment-alt" }} text="Notifications" />}
+      title={<H3 icon={{ icon: "ph:chat-bold" }} text="Notifications" />}
       body={
         <Show
           when={getNotificationHistory().length > 0}
@@ -76,7 +76,7 @@ function NotificationEntry(props: {
         <Show when={props.notification.details !== undefined}>
           <Button
             variant="text"
-            fa={{ icon: "fa-clipboard", fixedWidth: true }}
+            icon={{ icon: "ph:clipboard-bold", fixedWidth: true }}
             balloon={{
               text: "Copy details to clipboard",
               position: "left",
@@ -88,13 +88,13 @@ function NotificationEntry(props: {
       <Show
         when={props.notification.useInnerHtml}
         fallback={
-          <div class="text-xs wrap-break-word text-text">
+          <div class="text-xs wrap-anywhere text-text">
             {props.notification.message}
           </div>
         }
       >
         <div
-          class="text-xs wrap-break-word text-text"
+          class="text-xs wrap-anywhere text-text"
           // oxlint-disable-next-line solid/no-innerhtml
           innerHTML={props.notification.message}
         ></div>

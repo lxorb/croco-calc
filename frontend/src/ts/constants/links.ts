@@ -30,11 +30,18 @@ export const GITHUB_REPO_URL = "https://github.com/lxorb/croco-calc";
 export const GITHUB_CONTRIBUTORS_URL = `${GITHUB_REPO_URL}/graphs/contributors`;
 
 /**
- * The upstream project croco calc is adapted from. CP-147 makes this credit
- * mandatory — it is the one place in `frontend/src` where the DoD-07 vocabulary
- * grep is allowed to match, and it may not be removed.
+ * The public status page, read by the outage/maintenance banners in
+ * `elements/psa.tsx`.
+ *
+ * `null` until one is provisioned. While it is `null` the banners still fire on
+ * a 503 or a failed request — they just say so in prose instead of linking to a
+ * page that does not exist, and the summary fetch is skipped entirely so a dead
+ * host cannot slow the boot path down.
+ *
+ * The upstream site used an Instatus page; the summary endpoint this expects is
+ * `${STATUS_PAGE_URL}/summary.json`, so any Instatus-compatible host drops in.
  */
-export const UPSTREAM_REPO_URL = "https://github.com/monkeytypegame/monkeytype";
+export const STATUS_PAGE_URL: string | null = null;
 
 /**
  * CP-017 — social targets. `discord` is `null` until a server exists, at which

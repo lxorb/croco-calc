@@ -130,7 +130,7 @@ export function Nav(): JSXElement {
         }}
       />
       {/*
-        C9: the monkeytype settings page is deleted, but the nav item stays and
+        C9: the upstream settings page is deleted, but the nav item stays and
         opens the theme modal. `data-nav-item="settings"` is preserved verbatim
         because all 52 theme CSS files colour the nav through it (CP-005,
         CP-164, CP-166).

@@ -1,5 +1,4 @@
 import { createSignal, DEV } from "solid-js";
-import { isProfilerMode } from "../utils/profiler-mode";
 
 export type TrackedSignal = {
   name: string;
@@ -92,7 +91,7 @@ function formatInitialValue(value: unknown): string {
   }
 }
 
-if (DEV && !isProfilerMode()) {
+if (DEV) {
   type NodeInfo = {
     name: string;
     type: "signal" | "store";

@@ -7,7 +7,7 @@ import {
   UserFlagOptions,
 } from "../../controllers/user-flag-controller";
 import { Balloon } from "./Balloon";
-import { Fa } from "./Fa";
+import { Icon } from "./Icon";
 export function UserFlags(
   props: SupportsFlags &
     UserFlagOptions & {
@@ -21,7 +21,7 @@ export function UserFlags(
       {(flag) => (
         <Show
           when={!props.iconsOnly}
-          fallback={<Fa icon={flag.icon} class={props.class} />}
+          fallback={<Icon icon={flag.icon} class={props.class} />}
         >
           <Balloon
             text={flag.description}
@@ -32,7 +32,7 @@ export function UserFlags(
               color: flag.color ?? "inherit",
             }}
           >
-            {<Fa icon={flag.icon} />}
+            {<Icon icon={flag.icon} />}
           </Balloon>
         </Show>
       )}

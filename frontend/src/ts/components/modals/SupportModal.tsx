@@ -9,7 +9,7 @@ import { Icon } from "../common/Icon";
 /**
  * CP-157 … CP-163.
  *
- * monkeytype's `Buy Merch` button is gone (CP-159), leaving three buttons in a
+ * The upstream `Buy Merch` button is gone (CP-159), leaving three buttons in a
  * three-column grid (CP-161). Ads, ko-fi and patreon are all deferred, so each
  * button reads its target from `SUPPORT_LINKS` and renders disabled with a
  * `coming soon` tooltip while that target is `null`/`false` (CP-162, CP-163).

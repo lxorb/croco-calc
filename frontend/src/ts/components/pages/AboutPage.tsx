@@ -6,7 +6,6 @@ import {
   GITHUB_CONTRIBUTORS_URL,
   GITHUB_REPO_URL,
   SOCIAL_LINKS,
-  UPSTREAM_REPO_URL,
 } from "../../constants/links";
 import {
   getContributorsQueryOptions,
@@ -481,7 +480,7 @@ export function AboutPage(): JSXElement {
             <Button
               variant="text"
               text="Monkeytype"
-              href={UPSTREAM_REPO_URL}
+              href="https://github.com/monkeytypegame/monkeytype"
               class="p-0 pt-2 pr-2 pb-2"
             />
             and its authors, for the design and the codebase croco calc is

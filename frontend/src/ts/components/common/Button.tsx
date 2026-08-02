@@ -8,7 +8,7 @@ type BaseProps = {
   text?: string;
   /**
    * Leading icon, as an iconify `set:name` id (CP-001, CP-002, C10). This
-   * replaces monkeytype's `fa` prop one-for-one — the `Fa` renderer was swapped
+   * replaces the upstream `fa` prop one-for-one — the `Fa` renderer was swapped
    * for `Icon`, the call sites keep their shape and only the icon string
    * changes.
    */

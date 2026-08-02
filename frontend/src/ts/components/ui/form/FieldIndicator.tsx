@@ -3,7 +3,7 @@ import type { AnyFieldApi } from "@tanstack/solid-form";
 import { Match, Switch } from "solid-js";
 
 import { Balloon } from "../../common/Balloon";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 import { LoadingCircle } from "../../common/LoadingCircle";
 
 export type FieldIndicatorProps = {
@@ -32,7 +32,7 @@ export function FieldIndicator(props: FieldIndicatorProps) {
             length="large"
             text={props.field.state.meta.errors.join(", ")}
           >
-            <Fa icon="fa-times" class="text-error" fixedWidth />
+            <Icon icon="ph:x-bold" class="text-error" fixedWidth />
           </Balloon>
         </Match>
         <Match when={hasWarning()}>
@@ -41,7 +41,7 @@ export function FieldIndicator(props: FieldIndicatorProps) {
             length="large"
             text={getWarnings().join(", ")}
           >
-            <Fa icon="fa-exclamation-triangle" class="text-main" />
+            <Icon icon="ph:warning-bold" class="text-main" />
           </Balloon>
         </Match>
         <Match
@@ -52,7 +52,7 @@ export function FieldIndicator(props: FieldIndicatorProps) {
                 !props.field.state.meta.isDefaultValue))
           }
         >
-          <Fa icon="fa-check" class="text-main" fixedWidth />
+          <Icon icon="ph:check-bold" class="text-main" fixedWidth />
         </Match>
       </Switch>
     </div>

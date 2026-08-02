@@ -24,7 +24,7 @@ import { z } from "zod";
 
 import { useLocalStorage } from "../../../hooks/useLocalStorage";
 import { cn } from "../../../utils/cn";
-import { Fa } from "../../common/Fa";
+import { Icon } from "../../common/Icon";
 import {
   Table,
   TableBody,
@@ -279,24 +279,26 @@ export function DataTable<TData extends Object, TValue = any>(
                               )}
                             </Show>
 
-                            <Switch fallback={<i class="fa-fw"></i>}>
+                            <Switch
+                              fallback={
+                                // An invisible sort caret, so the header does not
+                                // jump sideways when a column becomes sorted.
+                                <Icon
+                                  icon="ph:caret-up-bold"
+                                  fixedWidth
+                                  class="opacity-0"
+                                />
+                              }
+                            >
                               <Match
                                 when={header.column.getIsSorted() === "asc"}
                               >
-                                <Fa
-                                  icon={"fa-sort-up"}
-                                  fixedWidth
-                                  aria-hidden="true"
-                                />
+                                <Icon icon={"ph:caret-up-bold"} fixedWidth />
                               </Match>
                               <Match
                                 when={header.column.getIsSorted() === "desc"}
                               >
-                                <Fa
-                                  icon={"fa-sort-down"}
-                                  fixedWidth
-                                  aria-hidden="true"
-                                />
+                                <Icon icon={"ph:caret-down-bold"} fixedWidth />
                               </Match>
                             </Switch>
                           </button>

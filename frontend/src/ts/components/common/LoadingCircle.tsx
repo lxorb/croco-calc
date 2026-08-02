@@ -1,7 +1,7 @@
 import { JSXElement, Show } from "solid-js";
 
 import { cn } from "../../utils/cn";
-import { Fa } from "./Fa";
+import { Icon } from "./Icon";
 
 export function LoadingCircle(props: {
   color?: "main" | "sub" | "text";
@@ -41,7 +41,7 @@ export function LoadingCircle(props: {
           props.class,
         )}
       >
-        <Fa icon="fa-circle-notch" fixedWidth spin />
+        <Icon icon="ph:circle-notch-bold" fixedWidth spin />
       </div>
     </Show>
   );
