@@ -1,9 +1,21 @@
 import { Mode, PersonalBest, PersonalBests } from "@croco-calc/schemas/shared";
 import { Result as ResultType } from "@croco-calc/schemas/results";
-import { getFunbox } from "@monkeytype/funbox";
+import {
+  isDefaultSettingsId,
+  LeaderboardMode2,
+  LEADERBOARD_TIMES,
+} from "@croco-calc/schemas/math";
 
+/**
+ * The denormalised "best eligible result per board" projection the all-time
+ * leaderboard aggregation reads (`dal/leaderboards.ts`).
+ *
+ * monkeytype nested a language level under `mode2`; croco calc has no language
+ * dimension at all (AC-113, INV-153), so a board is identified by `mode2` alone
+ * and the innermost value is the personal best itself.
+ */
 export type LbPersonalBests = {
-  time: Record<number, Record<string, PersonalBest>>;
+  time: Partial<Record<LeaderboardMode2, PersonalBest>>;
 };
 
 type CheckAndUpdatePbResult = {
@@ -14,12 +26,12 @@ type CheckAndUpdatePbResult = {
 
 type Result = Omit<ResultType<Mode>, "_id" | "name">;
 
-export function canFunboxGetPb(result: Result): boolean {
-  if (result.funbox === undefined || result.funbox.length === 0) return true;
-
-  return getFunbox(result.funbox).every((f) => f.canGetPb);
-}
-
+/**
+ * AC-065 / C31 — personal bests are keyed on `(mode2, settingsId)` and the
+ * comparison is on `score`. A result is a PB iff its `score` **strictly** exceeds
+ * the stored best for the same pair, so an equal score never overwrites the older
+ * (and therefore earlier-achieved) entry.
+ */
 export function checkAndUpdatePb(
   userPersonalBests: PersonalBests,
   lbPersonalBests: LbPersonalBests | undefined,
@@ -28,21 +40,19 @@ export function checkAndUpdatePb(
   const mode = result.mode;
   const mode2 = result.mode2;
 
-  const userPb = userPersonalBests ?? {};
+  const userPb = userPersonalBests ?? { time: {} };
   userPb[mode] ??= {};
   userPb[mode][mode2] ??= [];
 
-  const personalBestMatch = (userPb[mode][mode2] as PersonalBest[]).find((pb) =>
-    matchesPersonalBest(result, pb),
-  );
+  const bests = userPb[mode][mode2];
+  const personalBestMatch = bests.find((pb) => matchesPersonalBest(result, pb));
 
   let isPb = true;
 
-  if (personalBestMatch) {
-    const didUpdate = updatePersonalBest(personalBestMatch, result);
-    isPb = didUpdate;
+  if (personalBestMatch !== undefined) {
+    isPb = updatePersonalBest(personalBestMatch, result);
   } else {
-    (userPb[mode][mode2] as PersonalBest[]).push(buildPersonalBest(result));
+    bests.push(buildPersonalBest(result));
   }
 
   if (lbPersonalBests !== undefined && lbPersonalBests !== null) {
@@ -59,106 +69,84 @@ export function checkAndUpdatePb(
   return {
     isPb,
     personalBests: userPb,
-    lbPersonalBests: lbPersonalBests,
+    lbPersonalBests,
   };
 }
 
+/**
+ * C31: the PB key. `mode2` is already the record key, so the only remaining
+ * discriminator is the settings signature — one string equality against the
+ * value frozen on the result at submission time (SB-178).
+ */
 function matchesPersonalBest(
   result: Result,
   personalBest: PersonalBest,
 ): boolean {
-  if (
-    result.difficulty === undefined ||
-    result.language === undefined ||
-    result.punctuation === undefined ||
-    result.lazyMode === undefined ||
-    result.numbers === undefined
-  ) {
+  if (result.settingsId === undefined) {
     throw new Error("Missing result data (matchesPersonalBest)");
   }
+  return result.settingsId === personalBest.settingsId;
+}
 
-  const sameLazyMode =
-    (result.lazyMode ?? false) === (personalBest.lazyMode ?? false);
-  const samePunctuation =
-    (result.punctuation ?? false) === (personalBest.punctuation ?? false);
-  const sameDifficulty = result.difficulty === personalBest.difficulty;
-  const sameLanguage = result.language === personalBest.language;
-  const sameNumbers =
-    (result.numbers ?? false) === (personalBest.numbers ?? false);
-
-  return (
-    sameLazyMode &&
-    samePunctuation &&
-    sameDifficulty &&
-    sameLanguage &&
-    sameNumbers
-  );
+function assertComplete(result: Result, caller: string): void {
+  if (
+    result.score === undefined ||
+    result.correct === undefined ||
+    result.wrong === undefined ||
+    result.acc === undefined ||
+    result.tpm === undefined ||
+    result.spm === undefined ||
+    result.settings === undefined ||
+    result.settingsId === undefined
+  ) {
+    throw new Error(`Missing result data (${caller})`);
+  }
 }
 
 function updatePersonalBest(
   personalBest: PersonalBest,
   result: Result,
 ): boolean {
-  if (personalBest.wpm >= result.wpm) {
+  // AC-065 — strictly greater.
+  if (personalBest.score >= result.score) {
     return false;
   }
 
-  if (
-    result.difficulty === undefined ||
-    result.language === undefined ||
-    result.punctuation === undefined ||
-    result.lazyMode === undefined ||
-    result.acc === undefined ||
-    result.consistency === undefined ||
-    result.rawWpm === undefined ||
-    result.wpm === undefined ||
-    result.numbers === undefined
-  ) {
-    throw new Error("Missing result data (updatePersonalBest)");
-  }
+  assertComplete(result, "updatePersonalBest");
 
-  personalBest.difficulty = result.difficulty;
-  personalBest.language = result.language;
-  personalBest.punctuation = result.punctuation;
-  personalBest.lazyMode = result.lazyMode;
+  personalBest.score = result.score;
+  personalBest.correct = result.correct;
+  personalBest.wrong = result.wrong;
   personalBest.acc = result.acc;
-  personalBest.consistency = result.consistency;
-  personalBest.raw = result.rawWpm;
-  personalBest.wpm = result.wpm;
-  personalBest.numbers = result.numbers;
+  personalBest.tpm = result.tpm;
+  personalBest.spm = result.spm;
+  personalBest.settings = result.settings;
+  personalBest.settingsId = result.settingsId;
   personalBest.timestamp = Date.now();
 
   return true;
 }
 
 function buildPersonalBest(result: Result): PersonalBest {
-  if (
-    result.difficulty === undefined ||
-    result.language === undefined ||
-    result.punctuation === undefined ||
-    result.lazyMode === undefined ||
-    result.acc === undefined ||
-    result.consistency === undefined ||
-    result.rawWpm === undefined ||
-    result.wpm === undefined ||
-    result.numbers === undefined
-  ) {
-    throw new Error("Missing result data (buildPersonalBest)");
-  }
+  assertComplete(result, "buildPersonalBest");
   return {
+    score: result.score,
+    correct: result.correct,
+    wrong: result.wrong,
     acc: result.acc,
-    consistency: result.consistency,
-    difficulty: result.difficulty,
-    lazyMode: result.lazyMode,
-    language: result.language,
-    punctuation: result.punctuation,
-    raw: result.rawWpm,
-    wpm: result.wpm,
-    numbers: result.numbers,
+    tpm: result.tpm,
+    spm: result.spm,
+    settings: result.settings,
+    settingsId: result.settingsId,
     timestamp: Date.now(),
   };
 }
 
+/**
+ * Recomputes the denormalised leaderboard PB for the board this result belongs
+ * to. Only default-settings runs at `time` 4 or 8 have a board at all (SB-175 as
+ * restated by C31), so nothing else can ever touch `lbPersonalBests`.
+ */
 export function updateLeaderboardPersonalBests(
   userPersonalBests: PersonalBests,
   lbPersonalBests: LbPersonalBests,
@@ -167,44 +155,31 @@ export function updateLeaderboardPersonalBests(
   if (!shouldUpdateLeaderboardPersonalBests(result)) {
     return null;
   }
-  const lbPb = lbPersonalBests ?? {};
-  const mode = result.mode as keyof typeof lbPb;
-  const mode2 = result.mode2 as unknown as keyof (typeof lbPb)[typeof mode];
-  lbPb[mode] ??= {};
-  lbPb[mode][mode2] ??= {};
 
-  const bestForEveryLanguage: Record<string, PersonalBest> = {};
-  (userPersonalBests[mode][mode2] as PersonalBest[]).forEach(
-    (pb: PersonalBest) => {
-      const language = pb.language;
-      if (
-        bestForEveryLanguage[language] === undefined ||
-        bestForEveryLanguage[language].wpm < pb.wpm
-      ) {
-        bestForEveryLanguage[language] = pb;
-      }
-    },
-  );
-  Object.entries(bestForEveryLanguage).forEach(([language, pb]) => {
-    const languageDoesNotExist = lbPb[mode][mode2]?.[language] === undefined;
-    const languageIsEmpty =
-      lbPb[mode][mode2]?.[language] &&
-      Object.keys(lbPb[mode][mode2][language]).length === 0;
+  const lbPb: LbPersonalBests = lbPersonalBests ?? { time: {} };
+  lbPb.time ??= {};
 
-    if (
-      (languageDoesNotExist ||
-        languageIsEmpty ||
-        (lbPb[mode][mode2]?.[language]?.wpm ?? 0) < pb.wpm) &&
-      lbPb[mode][mode2] !== undefined
-    ) {
-      lbPb[mode][mode2][language] = pb;
-    }
-  });
+  const mode2 = result.mode2 as LeaderboardMode2;
+  const stored = userPersonalBests.time?.[mode2] ?? [];
+
+  // The board is the *default settings* board, so the candidate is the stored PB
+  // carrying `LEADERBOARD_SETTINGS_ID` — never simply the highest-scoring entry,
+  // which could have been set under an easier configuration.
+  const candidate = stored.find((pb) => isDefaultSettingsId(pb.settingsId));
+  if (candidate === undefined) return null;
+
+  const current = lbPb.time[mode2];
+  if (current === undefined || current.score < candidate.score) {
+    lbPb.time[mode2] = candidate;
+  }
+
   return lbPb;
 }
 
 function shouldUpdateLeaderboardPersonalBests(result: Result): boolean {
-  const isValidTimeMode =
-    result.mode === "time" && (result.mode2 === "15" || result.mode2 === "60");
-  return isValidTimeMode && !result.lazyMode;
+  return (
+    result.mode === "time" &&
+    (LEADERBOARD_TIMES as readonly number[]).includes(Number(result.mode2)) &&
+    isDefaultSettingsId(result.settingsId)
+  );
 }

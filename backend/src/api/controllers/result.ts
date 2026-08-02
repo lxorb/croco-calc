@@ -12,23 +12,11 @@ import "dotenv/config";
 import { CrocoResponse } from "../../utils/croco-response";
 import CrocoError from "../../utils/error";
 import { isTestTooShort } from "../../utils/validation";
-import {
-  implemented as anticheatImplemented,
-  validateResult,
-  validateKeys,
-} from "../../anticheat/index";
+import { validateResult } from "../../anticheat/index";
 import CrocoStatusCodes from "../../constants/croco-status-codes";
-import {
-  incrementResult,
-  incrementDailyLeaderboard,
-} from "../../utils/prometheus";
-import GeorgeQueue from "../../queues/george-queue";
 import { getDailyLeaderboard } from "../../utils/daily-leaderboards";
 import * as UserDAL from "../../dal/user";
-import { buildCrocoMail } from "../../utils/croco-mail";
 import * as WeeklyXpLeaderboard from "../../services/weekly-xp-leaderboard";
-import { UAParser } from "ua-parser-js";
-import { canFunboxGetPb } from "../../utils/pb";
 import { buildDbResult } from "../../utils/result";
 import { Configuration } from "@croco-calc/schemas/configuration";
 import { addImportantLog, addLog } from "../../dal/logs";
@@ -40,82 +28,42 @@ import {
   GetResultByIdResponse,
   GetResultsQuery,
   GetResultsResponse,
-  UpdateResultTagsRequest,
-  UpdateResultTagsResponse,
 } from "@croco-calc/contracts/results";
 import {
   CompletedEvent,
-  KeyStats,
   PostResultResponse,
   XpBreakdown,
 } from "@croco-calc/schemas/results";
 import {
-  isSafeNumber,
-  mapRange,
-  roundTo2,
-  stdDev,
-} from "@croco-calc/util/numbers";
+  buildSettingsId,
+  isLeaderboardEligible,
+  MathGeneratorSettings,
+} from "@croco-calc/schemas/math";
+import { computeMetrics, TASK_LOG_TOOLONG } from "@croco-calc/math-engine";
+import { isSafeNumber } from "@croco-calc/util/numbers";
 import {
   getCurrentDayTimestamp,
   getStartOfDayTimestamp,
 } from "@croco-calc/util/date-and-time";
 import { CrocoRequest } from "../types";
-import { getFunbox, checkCompatibility } from "@monkeytype/funbox";
 import { tryCatch } from "@croco-calc/util/trycatch";
 import { getCachedConfiguration } from "../../init/configuration";
-import { getChallenges } from "@monkeytype/challenges";
-
-try {
-  if (!anticheatImplemented()) throw new Error("undefined");
-  Logger.success("Anticheat module loaded");
-} catch (e) {
-  if (isDevEnvironment()) {
-    Logger.warning(
-      "No anticheat module found. Continuing in dev mode, results will not be validated.",
-    );
-  } else {
-    Logger.error(
-      "No anticheat module found. To continue in dev mode, add MODE=dev to your .env file in the backend directory",
-    );
-    process.exit(1);
-  }
-}
-
-const autoRoleChallengeNames = new Set(
-  getChallenges()
-    .filter((it) => it.settings?.autoRole)
-    .map((it) => it.name),
-);
 
 export async function getResults(
   req: CrocoRequest<GetResultsQuery>,
 ): Promise<GetResultsResponse> {
   const { uid } = req.ctx.decodedToken;
-  const premiumFeaturesEnabled = req.ctx.configuration.users.premium.enabled;
   const { onOrAfterTimestamp = NaN, offset = 0 } = req.query;
-  const userHasPremium = await UserDAL.checkIfUserIsPremium(uid);
 
-  const maxLimit =
-    premiumFeaturesEnabled && userHasPremium
-      ? req.ctx.configuration.results.limits.premiumUser
-      : req.ctx.configuration.results.limits.regularUser;
+  const maxLimit = req.ctx.configuration.results.limits.regularUser;
 
   let limit =
     req.query.limit ??
     Math.min(req.ctx.configuration.results.maxBatchSize, maxLimit);
 
-  //check if premium features are disabled and current call exceeds the limit for regular users
-  if (
-    userHasPremium &&
-    !premiumFeaturesEnabled &&
-    limit + offset > req.ctx.configuration.results.limits.regularUser
-  ) {
-    throw new CrocoError(503, "Premium feature disabled.");
-  }
-
   if (limit + offset > maxLimit) {
     if (offset < maxLimit) {
-      //batch is partly in the allowed ranged. Set the limit to the max allowed and return partly results.
+      //batch is partly in the allowed range. Set the limit to the max allowed and return partial results.
       limit = maxLimit - offset;
     } else {
       throw new CrocoError(422, `Max results limit of ${maxLimit} exceeded.`);
@@ -133,7 +81,6 @@ export async function getResults(
       limit,
       offset,
       onOrAfterTimestamp,
-      isPremium: userHasPremium,
     },
     uid,
   );
@@ -167,29 +114,6 @@ export async function deleteAll(req: CrocoRequest): Promise<CrocoResponse> {
   return new CrocoResponse("All results deleted", null);
 }
 
-export async function updateTags(
-  req: CrocoRequest<undefined, UpdateResultTagsRequest>,
-): Promise<UpdateResultTagsResponse> {
-  const { uid } = req.ctx.decodedToken;
-  const { tagIds, resultId } = req.body;
-
-  await ResultDAL.updateTags(uid, resultId, tagIds);
-  const result = await ResultDAL.getResult(uid, resultId);
-
-  result.difficulty ??= "normal";
-  result.language ??= "english";
-  result.funbox ??= [];
-  result.lazyMode ??= false;
-  result.punctuation ??= false;
-  result.numbers ??= false;
-
-  const user = await UserDAL.getPartialUser(uid, "update tags", ["tags"]);
-  const tagPbs = await UserDAL.checkIfTagPb(uid, user, result);
-  return new CrocoResponse("Result tags updated", {
-    tagPbs,
-  });
-}
-
 export async function addResult(
   req: CrocoRequest<undefined, AddResultRequest>,
 ): Promise<AddResultResponse> {
@@ -212,12 +136,18 @@ export async function addResult(
     throw new CrocoError(status.code, status.message);
   }
 
-  if (user.lbOptOut !== true && completedEvent.acc < 75) {
-    throw new CrocoError(400, "Accuracy too low");
-  }
+  // -----------------------------------------------------------------------
+  // BL-5. monkeytype rejected every result with `acc < 75` here, and its schema
+  // floored `acc` at 50. A math trainer legitimately produces 40-70 % accuracy,
+  // so both constraints are **gone** and neither may come back: accuracy is a
+  // difficulty signal, never a cheat signal (ME-183). The schema floor was
+  // removed by WP-03 (`packages/schemas/src/results.ts` -> `acc: PercentageSchema`,
+  // no `.min()`); this is the controller half of the same fix.
+  // -----------------------------------------------------------------------
 
   const resulthash = completedEvent.hash;
   if (req.ctx.configuration.results.objectHashCheckEnabled) {
+    // ME-175 — kept on top of the regeneration check, not replaced by it.
     const objectToHash = omit(completedEvent, ["hash"]);
     const serverhash = objectHash(objectToHash);
     if (serverhash !== resulthash) {
@@ -237,104 +167,75 @@ export async function addResult(
     Logger.warning("Object hash check is disabled, skipping hash check");
   }
 
-  if (completedEvent.funbox.length !== new Set(completedEvent.funbox).size) {
-    throw new CrocoError(400, "Duplicate funboxes");
-  }
+  // The three settings views on the payload have to agree with each other before
+  // anything downstream keys off them: `settingsId` is what personal bests and
+  // leaderboard eligibility are keyed on (C4, C31), so it is **derived** here and
+  // compared, never taken on trust (ME-019).
+  assertSettingsConsistent(completedEvent);
 
-  if (!checkCompatibility(completedEvent.funbox)) {
-    throw new CrocoError(400, "Impossible funbox combination");
-  }
-
-  let keySpacingStats: KeyStats | undefined = undefined;
-  if (
-    completedEvent.keySpacing !== "toolong" &&
-    completedEvent.keySpacing.length > 0
-  ) {
-    keySpacingStats = {
-      average:
-        completedEvent.keySpacing.reduce(
-          (previous, current) => (current += previous),
-        ) / completedEvent.keySpacing.length,
-      sd: stdDev(completedEvent.keySpacing),
-    };
-  }
-
-  let keyDurationStats: KeyStats | undefined = undefined;
-  if (
-    completedEvent.keyDuration !== "toolong" &&
-    completedEvent.keyDuration.length > 0
-  ) {
-    keyDurationStats = {
-      average:
-        completedEvent.keyDuration.reduce(
-          (previous, current) => (current += previous),
-        ) / completedEvent.keyDuration.length,
-      sd: stdDev(completedEvent.keyDuration),
-    };
-  }
-
-  if (user.suspicious && completedEvent.testDuration <= 120) {
+  if (user.suspicious === true) {
     await addImportantLog("suspicious_user_result", completedEvent, uid);
   }
 
-  if (
-    completedEvent.mode === "time" &&
-    (completedEvent.mode2 === "60" || completedEvent.mode2 === "15") &&
-    completedEvent.wpm > 250 &&
-    user.lbOptOut !== true
-  ) {
-    await addImportantLog("highwpm_user_result", completedEvent, uid);
-  }
+  // -- anti-cheat ---------------------------------------------------------
+  const serverNow = Date.now();
+  const verdict = validateResult({
+    mathSeed: completedEvent.mathSeed,
+    mathSettings: completedEvent.mathSettings,
+    engineVersion: completedEvent.engineVersion,
+    taskLog: completedEvent.taskLog,
+    testDuration: completedEvent.testDuration,
+    timestamp: completedEvent.timestamp,
+    answered: completedEvent.correct + completedEvent.wrong,
+    serverNow,
+  });
 
-  if (anticheatImplemented()) {
-    if (
-      !validateResult(
-        completedEvent,
-        ((req.raw.headers["x-client-version"] as string) ||
-          req.raw.headers["client-version"]) as string,
-        JSON.stringify(new UAParser(req.raw.headers["user-agent"]).getResult()),
-        user.lbOptOut === true,
-      )
-    ) {
-      const status = CrocoStatusCodes.RESULT_DATA_INVALID;
-      throw new CrocoError(status.code, "Result data doesn't make sense");
-    } else if (isDevEnvironment()) {
-      Logger.success("Result data validated");
-    }
-  } else {
-    if (!isDevEnvironment()) {
-      throw new Error("No anticheat module found");
-    }
-    Logger.warning(
-      "No anticheat module found. Continuing in dev mode, results will not be validated.",
+  if (!verdict.valid) {
+    const { failure } = verdict;
+    void addLog(
+      `anticheat_${failure.code.replace(/-/g, "_")}`,
+      {
+        ...failure.details,
+        mathSeed: completedEvent.mathSeed,
+        mathSettings: completedEvent.mathSettings,
+        engineVersion: completedEvent.engineVersion,
+      },
+      uid,
     );
+
+    if (failure.code === "task-log-invalid") {
+      // A log that does not reproduce from its own seed cannot happen by
+      // accident, so it counts towards the auto-ban budget. Plausibility
+      // violations deliberately do **not** — they are heuristics, and BL-5 is
+      // the standing reminder of what over-eager heuristics cost.
+      await recordAutoBan(uid, req.ctx.configuration.users.autoBan);
+    }
+
+    throw new CrocoError(failure.status, failure.message);
+  } else if (isDevEnvironment()) {
+    Logger.success("Result data validated");
   }
 
-  //dont use - result timestamp is unreliable, can be changed by system time and stuff
-  // if (result.timestamp > Math.round(Date.now() / 1000) * 1000 + 10) {
-  //   log(
-  //     "time_traveler",
-  //     {
-  //       resultTimestamp: result.timestamp,
-  //       serverTimestamp: Math.round(Date.now() / 1000) * 1000 + 10,
-  //     },
-  //     uid
-  //   );
-  //   return res.status(400).json({ message: "Time traveler detected" });
+  // The task log has now been proven to reproduce from `(mathSeed, mathSettings)`,
+  // so it — and only it — is the source of truth for the metrics. Recomputing
+  // them closes the gap where a genuine log is submitted next to a fabricated
+  // `score` (AC-025).
+  assertMetricsMatchTaskLog(completedEvent);
 
   const { data: lastResultTimestamp } = await tryCatch(
     ResultDAL.getLastResultTimestamp(uid),
   );
 
-  //convert result test duration to miliseconds
-  completedEvent.timestamp = Math.floor(Date.now() / 1000) * 1000;
+  //the client timestamp is unreliable (system clock), so the stored one is ours.
+  //ME-182(c) has already bounded the submitted value.
+  completedEvent.timestamp = Math.floor(serverNow / 1000) * 1000;
 
   //check if now is earlier than last result plus duration (-1 second as a buffer)
   const testDurationMilis = completedEvent.testDuration * 1000;
   const incompleteTestsMilis = completedEvent.incompleteTestSeconds * 1000;
   const earliestPossible =
     (lastResultTimestamp ?? 0) + testDurationMilis + incompleteTestsMilis;
-  const nowNoMilis = Math.floor(Date.now() / 1000) * 1000;
+  const nowNoMilis = Math.floor(serverNow / 1000) * 1000;
   if (
     isSafeNumber(lastResultTimestamp) &&
     nowNoMilis < earliestPossible - 1000
@@ -354,59 +255,7 @@ export async function addResult(
     throw new CrocoError(status.code, "Invalid result spacing");
   }
 
-  //check keyspacing and duration here for bots
-  if (
-    completedEvent.mode === "time" &&
-    completedEvent.wpm > 130 &&
-    completedEvent.testDuration < 122 &&
-    (user.verified === false || user.verified === undefined) &&
-    user.lbOptOut !== true
-  ) {
-    if (!keySpacingStats || !keyDurationStats) {
-      const status = CrocoStatusCodes.MISSING_KEY_DATA;
-      throw new CrocoError(status.code, "Missing key data");
-    }
-    if (completedEvent.keyOverlap === undefined) {
-      throw new CrocoError(400, "Old key data format");
-    }
-    if (anticheatImplemented()) {
-      if (
-        !validateKeys(completedEvent, keySpacingStats, keyDurationStats, uid)
-      ) {
-        //autoban
-        const autoBanConfig = req.ctx.configuration.users.autoBan;
-        if (autoBanConfig.enabled) {
-          const didUserGetBanned = await UserDAL.recordAutoBanEvent(
-            uid,
-            autoBanConfig.maxCount,
-            autoBanConfig.maxHours,
-          );
-          if (didUserGetBanned) {
-            const mail = buildCrocoMail({
-              subject: "Banned",
-              body: "Your account has been automatically banned for triggering the anticheat system. If you believe this is a mistake, please contact support.",
-            });
-            await UserDAL.addToInbox(
-              uid,
-              [mail],
-              req.ctx.configuration.users.inbox,
-            );
-            user.banned = true;
-          }
-        }
-        const status = CrocoStatusCodes.BOT_DETECTED;
-        throw new CrocoError(status.code, "Possible bot detected");
-      }
-    } else {
-      if (!isDevEnvironment()) {
-        throw new Error("No anticheat module found");
-      }
-      Logger.warning(
-        "No anticheat module found. Continuing in dev mode, results will not be validated.",
-      );
-    }
-  }
-
+  // ME-175 — the duplicate/replay check.
   if (req.ctx.configuration.users.lastHashesCheck.enabled) {
     let lastHashes = user.lastReultHashes ?? [];
     if (lastHashes.includes(resulthash)) {
@@ -431,65 +280,25 @@ export async function addResult(
     }
   }
 
-  if (keyDurationStats) {
-    keyDurationStats.average = roundTo2(keyDurationStats.average);
-    keyDurationStats.sd = roundTo2(keyDurationStats.sd);
-  }
-  if (keySpacingStats) {
-    keySpacingStats.average = roundTo2(keySpacingStats.average);
-    keySpacingStats.sd = roundTo2(keySpacingStats.sd);
-  }
+  // AC-065 / C38 — every completed run is a PB candidate. There is no bail-out
+  // concept in croco calc, so there is no condition to gate this on (AC-187).
+  const isPb = await UserDAL.checkIfPb(uid, user, completedEvent);
 
-  let isPb = false;
-  let tagPbs: string[] = [];
-
-  if (!completedEvent.bailedOut) {
-    [isPb, tagPbs] = await Promise.all([
-      UserDAL.checkIfPb(uid, user, completedEvent),
-      UserDAL.checkIfTagPb(uid, user, completedEvent),
-    ]);
-  }
-
-  if (completedEvent.mode === "time" && completedEvent.mode2 === "60") {
-    void UserDAL.incrementBananas(uid, completedEvent.wpm);
-    if (
-      isPb &&
-      user.discordId !== undefined &&
-      user.discordId !== "" &&
-      user.lbOptOut !== true
-    ) {
-      void GeorgeQueue.updateDiscordRole(user.discordId, completedEvent.wpm);
-    }
-  }
-
-  if (
-    completedEvent.challenge !== null &&
-    completedEvent.challenge !== undefined &&
-    autoRoleChallengeNames.has(completedEvent.challenge) &&
-    user.discordId !== undefined &&
-    user.discordId !== ""
-  ) {
-    void GeorgeQueue.awardChallenge(user.discordId, completedEvent.challenge);
-  } else {
-    delete completedEvent.challenge;
-  }
-
-  const afk = completedEvent.afkDuration ?? 0;
-  const totalDurationTypedSeconds =
+  const afk = completedEvent.afkDuration;
+  const totalDurationSolvedSeconds =
     completedEvent.testDuration + completedEvent.incompleteTestSeconds - afk;
   void UserDAL.updateTypingStats(
     uid,
     completedEvent.restartCount,
-    totalDurationTypedSeconds,
+    totalDurationSolvedSeconds,
   );
   void PublicDAL.updateStats(
     completedEvent.restartCount,
-    totalDurationTypedSeconds,
+    totalDurationSolvedSeconds,
   );
 
   const dailyLeaderboardsConfig = req.ctx.configuration.dailyLeaderboards;
   const dailyLeaderboard = getDailyLeaderboard(
-    completedEvent.language,
     completedEvent.mode,
     completedEvent.mode2,
     dailyLeaderboardsConfig,
@@ -497,54 +306,38 @@ export async function addResult(
 
   let dailyLeaderboardRank = -1;
 
-  const stopOnLetterTriggered =
-    completedEvent.stopOnLetter && completedEvent.acc < 100;
+  const minTimeSpent = (await getCachedConfiguration(true)).leaderboards
+    .minTimeSpent;
 
-  const minTimeTyping = (await getCachedConfiguration(true)).leaderboards
-    .minTimeTyping;
-
+  // AC-120 — user eligibility.
   const userEligibleForLeaderboard =
     user.banned !== true &&
     user.lbOptOut !== true &&
-    (isDevEnvironment() || (user.timeTyping ?? 0) > minTimeTyping);
+    (isDevEnvironment() || (user.timeSpent ?? 0) > minTimeSpent);
 
+  // AC-121 — result eligibility for the *speed* boards: user eligible, `mode2`
+  // is 4 or 8, and `settingsId` equals the frozen `LEADERBOARD_SETTINGS_ID`
+  // (C4). Clause 4 (`bailedOut`) is struck by C38, and clause 5 (the validation
+  // pipeline) has already thrown if it failed.
   const validResultCriteria =
-    canFunboxGetPb(completedEvent) &&
-    !completedEvent.bailedOut &&
     userEligibleForLeaderboard &&
-    !stopOnLetterTriggered;
-
-  const selectedBadgeId = user.inventory?.badges?.find((b) => b.selected)?.id;
-  const isPremium =
-    (await UserDAL.checkIfUserIsPremium(user.uid, user)) || undefined;
+    isLeaderboardEligible(completedEvent.settingsId, completedEvent.mode2);
 
   if (dailyLeaderboard && validResultCriteria) {
-    incrementDailyLeaderboard(
-      completedEvent.mode,
-      completedEvent.mode2,
-      completedEvent.language,
-    );
     dailyLeaderboardRank = await dailyLeaderboard.addResult(
       {
-        name: user.name,
-        wpm: completedEvent.wpm,
-        raw: completedEvent.rawWpm,
-        acc: completedEvent.acc,
-        consistency: completedEvent.consistency,
-        timestamp: completedEvent.timestamp,
         uid,
-        discordAvatar: user.discordAvatar,
-        discordId: user.discordId,
-        badgeId: selectedBadgeId,
-        isPremium,
+        name: user.name,
+        score: completedEvent.score,
+        correct: completedEvent.correct,
+        wrong: completedEvent.wrong,
+        acc: completedEvent.acc,
+        tpm: completedEvent.tpm,
+        timestamp: completedEvent.timestamp,
       },
       dailyLeaderboardsConfig,
     );
-    if (
-      dailyLeaderboardRank >= 1 &&
-      dailyLeaderboardRank <= 10 &&
-      completedEvent.testDuration <= 120
-    ) {
+    if (dailyLeaderboardRank >= 1 && dailyLeaderboardRank <= 10) {
       const now = Date.now();
       const reset = getCurrentDayTimestamp();
       const limit = 6 * 60 * 60 * 1000;
@@ -554,50 +347,19 @@ export async function addResult(
     }
   }
 
-  const streak = await UserDAL.updateStreak(uid, completedEvent.timestamp);
-  const badgeWaitingInInbox = (
-    user.inbox?.flatMap((i) =>
-      (i.rewards ?? []).map((r) => (r.type === "badge" ? r.item.id : null)),
-    ) ?? []
-  ).includes(14);
-
-  const shouldGetBadge =
-    streak >= 365 &&
-    user.inventory?.badges?.find((b) => b.id === 14) === undefined &&
-    !badgeWaitingInInbox;
-
-  if (shouldGetBadge) {
-    const mail = buildCrocoMail({
-      subject: "Badge",
-      body: "Congratulations for reaching a 365 day streak! You have been awarded a special badge. Now, go touch some grass.",
-      rewards: [
-        {
-          type: "badge",
-          item: {
-            id: 14,
-          },
-        },
-      ],
-    });
-    await UserDAL.addToInbox(uid, [mail], req.ctx.configuration.users.inbox);
-  }
-
   const xpGained = await calculateXp(
     completedEvent,
     req.ctx.configuration.users.xp,
     lastResultTimestamp,
     user.xp ?? 0,
-    streak,
   );
 
+  // AC-034 — both invariants are 500s with the offending payload attached.
   if (isNaN(xpGained.xp)) {
     throw new CrocoError(
       500,
       "Calculated XP is NaN",
-      JSON.stringify({
-        xpGained,
-        result: completedEvent,
-      }),
+      JSON.stringify({ xpGained, result: completedEvent }),
       uid,
     );
   }
@@ -606,14 +368,14 @@ export async function addResult(
     throw new CrocoError(
       500,
       "Calculated XP is negative",
-      JSON.stringify({
-        xpGained,
-        result: completedEvent,
-      }),
+      JSON.stringify({ xpGained, result: completedEvent }),
       uid,
     );
   }
 
+  // AC-123 — the weekly XP board deliberately does **not** apply the
+  // default-settings gate or the 4/8-minute gate; it only needs an eligible user
+  // and XP > 0, so the weekly totals agree with the profile's XP.
   const weeklyXpLeaderboardConfig = req.ctx.configuration.leaderboards.weeklyXp;
   let weeklyXpLeaderboardRank = -1;
 
@@ -627,12 +389,8 @@ export async function addResult(
         entry: {
           uid,
           name: user.name,
-          discordAvatar: user.discordAvatar,
-          discordId: user.discordId,
-          badgeId: selectedBadgeId,
           lastActivityTimestamp: Date.now(),
-          isPremium,
-          timeTypedSeconds: totalDurationTypedSeconds,
+          timeSpentSeconds: totalDurationSolvedSeconds,
         },
         xpGained: xpGained.xp,
       },
@@ -640,13 +398,6 @@ export async function addResult(
   }
 
   const dbresult = buildDbResult(completedEvent, user.name, isPb);
-  if (keySpacingStats !== undefined) {
-    dbresult.keySpacingStats = keySpacingStats;
-  }
-  if (keyDurationStats !== undefined) {
-    dbresult.keyDurationStats = keyDurationStats;
-  }
-
   const addedResult = await ResultDAL.addResult(uid, dbresult);
 
   await UserDAL.incrementXp(uid, xpGained.xp);
@@ -655,23 +406,17 @@ export async function addResult(
   if (isPb) {
     void addLog(
       "user_new_pb",
-      `${`${completedEvent.mode} ${completedEvent.mode2}`} ${
-        completedEvent.wpm
-      } ${completedEvent.acc}% ${completedEvent.rawWpm} ${
-        completedEvent.consistency
-      }% (${addedResult.insertedId})`,
+      `${completedEvent.mode} ${completedEvent.mode2} score ${completedEvent.score} ${completedEvent.acc}% ${completedEvent.tpm} tpm (${addedResult.insertedId})`,
       uid,
     );
   }
 
   const data: PostResultResponse = {
     isPb,
-    tagPbs,
     insertedId: addedResult.insertedId.toHexString(),
     xp: xpGained.xp,
     dailyXpBonus: xpGained.dailyBonus ?? false,
     xpBreakdown: xpGained.breakdown ?? {},
-    streak,
   };
 
   if (dailyLeaderboardRank !== -1) {
@@ -682,9 +427,105 @@ export async function addResult(
     data.weeklyXpLeaderboardRank = weeklyXpLeaderboardRank;
   }
 
-  incrementResult(completedEvent, dbresult.isPb);
-
   return new CrocoResponse("Result saved", data);
+}
+
+/**
+ * ME-019 / C4 — `settingsId` is derived from the settings snapshot, and the
+ * snapshot itself has to be the same one the tasks were generated from, or the
+ * regeneration check would be verifying a different test than the one the
+ * leaderboard is keyed on.
+ */
+function assertSettingsConsistent(completedEvent: CompletedEvent): void {
+  const { mathSettings, settings, settingsId, mode2, testDuration } =
+    completedEvent;
+
+  const derivedFromSnapshot = buildSettingsId(settings);
+  if (derivedFromSnapshot !== settingsId) {
+    throw new CrocoError(
+      CrocoStatusCodes.RESULT_DATA_INVALID.code,
+      "Result settings id does not match its settings",
+    );
+  }
+
+  const generatorSettings: MathGeneratorSettings = {
+    addition: mathSettings.addition,
+    multiplication: mathSettings.multiplication,
+    division: mathSettings.division,
+    fractionAddition: mathSettings.fractionAddition,
+    fractionMultiplication: mathSettings.fractionMultiplication,
+    decimals: mathSettings.decimals,
+    negatives: mathSettings.negatives,
+  };
+  if (buildSettingsId(generatorSettings) !== settingsId) {
+    throw new CrocoError(
+      CrocoStatusCodes.RESULT_DATA_INVALID.code,
+      "Result settings do not match the generator settings",
+    );
+  }
+
+  if (mode2 !== `${mathSettings.time}`) {
+    throw new CrocoError(
+      CrocoStatusCodes.RESULT_DATA_INVALID.code,
+      "Result mode2 does not match the test length",
+    );
+  }
+
+  // ME-182(a) is also enforced by the plausibility layer; failing here first
+  // gives a message that names the actual problem.
+  if (testDuration !== mathSettings.time * 60) {
+    throw new CrocoError(
+      CrocoStatusCodes.RESULT_DATA_INVALID.code,
+      "Result duration does not match the test length",
+    );
+  }
+}
+
+/** Rounded metrics are compared with a tolerance; counts must match exactly. */
+const METRIC_TOLERANCE = 0.011;
+
+function assertMetricsMatchTaskLog(completedEvent: CompletedEvent): void {
+  // ME-176's degraded path has no entries left to recompute from. It is
+  // unreachable for a plausible result anyway (120 tpm over 480 s caps a
+  // legitimate log at 960 entries, below the 1000-entry threshold).
+  if (completedEvent.taskLog === TASK_LOG_TOOLONG) return;
+
+  const expected = computeMetrics(
+    completedEvent.taskLog,
+    completedEvent.testDuration,
+  );
+
+  const exact: (keyof typeof expected)[] = ["correct", "wrong", "score"];
+  for (const field of exact) {
+    if (completedEvent[field] !== expected[field]) {
+      throw new CrocoError(
+        CrocoStatusCodes.RESULT_DATA_INVALID.code,
+        `Reported ${field} does not match the task log`,
+      );
+    }
+  }
+
+  const rounded: (keyof typeof expected)[] = ["acc", "tpm", "spm"];
+  for (const field of rounded) {
+    if (Math.abs(completedEvent[field] - expected[field]) > METRIC_TOLERANCE) {
+      throw new CrocoError(
+        CrocoStatusCodes.RESULT_DATA_INVALID.code,
+        `Reported ${field} does not match the task log`,
+      );
+    }
+  }
+}
+
+async function recordAutoBan(
+  uid: string,
+  autoBanConfig: Configuration["users"]["autoBan"],
+): Promise<void> {
+  if (!autoBanConfig.enabled) return;
+  await UserDAL.recordAutoBanEvent(
+    uid,
+    autoBanConfig.maxCount,
+    autoBanConfig.maxHours,
+  );
 }
 
 type XpResult = {
@@ -693,122 +534,91 @@ type XpResult = {
   breakdown?: XpBreakdown;
 };
 
-async function calculateXp(
-  result: CompletedEvent,
+/**
+ * AC-027 — the mode modifier table, keyed on the **C2 canonical stored
+ * literals**. Keying it on the display labels (`100x100`, `xxx/xx`, `1/xx`, …)
+ * would make every lookup miss and pin `modeModifier` at a constant 1; AC-039's
+ * 1694-XP acceptance test is the guard against exactly that.
+ */
+const MODE_BONUSES = {
+  addition: { off: 0, "100": 0, "1000": 0.05 },
+  multiplication: { off: 0, "12": 0.05, "20": 0.1, "100": 0.2 },
+  division: { off: 0, tables: 0.05, threeByTwo: 0.15 },
+  fractionAddition: { off: 0, "12": 0.1, "99": 0.2 },
+} as const;
+
+const BOOLEAN_BONUSES = {
+  fractionMultiplication: 0.1,
+  decimals: 0.15,
+  negatives: 0.1,
+} as const;
+
+/** AC-027 — `1 + Σ bonus(setting)` over the seven task-shaping settings. */
+export function modeModifierOf(settings: MathGeneratorSettings): number {
+  let modifier = 1;
+  modifier += MODE_BONUSES.addition[settings.addition];
+  modifier += MODE_BONUSES.multiplication[settings.multiplication];
+  modifier += MODE_BONUSES.division[settings.division];
+  modifier += MODE_BONUSES.fractionAddition[settings.fractionAddition];
+  if (settings.fractionMultiplication) {
+    modifier += BOOLEAN_BONUSES.fractionMultiplication;
+  }
+  if (settings.decimals) modifier += BOOLEAN_BONUSES.decimals;
+  if (settings.negatives) modifier += BOOLEAN_BONUSES.negatives;
+  return modifier;
+}
+
+/**
+ * AC-025 … AC-039.
+ *
+ * Dropped from monkeytype's `calculateXp`: the quote / punctuation / numbers /
+ * funbox bonuses (no such settings exist), the "corrected everything" bonus
+ * (AC-028 — croco calc has no character-level correction), the streak modifier
+ * (C17) and the incomplete-tests component (AC-032 — fixed-duration timers have
+ * no partial-word notion).
+ */
+export async function calculateXp(
+  result: Pick<
+    CompletedEvent,
+    "acc" | "testDuration" | "afkDuration" | "settings"
+  >,
   xpConfiguration: Configuration["users"]["xp"],
   lastResultTimestamp: number | null,
   currentTotalXp: number,
-  streak: number,
 ): Promise<XpResult> {
-  const {
-    mode,
-    acc,
-    testDuration,
-    incompleteTestSeconds,
-    incompleteTests,
-    afkDuration,
-    charStats,
-    punctuation,
-    numbers,
-    funbox: resultFunboxes,
-  } = result;
+  const { acc, testDuration, afkDuration, settings } = result;
+  const { enabled, gainMultiplier, maxDailyBonus, minDailyBonus } =
+    xpConfiguration;
 
-  const {
-    enabled,
-    gainMultiplier,
-    maxDailyBonus,
-    minDailyBonus,
-    funboxBonus: funboxBonusConfiguration,
-  } = xpConfiguration;
-
-  if (mode === "zen" || !enabled) {
-    return {
-      xp: 0,
-    };
+  if (!enabled) {
+    return { xp: 0 };
   }
 
   const breakdown: XpBreakdown = {};
 
+  // AC-026 — XP rewards time on task, not score, so a beginner still levels up.
   const baseXp = Math.round((testDuration - afkDuration) * 2);
   breakdown.base = baseXp;
 
-  let modifier = 1;
+  let modifier = modeModifierOf(settings);
 
-  const correctedEverything = charStats
-    .slice(1)
-    .every((charStat: number) => charStat === 0);
-
+  // AC-028 — the perfect-accuracy bonus. There is deliberately no
+  // "corrected everything" counterpart.
+  let perfectBonus = 0;
   if (acc === 100) {
-    modifier += 0.5;
-    breakdown.fullAccuracy = Math.round(baseXp * 0.5);
-  } else if (correctedEverything) {
-    // corrected everything bonus
-    modifier += 0.25;
-    breakdown.corrected = Math.round(baseXp * 0.25);
+    perfectBonus = 0.5;
+    modifier += perfectBonus;
+    breakdown.fullAccuracy = Math.round(baseXp * perfectBonus);
   }
 
-  if (mode === "quote") {
-    // real sentences bonus
-    modifier += 0.5;
-    breakdown.quote = Math.round(baseXp * 0.5);
-  } else {
-    // punctuation bonus
-    if (punctuation) {
-      modifier += 0.4;
-      breakdown.punctuation = Math.round(baseXp * 0.4);
-    }
-    if (numbers) {
-      modifier += 0.1;
-      breakdown.numbers = Math.round(baseXp * 0.1);
-    }
-  }
+  // AC-037 — so the breakdown rows sum to the awarded XP.
+  breakdown.modes = Math.round(baseXp * (modifier - 1 - perfectBonus));
 
-  if (funboxBonusConfiguration > 0 && resultFunboxes.length !== 0) {
-    const funboxModifier = resultFunboxes.reduce((sum, funboxName) => {
-      const funbox = getFunbox(funboxName);
-      const difficultyLevel = funbox?.difficultyLevel ?? 0;
-      return sum + Math.max(difficultyLevel * funboxBonusConfiguration, 0);
-    }, 0);
+  // AC-029 — the lower clamp is mandatory. croco calc accuracy legitimately
+  // reaches 0 and `result.ts` throws on negative XP (AC-034).
+  const accuracyModifier = Math.min(Math.max((acc - 50) / 50, 0), 1);
 
-    if (funboxModifier > 0) {
-      modifier += funboxModifier;
-      breakdown.funbox = Math.round(baseXp * funboxModifier);
-    }
-  }
-
-  if (xpConfiguration.streak.enabled) {
-    const streakModifier = parseFloat(
-      mapRange(
-        streak,
-        0,
-        xpConfiguration.streak.maxStreakDays,
-        0,
-        xpConfiguration.streak.maxStreakMultiplier,
-        true,
-      ).toFixed(1),
-    );
-
-    if (streakModifier > 0) {
-      modifier += streakModifier;
-      breakdown.streak = Math.round(baseXp * streakModifier);
-    }
-  }
-
-  let incompleteXp = 0;
-  if (incompleteTests !== undefined && incompleteTests.length > 0) {
-    incompleteTests.forEach((it: { acc: number; seconds: number }) => {
-      let mod = (it.acc - 50) / 50;
-      if (mod < 0) mod = 0;
-      incompleteXp += Math.round(it.seconds * mod);
-    });
-    breakdown.incomplete = incompleteXp;
-  } else if (incompleteTestSeconds && incompleteTestSeconds > 0) {
-    incompleteXp = Math.round(incompleteTestSeconds);
-    breakdown.incomplete = incompleteXp;
-  }
-
-  const accuracyModifier = (acc - 50) / 50;
-
+  // AC-035 — first completed test of a UTC day.
   let dailyBonus = 0;
   if (isSafeNumber(lastResultTimestamp)) {
     const lastResultDay = getStartOfDayTimestamp(lastResultTimestamp);
@@ -823,27 +633,22 @@ async function calculateXp(
     }
   }
 
+  // AC-030 / AC-031.
   const xpWithModifiers = Math.round(baseXp * modifier);
-
   const xpAfterAccuracy = Math.round(xpWithModifiers * accuracyModifier);
   breakdown.accPenalty = xpWithModifiers - xpAfterAccuracy;
 
-  const totalXp =
-    Math.round((xpAfterAccuracy + incompleteXp) * gainMultiplier) + dailyBonus;
+  // AC-034.
+  const totalXp = Math.round(xpAfterAccuracy * gainMultiplier) + dailyBonus;
 
+  // AC-033 — surfaced only when it is doing something.
   if (gainMultiplier !== 1) {
-    // breakdown.push([
-    //   "configMultiplier",
-    //   Math.round((xpAfterAccuracy + incompleteXp) * (gainMultiplier - 1)),
-    // ]);
     breakdown.configMultiplier = gainMultiplier;
   }
 
-  const isAwardingDailyBonus = dailyBonus > 0;
-
   return {
     xp: totalXp,
-    dailyBonus: isAwardingDailyBonus,
+    dailyBonus: dailyBonus > 0,
     breakdown,
   };
 }

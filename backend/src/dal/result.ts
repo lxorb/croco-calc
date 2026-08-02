@@ -1,14 +1,8 @@
-import {
-  Collection,
-  type DeleteResult,
-  Filter,
-  ObjectId,
-  type UpdateResult,
-} from "mongodb";
+import { Collection, type DeleteResult, Filter, ObjectId } from "mongodb";
 import CrocoError from "../utils/error";
 import * as db from "../init/db";
-import { getUser, getTags } from "./user";
-import { DBResult, replaceLegacyValues } from "../utils/result";
+import { getUser } from "./user";
+import { DBResult } from "../utils/result";
 import { tryCatch } from "@croco-calc/util/trycatch";
 
 export const getResultCollection = (): Collection<DBResult> =>
@@ -33,31 +27,6 @@ export async function deleteAll(uid: string): Promise<DeleteResult> {
   return await getResultCollection().deleteMany({ uid });
 }
 
-export async function updateTags(
-  uid: string,
-  resultId: string,
-  tags: string[],
-): Promise<UpdateResult> {
-  const result = await getResultCollection().findOne({
-    _id: new ObjectId(resultId),
-    uid,
-  });
-  if (!result) throw new CrocoError(404, "Result not found");
-  const userTags = await getTags(uid);
-  const userTagIds = new Set(userTags.map((tag) => tag._id.toString()));
-  let validTags = true;
-  tags.forEach((tagId) => {
-    if (!userTagIds.has(tagId)) validTags = false;
-  });
-  if (!validTags) {
-    throw new CrocoError(422, "One of the tag id's is not valid");
-  }
-  return await getResultCollection().updateOne(
-    { _id: new ObjectId(resultId), uid },
-    { $set: { tags } },
-  );
-}
-
 export async function getResult(uid: string, id: string): Promise<DBResult> {
   const result = await getResultCollection().findOne({
     _id: new ObjectId(id),
@@ -65,7 +34,7 @@ export async function getResult(uid: string, id: string): Promise<DBResult> {
   });
 
   if (!result) throw new CrocoError(404, "Result not found");
-  return replaceLegacyValues(result);
+  return result;
 }
 
 export async function getLastResult(uid: string): Promise<DBResult> {
@@ -75,7 +44,7 @@ export async function getLastResult(uid: string): Promise<DBResult> {
   );
 
   if (lastResult === null) throw new CrocoError(404, "No last result found");
-  return replaceLegacyValues(lastResult);
+  return lastResult;
 }
 
 export async function getLastResultTimestamp(uid: string): Promise<number> {
@@ -97,7 +66,7 @@ export async function getResultByTimestamp(
 ): Promise<DBResult | null> {
   const result = await getResultCollection().findOne({ uid, timestamp });
   if (result === null) return null;
-  return replaceLegacyValues(result);
+  return result;
 }
 
 type GetResultsOpts = {
@@ -123,10 +92,10 @@ export async function getResults(
 
   let query = getResultCollection()
     .find(condition, {
+      // `ResultMinifiedSchema` — the account page's results table never renders
+      // the chart series or the owner's own name.
       projection: {
         chartData: 0,
-        keySpacingStats: 0,
-        keyDurationStats: 0,
         name: 0,
       },
     })
@@ -141,5 +110,5 @@ export async function getResults(
 
   const results = await query.toArray();
   if (results === undefined) throw new CrocoError(404, "Result not found");
-  return results.map(replaceLegacyValues);
+  return results;
 }
