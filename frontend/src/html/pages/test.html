@@ -4,32 +4,29 @@
   <div id="testInitFailed" class="content-grid hidden">
     <div class="message">
       <div class="text">
-        Test initialization failed. Please try different settings or refreshing
-        the page. If the problem persists, please contact support.
+        Task generation failed. Please try different settings or refresh the
+        page. If the problem persists, please contact support.
       </div>
       <div class="error"></div>
       <button class="active restart">
-        <i class="fas fa-fw fa-redo-alt"></i>
+        <mount data-component="restarticon" class="contents"></mount>
         Restart
       </button>
     </div>
   </div>
-  <div id="typingTest" class="content-grid full-width-padding">
-    <mount data-component="capswarning"></mount>
-    <div id="memoryTimer">Time left to memorise all words: 0s</div>
-    <div id="layoutfluidTimer">Time left to memorise all words: 0s</div>
+  <div id="tasksTest" class="content-grid full-width-padding">
     <mount data-component="testmodesnotice"></mount>
 
     <mount data-component="livestatstexttop"></mount>
     <mount data-component="livestatsmini" class="full-width"></mount>
-    <div id="wordsWrapper" class="content-grid full-width" translate="no">
+    <div id="tasksWrapper" class="content-grid full-width" translate="no">
       <textarea
-        id="wordsInput"
+        id="tasksInput"
         class="full-width"
         autocomplete="off"
-        autocapitalize="off"
         autocapitalize="none"
         autocorrect="off"
+        inputmode="decimal"
         data-gramm="false"
         data-gramm_editor="false"
         data-enable-grammarly="false"
@@ -41,14 +38,12 @@
         spellcheck="false"
       ></textarea>
       <mount data-component="outoffocuswarning" class="contents"></mount>
-      <div id="paceCaret" class="full-width default hidden"></div>
+      <mount data-component="prestarthint" class="contents"></mount>
       <div id="caret" class="full-width default"></div>
-      <div id="words" class="full-width"></div>
+      <div id="tasks" class="full-width preStart" data-state="idle"></div>
     </div>
 
-    <mount data-component="compositiondisplay"></mount>
-    <mount data-component="keymap"></mount>
-    <mount data-component="monkey"></mount>
+    <mount data-component="answersymbols"></mount>
 
     <button
       id="restartTestButton"
@@ -56,13 +51,12 @@
       data-balloon-pos="down"
       class="text"
     >
-      <i class="fas fa-fw fa-redo-alt"></i>
+      <mount data-component="restarticon" class="contents"></mount>
     </button>
     <mount data-component="livestatstextbottom"></mount>
-    <mount data-component="premid"></mount>
   </div>
   <div class="loading hidden">
-    <i class="fas fa-circle-notch fa-spin"></i>
+    <mount data-component="loadingspinner" class="contents"></mount>
   </div>
   <load src="./test-result.html" />
 </div>
