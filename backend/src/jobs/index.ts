@@ -1,7 +1,7 @@
 /**
  * The cron runner, started from `server.ts`.
  *
- * The last two entries are INF-066: the work BullMQ's `later-queue` used to do
+ * The last two entries are INF-066: the work the old `later-queue` used to do
  * on a delay now runs on a schedule, because there is no queue left to delay it
  * on (C23). Every job in this directory acquires the INF-151 advisory lock
  * before doing anything — at `maxReplicas = 3` (INF-036) this file is loaded in

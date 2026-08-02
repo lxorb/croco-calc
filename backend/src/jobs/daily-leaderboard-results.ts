@@ -1,7 +1,7 @@
 /**
  * Awards yesterday's daily-leaderboard placements (INF-066).
  *
- * This is BullMQ's `daily-leaderboard-results` task
+ * This is the old queue runner's `daily-leaderboard-results` task
  * (`backend/src/queues/later-queue.ts`, `backend/src/workers/later-worker.ts`)
  * moved into the cron runner, because the queue that used to schedule it is
  * gone (C23, INF-063/INF-065). Two consequences of the move:

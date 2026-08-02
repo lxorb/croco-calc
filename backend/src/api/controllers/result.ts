@@ -317,8 +317,9 @@ export async function addResult(
 
   // AC-121 — result eligibility for the *speed* boards: user eligible, `mode2`
   // is 4 or 8, and `settingsId` equals the frozen `LEADERBOARD_SETTINGS_ID`
-  // (C4). Clause 4 (`bailedOut`) is struck by C38, and clause 5 (the validation
-  // pipeline) has already thrown if it failed.
+  // (C4). Clause 4 is struck by C38 — croco calc has no early-exit concept at
+  // all (AC-187), so there is no flag left to test — and clause 5 (the
+  // validation pipeline) has already thrown if it failed.
   const validResultCriteria =
     userEligibleForLeaderboard &&
     isLeaderboardEligible(completedEvent.settingsId, completedEvent.mode2);

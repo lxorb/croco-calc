@@ -1,9 +1,9 @@
 /**
  * The daily leaderboard, on MongoDB (INF-064, master C23).
  *
- * monkeytype ran this on Redis sorted sets driven by five Lua scripts. Redis is
- * removed entirely (INF-063: Azure Cache for Redis Basic C0 is ~$16/mo, a third
- * of the whole budget), so the board is a plain collection keyed
+ * monkeytype ran this on in-memory sorted sets driven by five Lua scripts. That
+ * store is removed entirely (INF-063: the managed cache tier it needed is
+ * ~$16/mo, a third of the whole budget), so the board is a plain collection keyed
  * `{ periodTimestamp, modeKey, uid }` with a compound index
  * `{ periodTimestamp, modeKey, score: -1 }` and a TTL index for expiry, ranked
  * with `$setWindowFields` — the same technique the all-time board uses.
@@ -53,9 +53,9 @@ export const getDailyLeaderboardCollection =
 
 /**
  * Ties break on accuracy and then on who got there first. monkeytype packed the
- * same ordering into a single `kogascore` integer because a Redis sorted set has
- * only one dimension; MongoDB can sort on three keys directly, so the encoding
- * is dropped.
+ * same ordering into a single `kogascore` integer because the sorted set it used
+ * has only one dimension; MongoDB can sort on three keys directly, so the
+ * encoding is dropped.
  */
 const RANK_SORT = { score: -1, acc: -1, timestamp: 1 } as const;
 

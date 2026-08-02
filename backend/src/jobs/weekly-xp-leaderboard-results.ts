@@ -1,8 +1,9 @@
 /**
  * Awards last week's XP-leaderboard placements (INF-066).
  *
- * BullMQ's `weekly-xp-leaderboard-results` task moved into the cron runner, for
- * the same reason as its daily sibling: the queue that scheduled it is gone
+ * The old queue runner's `weekly-xp-leaderboard-results` task moved into the
+ * cron runner, for the same reason as its daily sibling: the queue that
+ * scheduled it is gone
  * (C23, INF-063/INF-065). The weekly board has **no mode axis at all** (AC-112),
  * so unlike the daily rollover there is exactly one board to settle.
  */

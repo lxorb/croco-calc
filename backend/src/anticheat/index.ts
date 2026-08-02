@@ -1,11 +1,13 @@
 /**
  * croco calc's anti-cheat layer.
  *
- * monkeytype shipped a **stub** here (`BYPASS_ANTICHEAT=true` made
- * `implemented()` return `true` and both validators unconditionally returned
- * `true`) because the real module is closed-source. That stub is gone: croco
- * calc's math engine is deterministic and seeded, so the server can simply
- * regenerate the whole test and check it (DoD-04a).
+ * monkeytype shipped a **stub** here: one environment variable made
+ * `implemented()` return `true` while both validators unconditionally returned
+ * `true`, because the real module is closed-source. That stub is gone, escape
+ * hatch and all — DoD-04a's grep for its name must find nothing anywhere in the
+ * repo, so the name is not repeated here either. croco calc's math engine is
+ * deterministic and seeded, so the server can simply regenerate the whole test
+ * and check it.
  *
  * Two layers, both required (WP-10 brief):
  *

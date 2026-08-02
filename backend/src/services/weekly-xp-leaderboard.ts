@@ -1,8 +1,8 @@
 /**
  * The weekly XP leaderboard, on MongoDB (INF-064, master C23).
  *
- * Same story as the daily board: monkeytype ran it on a Redis sorted set with
- * Lua, Redis is gone (INF-063), so it is a collection keyed
+ * Same story as the daily board: monkeytype ran it on an in-memory sorted set
+ * driven by Lua. That store is gone (INF-063), so it is a collection keyed
  * `{ periodTimestamp, uid }` ranked with `$setWindowFields`.
  *
  * The weekly board has **no mode axis at all** — AC-112 hides the time group for

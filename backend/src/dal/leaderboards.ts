@@ -284,7 +284,6 @@ export async function update(
 
 /** AC-090: buckets of 10 score points. */
 export const SCORE_HISTOGRAM_BUCKET_SIZE = 10;
-const SCORE_HISTOGRAM_BUCKETS = 32;
 
 /**
  * The site-wide score histogram behind `GET /public/scoreHistogram`.
@@ -295,23 +294,46 @@ const SCORE_HISTOGRAM_BUCKETS = 32;
  * a single small document — so the buckets are read back and upserted normally.
  * Nothing in this file now depends on `$merge`, `$function`, `$accumulator`,
  * `$where` or mapReduce.
+ *
+ * **The bucket range is deliberately unbounded above.** monkeytype used a fixed
+ * `$bucket` with 32 boundaries of 10 (0 … 310) plus a `default: "other"` bin,
+ * because 310 comfortably covers every realistic **wpm**. `score` is
+ * `correct - wrong` over a run of up to eight minutes: ME-179's own ceiling
+ * (`MAX_PLAUSIBLE_TPM = 120`) admits 960 answers, and a plausible 45 tpm × 8 min
+ * already lands near 340. Carrying the 310 boundary over would have silently
+ * deleted every strong player from the chart — the BL-5 failure mode (a
+ * typing-shaped constant applied to a different metric) repeated. So the bucket
+ * index is computed arithmetically instead of enumerated, and no upper bound
+ * exists to fall off.
+ *
+ * Scores below zero are folded into the `0` bucket rather than dropped:
+ * `ScoreHistogramSchema` keys are `/^\d+$/` (`packages/schemas/src/util.ts`), so
+ * a negative key could not be represented, and losing those users would be the
+ * same bug at the other end of the axis.
  */
 async function updateScoreHistogram(
   mode: string,
   mode2: string,
 ): Promise<void> {
-  const boundaries = [...Array(SCORE_HISTOGRAM_BUCKETS).keys()].map(
-    (it) => it * SCORE_HISTOGRAM_BUCKET_SIZE,
-  );
-
   const buckets = await getCollection(mode, mode2)
-    .aggregate<{ _id: number | string; count: number }>(
+    .aggregate<{ _id: number; count: number }>(
       [
         {
-          $bucket: {
-            groupBy: "$score",
-            boundaries,
-            default: "other",
+          $group: {
+            _id: {
+              $multiply: [
+                {
+                  $floor: {
+                    $divide: [
+                      { $max: ["$score", 0] },
+                      SCORE_HISTOGRAM_BUCKET_SIZE,
+                    ],
+                  },
+                },
+                SCORE_HISTOGRAM_BUCKET_SIZE,
+              ],
+            },
+            count: { $sum: 1 },
           },
         },
       ],
@@ -321,11 +343,11 @@ async function updateScoreHistogram(
 
   const histogram: Record<string, number> = {};
   for (const bucket of buckets) {
-    // `ScoreHistogramSchema` keys are digit strings, so the catch-all bucket
-    // (negative scores and anything past the last boundary) is dropped rather
-    // than emitted under a key the response schema would reject.
-    if (typeof bucket._id !== "number") continue;
-    histogram[bucket._id.toString()] = bucket.count;
+    // A `$group` over the same key can only emit one document per bucket, so
+    // this never merges counts — but it is written as an add so a future change
+    // to the key expression cannot silently drop a bin.
+    const key = bucket._id.toString();
+    histogram[key] = (histogram[key] ?? 0) + bucket.count;
   }
 
   const statsKey = `${mode}_${mode2}` as keyof PublicScoreStatsDB;

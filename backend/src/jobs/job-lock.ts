@@ -1,8 +1,9 @@
 /**
  * MongoDB-backed advisory lock for cron jobs (INF-151 … INF-155).
  *
- * Removing BullMQ (C23, INF-063) removed the only thing that guaranteed a single
- * consumer, and INF-036 lets Azure Container Apps scale to `maxReplicas = 3`.
+ * Removing the job queue (C23, INF-063) removed the only thing that guaranteed a
+ * single consumer, and INF-036 lets Azure Container Apps scale to
+ * `maxReplicas = 3`.
  * Without this, `update-leaderboards`, the daily rollover and the weekly rollover
  * would each fire two or three times concurrently — double-awarding XP and
  * corrupting rank snapshots. There is no leader election anywhere else in the
