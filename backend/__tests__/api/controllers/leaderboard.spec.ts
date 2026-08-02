@@ -9,20 +9,24 @@ import * as Configuration from "../../../src/init/configuration";
 import { XpLeaderboardEntry } from "@croco-calc/schemas/leaderboards";
 
 const { mockApp, uid } = setup();
+
+/**
+ * The router runs with `jsonQuery: true` (`src/api/routes/index.ts`), so every
+ * query value arrives JSON-**decoded** — and the ts-rest client on the frontend
+ * JSON-**encodes** them to match (`frontend/src/ts/ape/adapters/ts-rest-adapter.ts`).
+ * supertest does neither, so a bare `mode2=8` reaches the schema as the *number*
+ * 8 and `LeaderboardMode2Schema` (`z.enum(["4", "8"])`) rejects it with a 422
+ * no real client could ever provoke. Encoding here is what the wire actually
+ * carries. Only numeric-looking values need it: `JSON.parse("time")` throws and
+ * ts-rest falls back to the raw string.
+ */
+const jsonQuery = (value: string): string => JSON.stringify(value);
+
 const configuration = Configuration.getCachedConfiguration();
 
-const allModes = [
-  "10",
-  "25",
-  "50",
-  "100",
-  "15",
-  "30",
-  "60",
-  "120",
-  "zen",
-  "custom",
-];
+/** AC-114 / SB-176: the boards are `time 4` and `time 8`, and nothing else. */
+const boardModes = ["time"] as const;
+const boardMode2s = ["4", "8"] as const;
 
 describe("Loaderboard Controller", () => {
   describe("get leaderboard", () => {
@@ -35,7 +39,7 @@ describe("Loaderboard Controller", () => {
       getLeaderboardCountMock.mockResolvedValue(42);
     });
 
-    it("should get for english time 60", async () => {
+    it("should get for time 8", async () => {
       //GIVEN
 
       const resultData = {
@@ -43,24 +47,23 @@ describe("Loaderboard Controller", () => {
         pageSize: 50,
         entries: [
           {
-            wpm: 20,
+            score: 190,
+            correct: 200,
+            wrong: 10,
             acc: 90,
+            tpm: 20,
             timestamp: 1000,
-            raw: 92,
-            consistency: 80,
             uid: "user1",
             name: "user1",
-            discordId: "discordId",
-            discordAvatar: "discordAvatar",
             rank: 1,
-            badgeId: 1,
-            isPremium: true,
           },
           {
-            wpm: 10,
+            score: 80,
+            correct: 90,
+            wrong: 10,
             acc: 80,
+            tpm: 10,
             timestamp: 1200,
-            raw: 82,
             uid: "user2",
             name: "user2",
             rank: 2,
@@ -78,7 +81,7 @@ describe("Loaderboard Controller", () => {
 
       const { body } = await mockApp
         .get("/leaderboards")
-        .query({ language: "english", mode: "time", mode2: "60" })
+        .query({ mode: "time", mode2: jsonQuery("8") })
         .expect(200);
 
       //THEN
@@ -89,23 +92,20 @@ describe("Loaderboard Controller", () => {
 
       expect(getLeaderboardMock).toHaveBeenCalledWith(
         "time",
-        "60",
-        "english",
+        "8",
         0,
         50,
-        false,
         undefined,
       );
 
       expect(getLeaderboardCountMock).toHaveBeenCalledWith(
         "time",
-        "60",
-        "english",
+        "8",
         undefined,
       );
     });
 
-    it("should get for english time 60 with page", async () => {
+    it("should get for time 8 with page", async () => {
       //GIVEN
       getLeaderboardMock.mockResolvedValue([]);
       getLeaderboardCountMock.mockResolvedValue(0);
@@ -117,9 +117,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           page,
           pageSize,
         })
@@ -137,11 +136,9 @@ describe("Loaderboard Controller", () => {
 
       expect(getLeaderboardMock).toHaveBeenCalledWith(
         "time",
-        "60",
-        "english",
+        "8",
         page,
         pageSize,
-        false,
         undefined,
       );
     });
@@ -158,9 +155,8 @@ describe("Loaderboard Controller", () => {
         .get("/leaderboards")
         .set("Authorization", `Bearer ${uid}`)
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           friendsOnly: true,
         })
         .expect(200);
@@ -168,21 +164,8 @@ describe("Loaderboard Controller", () => {
       //THEN
       expect(body.data.count).toEqual(2);
 
-      expect(getLeaderboardMock).toHaveBeenCalledWith(
-        "time",
-        "60",
-        "english",
-        0,
-        50,
-        false,
-        uid,
-      );
-      expect(getLeaderboardCountMock).toHaveBeenCalledWith(
-        "time",
-        "60",
-        "english",
-        uid,
-      );
+      expect(getLeaderboardMock).toHaveBeenCalledWith("time", "8", 0, 50, uid);
+      expect(getLeaderboardCountMock).toHaveBeenCalledWith("time", "8", uid);
     });
 
     describe("should get for modes", async () => {
@@ -190,19 +173,22 @@ describe("Loaderboard Controller", () => {
         getLeaderboardMock.mockResolvedValue([]);
       });
 
+      // AC-114 / SB-176: `time 4` and `time 8` are the whole matrix. `2` and
+      // `1` are legal *test* lengths with no board, so they are 422 at the
+      // schema rather than 404 at the controller (`LeaderboardMode2Schema`).
       const testCases = [
-        { mode: "time", mode2: "15", language: "english", expectStatus: 200 },
-        { mode: "time", mode2: "60", language: "english", expectStatus: 200 },
-        { mode: "time", mode2: "30", language: "english", expectStatus: 404 },
-        { mode: "words", mode2: "15", language: "english", expectStatus: 404 },
-        { mode: "time", mode2: "15", language: "spanish", expectStatus: 404 },
+        { mode: "time", mode2: "4", expectStatus: 200 },
+        { mode: "time", mode2: "8", expectStatus: 200 },
+        { mode: "time", mode2: "2", expectStatus: 422 },
+        { mode: "time", mode2: "1", expectStatus: 422 },
+        { mode: "time", mode2: "60", expectStatus: 422 },
       ];
       it.for(testCases)(
-        `expect $expectStatus for mode $mode, mode2 $mode2, lang $language`,
-        async ({ mode, mode2, language, expectStatus }) => {
+        `expect $expectStatus for mode $mode, mode2 $mode2`,
+        async ({ mode, mode2, expectStatus }) => {
           await mockApp
             .get("/leaderboards")
-            .query({ language, mode, mode2 })
+            .query({ mode, mode2: jsonQuery(mode2) })
             .expect(expectStatus);
         },
       );
@@ -213,18 +199,13 @@ describe("Loaderboard Controller", () => {
 
       expect(body).toEqual({
         message: "Invalid query schema",
-        validationErrors: [
-          '"language" Required',
-          '"mode" Required',
-          '"mode2" Needs to be either a number, "zen" or "custom".',
-        ],
+        validationErrors: ['"mode" Required', '"mode2" Required'],
       });
     });
     it("fails for invalid query", async () => {
       const { body } = await mockApp
         .get("/leaderboards")
         .query({
-          language: "en?gli.sh",
           mode: "unknownMode",
           mode2: "unknownMode2",
           page: -1,
@@ -235,9 +216,8 @@ describe("Loaderboard Controller", () => {
       expect(body).toEqual({
         message: "Invalid query schema",
         validationErrors: [
-          '"language" Invalid enum value. Must be a supported language',
-          `"mode" Invalid enum value. Expected 'time' | 'words' | 'quote' | 'custom' | 'zen', received 'unknownMode'`,
-          '"mode2" Needs to be a number or a number represented as a string e.g. "10".',
+          `"mode" Invalid enum value. Expected 'time', received 'unknownMode'`,
+          `"mode2" Invalid enum value. Expected '4' | '8', received 'unknownMode2'`,
           '"page" Number must be greater than or equal to 0',
           '"pageSize" Number must be less than or equal to 200',
         ],
@@ -247,9 +227,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           extra: "value",
         })
         .expect(422);
@@ -267,9 +246,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
         })
         .expect(503);
 
@@ -289,20 +267,22 @@ describe("Loaderboard Controller", () => {
     it("fails withouth authentication", async () => {
       await mockApp
         .get("/leaderboards/rank")
-        .query({ language: "english", mode: "time", mode2: "60" })
+        .query({ mode: "time", mode2: jsonQuery("8") })
         .expect(401);
     });
 
-    it("should get for english time 60", async () => {
+    it("should get for time 8", async () => {
       //GIVEN
 
       const entryId = new ObjectId();
       const resultEntry = {
         _id: entryId,
-        wpm: 10,
+        score: 80,
+        correct: 90,
+        wrong: 10,
         acc: 80,
+        tpm: 10,
         timestamp: 1200,
-        raw: 82,
         uid: "user2",
         name: "user2",
         rank: 2,
@@ -313,7 +293,7 @@ describe("Loaderboard Controller", () => {
 
       const { body } = await mockApp
         .get("/leaderboards/rank")
-        .query({ language: "english", mode: "time", mode2: "60" })
+        .query({ mode: "time", mode2: jsonQuery("8") })
         .set("Authorization", `Bearer ${uid}`)
         .expect(200);
 
@@ -325,13 +305,12 @@ describe("Loaderboard Controller", () => {
 
       expect(getLeaderboardRankMock).toHaveBeenCalledWith(
         "time",
-        "60",
-        "english",
+        "8",
         uid,
         false,
       );
     });
-    it("should get for english time 60 friends only", async () => {
+    it("should get for time 8 friends only", async () => {
       //GIVEN
       await enableConnectionsFeature(true);
       getLeaderboardRankMock.mockResolvedValue({} as any);
@@ -340,9 +319,8 @@ describe("Loaderboard Controller", () => {
       await mockApp
         .get("/leaderboards/rank")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           friendsOnly: true,
         })
         .set("Authorization", `Bearer ${uid}`)
@@ -351,8 +329,7 @@ describe("Loaderboard Controller", () => {
       //THEN
       expect(getLeaderboardRankMock).toHaveBeenCalledWith(
         "time",
-        "60",
-        "english",
+        "8",
         uid,
         true,
       );
@@ -366,9 +343,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/rank")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           friendsOnly: true,
         })
         .set("Authorization", `Bearer ${uid}`)
@@ -377,8 +353,7 @@ describe("Loaderboard Controller", () => {
       //THEN
       expect(getLeaderboardRankMock).toHaveBeenCalledWith(
         "time",
-        "60",
-        "english",
+        "8",
         uid,
         true,
       );
@@ -389,22 +364,22 @@ describe("Loaderboard Controller", () => {
     });
     it("should get for mode", async () => {
       getLeaderboardRankMock.mockResolvedValue({} as any);
-      for (const mode of ["time", "words", "quote", "zen", "custom"]) {
+      for (const mode of boardModes) {
         const response = await mockApp
           .get("/leaderboards/rank")
           .set("Authorization", `Bearer ${uid}`)
-          .query({ language: "english", mode, mode2: "custom" });
+          .query({ mode, mode2: jsonQuery("8") });
         expect(response.status, `for mode ${mode}`).toEqual(200);
       }
     });
 
     it("should get for mode2", async () => {
       getLeaderboardRankMock.mockResolvedValue({} as any);
-      for (const mode2 of allModes) {
+      for (const mode2 of boardMode2s) {
         const response = await mockApp
           .get("/leaderboards/rank")
           .set("Authorization", `Bearer ${uid}`)
-          .query({ language: "english", mode: "words", mode2 });
+          .query({ mode: "time", mode2: jsonQuery(mode2) });
 
         expect(response.status, `for mode2 ${mode2}`).toEqual(200);
       }
@@ -417,18 +392,13 @@ describe("Loaderboard Controller", () => {
 
       expect(body).toEqual({
         message: "Invalid query schema",
-        validationErrors: [
-          '"language" Required',
-          '"mode" Required',
-          '"mode2" Needs to be either a number, "zen" or "custom".',
-        ],
+        validationErrors: ['"mode" Required', '"mode2" Required'],
       });
     });
     it("fails for invalid query", async () => {
       const { body } = await mockApp
         .get("/leaderboards/rank")
         .query({
-          language: "en?gli.sh",
           mode: "unknownMode",
           mode2: "unknownMode2",
         })
@@ -438,9 +408,8 @@ describe("Loaderboard Controller", () => {
       expect(body).toEqual({
         message: "Invalid query schema",
         validationErrors: [
-          '"language" Invalid enum value. Must be a supported language',
-          `"mode" Invalid enum value. Expected 'time' | 'words' | 'quote' | 'custom' | 'zen', received 'unknownMode'`,
-          '"mode2" Needs to be a number or a number represented as a string e.g. "10".',
+          `"mode" Invalid enum value. Expected 'time', received 'unknownMode'`,
+          `"mode2" Invalid enum value. Expected '4' | '8', received 'unknownMode2'`,
         ],
       });
     });
@@ -448,9 +417,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/rank")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           extra: "value",
         })
         .set("Authorization", `Bearer ${uid}`)
@@ -469,9 +437,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/rank")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
         })
         .set("Authorization", `Bearer ${uid}`)
         .expect(503);
@@ -509,32 +476,27 @@ describe("Loaderboard Controller", () => {
       vi.useRealTimers();
     });
 
-    it("should get for english time 60", async () => {
+    it("should get for time 8", async () => {
       //GIVEN
       const lbConf = (await configuration).dailyLeaderboards;
-      const premiumEnabled = (await configuration).users.premium.enabled;
 
       const resultData = {
-        minWpm: 10,
+        minScore: 10,
         entries: [
           {
             name: "user1",
             rank: 1,
-            wpm: 20,
+            tpm: 20,
             acc: 90,
             timestamp: 1000,
-            raw: 92,
             consistency: 80,
             uid: "user1",
-            discordId: "discordId",
-            discordAvatar: "discordAvatar",
           },
           {
-            wpm: 10,
+            tpm: 10,
             rank: 2,
             acc: 80,
             timestamp: 1200,
-            raw: 82,
             consistency: 72,
             uid: "user2",
             name: "user2",
@@ -544,14 +506,14 @@ describe("Loaderboard Controller", () => {
 
       getResultMock.mockResolvedValue({
         count: 2,
-        minWpm: 10,
+        minScore: 10,
         entries: resultData,
       });
 
       //WHEN
       const { body } = await mockApp
         .get("/leaderboards/daily")
-        .query({ language: "english", mode: "time", mode2: "60" })
+        .query({ mode: "time", mode2: jsonQuery("8") })
         .expect(200);
 
       //THEN
@@ -560,29 +522,22 @@ describe("Loaderboard Controller", () => {
         data: {
           count: 2,
           pageSize: 50,
-          minWpm: 10,
+          minScore: 10,
           entries: resultData,
         },
       });
 
       expect(getDailyLeaderboardMock).toHaveBeenCalledWith(
-        "english",
         "time",
-        "60",
+        "8",
         lbConf,
         -1,
       );
 
-      expect(getResultMock).toHaveBeenCalledWith(
-        0,
-        50,
-        lbConf,
-        premiumEnabled,
-        undefined,
-      );
+      expect(getResultMock).toHaveBeenCalledWith(0, 50, lbConf, undefined);
     });
 
-    it("should get for english time 60 for yesterday", async () => {
+    it("should get for time 8 for yesterday", async () => {
       //GIVEN
       const lbConf = (await configuration).dailyLeaderboards;
 
@@ -590,9 +545,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/daily")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           daysBefore: 1,
         })
         .expect(200);
@@ -604,22 +558,20 @@ describe("Loaderboard Controller", () => {
           entries: [],
           count: 0,
           pageSize: 50,
-          minWpm: 0,
+          minScore: 0,
         },
       });
 
       expect(getDailyLeaderboardMock).toHaveBeenCalledWith(
-        "english",
         "time",
-        "60",
+        "8",
         lbConf,
         1722470400000,
       );
     });
-    it("should get for english time 60 with page and pageSize", async () => {
+    it("should get for time 8 with page and pageSize", async () => {
       //GIVEN
       const lbConf = (await configuration).dailyLeaderboards;
-      const premiumEnabled = (await configuration).users.premium.enabled;
       const page = 2;
       const pageSize = 25;
 
@@ -629,9 +581,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/daily")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           page,
           pageSize,
         })
@@ -644,14 +595,13 @@ describe("Loaderboard Controller", () => {
           entries: [],
           count: 0,
           pageSize,
-          minWpm: 0,
+          minScore: 0,
         },
       });
 
       expect(getDailyLeaderboardMock).toHaveBeenCalledWith(
-        "english",
         "time",
-        "60",
+        "8",
         lbConf,
         -1,
       );
@@ -660,7 +610,6 @@ describe("Loaderboard Controller", () => {
         page,
         pageSize,
         lbConf,
-        premiumEnabled,
         undefined,
       );
     });
@@ -668,7 +617,6 @@ describe("Loaderboard Controller", () => {
     it("should get for friends", async () => {
       //GIVEN
       const lbConf = (await configuration).dailyLeaderboards;
-      const premiumEnabled = (await configuration).users.premium.enabled;
       await enableConnectionsFeature(true);
       const friends = [
         new ObjectId().toHexString(),
@@ -681,9 +629,8 @@ describe("Loaderboard Controller", () => {
         .get("/leaderboards/daily")
         .set("Authorization", `Bearer ${uid}`)
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           friendsOnly: true,
         })
         .expect(200);
@@ -691,29 +638,21 @@ describe("Loaderboard Controller", () => {
       //THEN
 
       expect(getDailyLeaderboardMock).toHaveBeenCalledWith(
-        "english",
         "time",
-        "60",
+        "8",
         lbConf,
         -1,
       );
 
-      expect(getResultMock).toHaveBeenCalledWith(
-        0,
-        50,
-        lbConf,
-        premiumEnabled,
-        friends,
-      );
+      expect(getResultMock).toHaveBeenCalledWith(0, 50, lbConf, friends);
     });
 
     it("fails for daysBefore not one", async () => {
       const { body } = await mockApp
         .get("/leaderboards/daily")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           daysBefore: 2,
         })
         .expect(422);
@@ -735,19 +674,19 @@ describe("Loaderboard Controller", () => {
     });
 
     it("should get for mode", async () => {
-      for (const mode of ["time", "words", "quote", "zen", "custom"]) {
+      for (const mode of boardModes) {
         const response = await mockApp
           .get("/leaderboards/daily")
-          .query({ language: "english", mode, mode2: "custom" });
+          .query({ mode, mode2: jsonQuery("8") });
         expect(response.status, `for mode ${mode}`).toEqual(200);
       }
     });
 
     it("should get for mode2", async () => {
-      for (const mode2 of allModes) {
+      for (const mode2 of boardMode2s) {
         const response = await mockApp
           .get("/leaderboards/daily")
-          .query({ language: "english", mode: "words", mode2 });
+          .query({ mode: "time", mode2: jsonQuery(mode2) });
 
         expect(response.status, `for mode2 ${mode2}`).toEqual(200);
       }
@@ -758,11 +697,7 @@ describe("Loaderboard Controller", () => {
 
       expect(body).toEqual({
         message: "Invalid query schema",
-        validationErrors: [
-          '"language" Required',
-          '"mode" Required',
-          '"mode2" Needs to be either a number, "zen" or "custom".',
-        ],
+        validationErrors: ['"mode" Required', '"mode2" Required'],
       });
     });
 
@@ -770,7 +705,6 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/daily")
         .query({
-          language: "en?gli.sh",
           mode: "unknownMode",
           mode2: "unknownMode2",
         })
@@ -779,9 +713,8 @@ describe("Loaderboard Controller", () => {
       expect(body).toEqual({
         message: "Invalid query schema",
         validationErrors: [
-          '"language" Invalid enum value. Must be a supported language',
-          `"mode" Invalid enum value. Expected 'time' | 'words' | 'quote' | 'custom' | 'zen', received 'unknownMode'`,
-          '"mode2" Needs to be a number or a number represented as a string e.g. "10".',
+          `"mode" Invalid enum value. Expected 'time', received 'unknownMode'`,
+          `"mode2" Invalid enum value. Expected '4' | '8', received 'unknownMode2'`,
         ],
       });
     });
@@ -789,9 +722,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/daily")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           extra: "value",
         })
         .expect(422);
@@ -809,9 +741,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/daily")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
         })
         .expect(404);
 
@@ -851,10 +782,10 @@ describe("Loaderboard Controller", () => {
       await mockApp
         .get("/leaderboards/daily/rank")
 
-        .query({ language: "english", mode: "time", mode2: "60" })
+        .query({ mode: "time", mode2: jsonQuery("8") })
         .expect(401);
     });
-    it("should get for english time 60", async () => {
+    it("should get for time 8", async () => {
       //GIVEN
       const lbConf = (await configuration).dailyLeaderboards;
       const rankData = {
@@ -862,11 +793,10 @@ describe("Loaderboard Controller", () => {
         count: 1000,
         rank: 12,
         entry: {
-          wpm: 10,
+          tpm: 10,
           rank: 2,
           acc: 80,
           timestamp: 1200,
-          raw: 82,
           consistency: 72,
           uid: "user2",
           name: "user2",
@@ -879,7 +809,7 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/daily/rank")
         .set("Authorization", `Bearer ${uid}`)
-        .query({ language: "english", mode: "time", mode2: "60" })
+        .query({ mode: "time", mode2: jsonQuery("8") })
         .expect(200);
 
       //THEN
@@ -889,9 +819,8 @@ describe("Loaderboard Controller", () => {
       });
 
       expect(getDailyLeaderboardMock).toHaveBeenCalledWith(
-        "english",
         "time",
-        "60",
+        "8",
         lbConf,
         -1,
       );
@@ -899,7 +828,7 @@ describe("Loaderboard Controller", () => {
       expect(getRankMock).toHaveBeenCalledWith(uid, lbConf, undefined);
     });
 
-    it("should get for english time 60 friends only", async () => {
+    it("should get for time 8 friends only", async () => {
       //GIVEN
       await enableConnectionsFeature(true);
       const lbConf = (await configuration).dailyLeaderboards;
@@ -912,9 +841,8 @@ describe("Loaderboard Controller", () => {
         .get("/leaderboards/daily/rank")
         .set("Authorization", `Bearer ${uid}`)
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           friendsOnly: true,
         })
         .expect(200);
@@ -922,9 +850,8 @@ describe("Loaderboard Controller", () => {
       //THEN
 
       expect(getDailyLeaderboardMock).toHaveBeenCalledWith(
-        "english",
         "time",
-        "60",
+        "8",
         lbConf,
         -1,
       );
@@ -947,21 +874,21 @@ describe("Loaderboard Controller", () => {
     });
 
     it("should get for mode", async () => {
-      for (const mode of ["time", "words", "quote", "zen", "custom"]) {
+      for (const mode of boardModes) {
         const response = await mockApp
           .get("/leaderboards/daily/rank")
           .set("Authorization", `Bearer ${uid}`)
-          .query({ language: "english", mode, mode2: "custom" });
+          .query({ mode, mode2: jsonQuery("8") });
         expect(response.status, `for mode ${mode}`).toEqual(200);
       }
     });
 
     it("should get for mode2", async () => {
-      for (const mode2 of allModes) {
+      for (const mode2 of boardMode2s) {
         const response = await mockApp
           .get("/leaderboards/daily/rank")
           .set("Authorization", `Bearer ${uid}`)
-          .query({ language: "english", mode: "words", mode2 });
+          .query({ mode: "time", mode2: jsonQuery(mode2) });
 
         expect(response.status, `for mode2 ${mode2}`).toEqual(200);
       }
@@ -975,11 +902,7 @@ describe("Loaderboard Controller", () => {
 
       expect(body).toEqual({
         message: "Invalid query schema",
-        validationErrors: [
-          '"language" Required',
-          '"mode" Required',
-          '"mode2" Needs to be either a number, "zen" or "custom".',
-        ],
+        validationErrors: ['"mode" Required', '"mode2" Required'],
       });
     });
 
@@ -987,7 +910,6 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/daily/rank")
         .query({
-          language: "en?gli.sh",
           mode: "unknownMode",
           mode2: "unknownMode2",
         })
@@ -997,9 +919,8 @@ describe("Loaderboard Controller", () => {
       expect(body).toEqual({
         message: "Invalid query schema",
         validationErrors: [
-          '"language" Invalid enum value. Must be a supported language',
-          `"mode" Invalid enum value. Expected 'time' | 'words' | 'quote' | 'custom' | 'zen', received 'unknownMode'`,
-          '"mode2" Needs to be a number or a number represented as a string e.g. "10".',
+          `"mode" Invalid enum value. Expected 'time', received 'unknownMode'`,
+          `"mode2" Invalid enum value. Expected '4' | '8', received 'unknownMode2'`,
         ],
       });
     });
@@ -1008,9 +929,8 @@ describe("Loaderboard Controller", () => {
       const { body } = await mockApp
         .get("/leaderboards/daily/rank")
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
           extra: "value",
         })
         .set("Authorization", `Bearer ${uid}`)
@@ -1031,9 +951,8 @@ describe("Loaderboard Controller", () => {
         .get("/leaderboards/daily/rank")
         .set("Authorization", `Bearer ${uid}`)
         .query({
-          language: "english",
           mode: "time",
-          mode2: "60",
+          mode2: jsonQuery("8"),
         })
         .expect(404);
 
@@ -1075,21 +994,17 @@ describe("Loaderboard Controller", () => {
         {
           totalXp: 100,
           rank: 1,
-          timeTypedSeconds: 100,
+          timeSpentSeconds: 100,
           uid: "user1",
           name: "user1",
-          discordId: "discordId",
-          discordAvatar: "discordAvatar",
           lastActivityTimestamp: 1000,
         },
         {
           totalXp: 75,
           rank: 2,
-          timeTypedSeconds: 200,
+          timeSpentSeconds: 200,
           uid: "user2",
           name: "user2",
-          discordId: "discordId2",
-          discordAvatar: "discordAvatar2",
           lastActivityTimestamp: 2000,
         },
       ];
@@ -1114,13 +1029,7 @@ describe("Loaderboard Controller", () => {
 
       expect(getXpWeeklyLeaderboardMock).toHaveBeenCalledWith(lbConf, -1);
 
-      expect(getResultMock).toHaveBeenCalledWith(
-        0,
-        50,
-        lbConf,
-        false,
-        undefined,
-      );
+      expect(getResultMock).toHaveBeenCalledWith(0, 50, lbConf, undefined);
     });
 
     it("should get for last week", async () => {
@@ -1182,7 +1091,6 @@ describe("Loaderboard Controller", () => {
         page,
         pageSize,
         lbConf,
-        false,
         undefined,
       );
     });
@@ -1218,7 +1126,6 @@ describe("Loaderboard Controller", () => {
         page,
         pageSize,
         lbConf,
-        false,
         friends,
       );
     });
@@ -1302,11 +1209,9 @@ describe("Loaderboard Controller", () => {
       const resultData: XpLeaderboardEntry = {
         totalXp: 100,
         rank: 1,
-        timeTypedSeconds: 100,
+        timeSpentSeconds: 100,
         uid: "user1",
         name: "user1",
-        discordId: "discordId",
-        discordAvatar: "discordAvatar",
         lastActivityTimestamp: 1000,
       };
 
