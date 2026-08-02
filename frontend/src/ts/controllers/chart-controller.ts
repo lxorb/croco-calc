@@ -124,7 +124,7 @@ export class ChartWithUpdateColors<
 }
 
 /**
- * CP-121 — upstream's `afterLabel` highlighted the input typed in the hovered
+ * CP-121 — upstream's `afterLabel` highlighted the input entered in the hovered
  * second; here it highlights the **tasks committed in that second** in the
  * CP-126 history list. The list carries `data-second` on every entry, so the
  * lookup needs neither the result object nor an import of `test/result.ts`

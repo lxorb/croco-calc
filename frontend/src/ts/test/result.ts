@@ -88,16 +88,33 @@ let minChartVal = 0;
 let maxChartVal = 0;
 
 /**
- * CP-129 — the screenshot watermark reads croco calc's domain, taken from the
- * one address constant the shell already ships rather than a second literal
- * that could drift out of step with it (`constants/links.ts` is WP-08's).
+ * CP-129 — the screenshot watermark reads croco calc's domain, derived from the
+ * one address constant the shell already ships. `slice` past the `@` rather
+ * than `split(...)[1] ?? "crococalc.com"`: a fallback literal would be exactly
+ * the second copy CP-129 says must not exist, and it would be the copy that
+ * silently wins if the address ever changed shape. There is deliberately no
+ * second literal here to drift (`constants/links.ts` is WP-08's).
  */
-export const SITE_DOMAIN = CONTACT_EMAIL.split("@")[1] ?? "crococalc.com";
+export const SITE_DOMAIN = CONTACT_EMAIL.slice(CONTACT_EMAIL.indexOf("@") + 1);
 
 // #region metric rendering
 
 function answeredOf(res: PresentedResult): number {
   return res.correct + res.wrong;
+}
+
+/**
+ * ME-161 / master C33 — `score` is the only displayed metric that can go
+ * negative, and a *displayed* minus sign is U+2212, never the ASCII hyphen that
+ * `Number.prototype.toString` (and therefore `Format.score`) produces.
+ *
+ * The substitution lives here rather than in `utils/format.ts` (WP-08's) so it
+ * can never reach `data-score`, the local-PB payload or anything else that is
+ * read back as a number — every one of those keeps the raw value. If WP-08 ever
+ * moves the glyph into `Format.score` itself this becomes a harmless no-op.
+ */
+function formatScore(score: number): string {
+  return Format.score(score).replace("-", "\u2212");
 }
 
 function setBottom(selector: string, text: string, tooltip?: string): void {
@@ -110,7 +127,7 @@ function setBottom(selector: string, text: string, tooltip?: string): void {
 function updateScore(res: PresentedResult): void {
   setBottom(
     ".score",
-    Format.score(res.score),
+    formatScore(res.score),
     `${res.correct} correct − ${res.wrong} wrong`,
   );
   qs("#result .stats .correctwrong .correct .bottom")?.setText(
@@ -330,9 +347,12 @@ function updateCrown(res: PresentedResult, dontSave: boolean): void {
   const diff = res.score - (localPb?.score ?? 0);
 
   if (localPb === undefined || diff > 0) {
-    // Half crown until the server confirms it.
+    // Half crown until the server confirms it. The first run on a given
+    // (mode2, settingsId) is a PB by definition even when its score is
+    // negative, and `+−3` is not a legible improvement — only a genuine gain
+    // gets the leading `+`.
     showCrown("pending");
-    updateCrownText(`+${Format.score(diff)}`);
+    updateCrownText(diff > 0 ? `+${formatScore(diff)}` : formatScore(diff));
   } else {
     hideCrown();
   }
@@ -443,7 +463,7 @@ function updateChartPBLine(res: PresentedResult): void {
       padding: 3,
       borderRadius: 3,
       position: "center",
-      content: ` PB: ${Format.score(localPb.score)} `,
+      content: ` PB: ${formatScore(localPb.score)} `,
       display: true,
     },
   });

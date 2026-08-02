@@ -3,7 +3,7 @@
  *
  * Kept from upstream in full; what went is everything the results screen no
  * longer has — the replay block (CP-124), the funbox global-CSS hooks
- * (INV-093), the per-keystroke highlight overlays (CP-036) and the ad wrappers
+ * (INV-093), the per-character highlight overlays (CP-036) and the ad wrappers
  * (CP-006, CP-125). The watermark reads croco calc's domain (CP-129).
  */
 
