@@ -1,7 +1,8 @@
 /**
  * Result metrics owned by the math engine (ME-160 … ME-165), with the field
  * names ruled by C40 and AC-001 … AC-006: `correct`, `wrong`, `score`, `acc`,
- * `tpm`, `spm`. The identifier `net` appears nowhere.
+ * `tpm`, `spm`. Monkeytype's raw/adjusted speed pairing has no counterpart here,
+ * and neither does the field name it used for the adjusted half (C40).
  *
  * `roundTo2` and `kogasa` are transcribed verbatim from
  * `packages/util/src/numbers.ts` rather than imported, so this package stays
