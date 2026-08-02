@@ -113,7 +113,7 @@ resource "azurerm_container_app" "api" {
 
       # INF-050. MAINTENANCE is deliberately absent (INF-048): the maintenance
       # middleware 503s every path except /configuration, including the health
-      # probe, which would make ACA restart-loop the replica. REDIS_URI is
+      # probe, which would make ACA restart-loop the replica. The cache URI is
       # deliberately absent (INF-049), as is every BYPASS_* (INF-051).
       env {
         name  = "MODE"
