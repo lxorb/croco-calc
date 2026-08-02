@@ -183,7 +183,11 @@ export function applyPreStart(): void {
     Array.from({ length: RENDER_AHEAD }, (_, i) => maskedTaskHtml(i)).join(""),
   );
   resetStreamOffset();
-  applyGeometry();
+  // Not just `applyGeometry`: every restart path funnels through here,
+  // including the initial build, so this is the one place guaranteed to run
+  // after the config has loaded — and the line box can only be measured once
+  // the configured font size is on the element.
+  applyStreamStyles();
 }
 
 /**
