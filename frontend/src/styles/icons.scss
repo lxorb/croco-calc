@@ -1,0 +1,42 @@
+// Iconify icon presentation — replaces fontawesome-5.scss / fontawesome-6.scss.
+// Consumed by components/common/Icon.tsx (C10, SB-062, SB-064, CP-001).
+
+.icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  overflow: visible;
+
+  // SB-064: inherit the host button's colour so the OFF/ON/hover/disabled
+  // rules apply to icon and label together with no extra CSS.
+  fill: currentcolor;
+  color: inherit;
+}
+
+// SB-062: reproduces font awesome's fixed-width class, so labels of
+// different lengths stay optically aligned inside a settings-bar pill.
+.icon-fw {
+  width: 1.25em;
+}
+
+// Replaces font awesome's spin class; same 2s linear cycle.
+.icon-spin {
+  animation: icon-spin 2s linear infinite;
+}
+
+@keyframes icon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-spin {
+    animation-duration: 6s;
+  }
+}

@@ -51,20 +51,6 @@
   }
 }
 
-@keyframes flashKey {
-  from {
-    color: var(--bg-color);
-    background-color: var(--main-color);
-    border-color: var(--main-color);
-  }
-
-  to {
-    color: var(--sub-color);
-    background-color: var(--bg-color);
-    border-color: var(--sub-color);
-  }
-}
-
 @keyframes shake {
   0% {
     transform: translate(2px, 0) rotate(0deg);
@@ -107,18 +93,6 @@
   }
 }
 
-@keyframes scanline {
-  0% {
-    bottom: 100%;
-  }
-  80% {
-    bottom: 100%;
-  }
-  100% {
-    bottom: 0%;
-  }
-}
-
 @keyframes flashBorder {
   0% {
     box-shadow: 0 0 0 0.2em var(--main-color);
@@ -137,39 +111,5 @@
   }
   100% {
     background-position: 0% 50%;
-  }
-}
-
-@keyframes typedEffectFadeIn {
-  0% {
-    opacity: 0;
-  }
-  75% {
-    opacity: 0.4;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes typedEffectToDust {
-  0% {
-    transform: scale(1);
-    color: var(--current-color);
-  }
-  10% {
-    /* transform: scale(1); */
-  }
-  15% {
-    transform: scale(1);
-    color: var(--c-dot);
-  }
-  80% {
-    /* transform: scale(0.5); */
-    color: var(--c-dot);
-  }
-  100% {
-    transform: scale(0.4);
-    color: transparent;
   }
 }

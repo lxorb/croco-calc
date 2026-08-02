@@ -16,9 +16,12 @@
 }
 
 @layer custom-styles {
-  @import "buttons", "ads", "test-activity", "animations", "caret",
-    "commandline", "core", "fonts", "inputs", "popups", "scroll", "test",
-    "loading", "media-queries";
+  // NOTE (WP-04 → WP-06/WP-07): once WP-06 splits the `#result*` rules out of
+  // test.scss into result.scss, "result" has to join this list. index.scss is
+  // WP-04's file, so that one-line addition is a cross-package hand-off.
+  @import "buttons", "test-activity", "animations", "caret", "commandline",
+    "core", "fonts", "icons", "inputs", "popups", "scroll", "test", "loading",
+    "media-queries";
 
   .chartCanvas {
     width: 100% !important;
