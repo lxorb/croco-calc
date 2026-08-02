@@ -8,12 +8,7 @@ import {
 import app from "./app";
 import { Server } from "http";
 import { version } from "./version";
-import { recordServerVersion } from "./utils/prometheus";
-import * as RedisClient from "./init/redis";
-import queues from "./queues";
-import workers from "./workers";
 import Logger from "./utils/logger";
-import * as EmailClient from "./init/email-client";
 import { init as initFirebaseAdmin } from "./init/firebase-admin";
 import { createIndicies as leaderboardDbSetup } from "./dal/leaderboards";
 import { createIndicies as blocklistDbSetup } from "./dal/blocklist";
@@ -36,37 +31,6 @@ async function bootServer(port: number): Promise<Server> {
     Logger.success("Live configuration fetched");
     await updateFromConfigurationFile();
 
-    Logger.info("Initializing email client...");
-    await EmailClient.init();
-
-    Logger.info("Connecting to redis...");
-    await RedisClient.connect();
-
-    if (RedisClient.isConnected()) {
-      Logger.success("Connected to redis");
-      const connection = RedisClient.getConnection();
-
-      Logger.info("Initializing queues...");
-      queues.forEach((queue) => {
-        queue.init(connection ?? undefined);
-      });
-      Logger.success(
-        `Queues initialized: ${queues
-          .map((queue) => queue.queueName)
-          .join(", ")}`,
-      );
-
-      Logger.info("Initializing workers...");
-      workers.forEach(async (worker) => {
-        await worker(connection ?? undefined).run();
-      });
-      Logger.success(
-        `Workers initialized: ${workers
-          .map((worker) => worker(connection ?? undefined).name)
-          .join(", ")}`,
-      );
-    }
-
     Logger.info("Starting cron jobs...");
     jobs.forEach((job) => job.start());
     Logger.success("Cron jobs started");
@@ -79,8 +43,6 @@ async function bootServer(port: number): Promise<Server> {
 
     Logger.info("Setting up connections indicies...");
     await connectionsDbSetup();
-
-    recordServerVersion(version);
   } catch (error) {
     Logger.error("Failed to boot server");
     const message = getErrorMessage(error);

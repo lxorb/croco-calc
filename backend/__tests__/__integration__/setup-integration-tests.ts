@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, afterEach, vi } from "vitest";
 import { Collection, Db, MongoClient, WithId } from "mongodb";
 import { setupCommonMocks } from "../setup-common-mocks";
-import { getConnection } from "../../src/init/redis";
 
 process.env["MODE"] = "dev";
 
@@ -38,8 +37,6 @@ afterAll(async () => {
 
   db = undefined;
   client = undefined;
-
-  await getConnection()?.quit();
 
   vi.resetAllMocks();
 });
