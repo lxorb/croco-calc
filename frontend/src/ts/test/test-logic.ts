@@ -37,6 +37,7 @@ import {
   setActiveTaskIndex,
   setAnswerLength,
   setIsRepeated,
+  setIsTestInvalid,
   setIsTestRestarting,
   setLastResult,
   setResultCalculating,
@@ -61,7 +62,7 @@ export type TestResultPayload = {
   isRepeated: boolean;
   /** C37 — at least one whole minute with no input at all. */
   afkDetected: boolean;
-  /** Too few answers for the run to be meaningful. */
+  /** CP-109 — nothing was answered, so the run is invalid. */
   tooShort: boolean;
   dontSave: boolean;
 };
@@ -340,13 +341,18 @@ export async function finish(): Promise<void> {
   const completedEvent = buildCompletedEvent(active);
   setLastResult(completedEvent);
 
+  // CP-109 — a run with nothing answered is invalid: never saved, never a PB,
+  // never on a leaderboard. The results screen shows the standard notice.
   const answered = completedEvent.correct + completedEvent.wrong;
+  const invalid = answered === 0;
+  setIsTestInvalid(invalid);
+
   await presentResult({
     completedEvent,
     isRepeated: isRepeated(),
     afkDetected: completedEvent.afkDuration >= 60,
-    tooShort: answered < 3,
-    dontSave: !Config.resultSaving,
+    tooShort: invalid,
+    dontSave: invalid || !Config.resultSaving,
   });
 
   setResultCalculating(false);

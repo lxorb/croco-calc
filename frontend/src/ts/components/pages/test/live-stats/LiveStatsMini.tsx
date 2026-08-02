@@ -2,6 +2,7 @@ import { getConfig } from "../../../../config/store";
 import {
   getLiveAccText,
   getLiveSpeedText,
+  getSecondsRemaining,
   getTimerText,
   isTimerFlashHidden,
   showLiveStats,
@@ -31,7 +32,12 @@ export function LiveStatsMini() {
           }
         >
           {/* the fade animates the wrapper opacity, so the flash gate lives on the child */}
-          <div style={{ opacity: isTimerFlashHidden() ? 0 : 1 }}>
+          {/* CP-189 — the timer element carries `data-seconds-remaining`. */}
+          <div
+            data-timer=""
+            data-seconds-remaining={getSecondsRemaining()}
+            style={{ opacity: isTimerFlashHidden() ? 0 : 1 }}
+          >
             {getTimerText()}
           </div>
         </AnimeShow>

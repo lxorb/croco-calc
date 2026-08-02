@@ -30,7 +30,7 @@ function setupDom(): void {
         <div id="tasksWrapper">
           <textarea id="tasksInput"></textarea>
           <div id="caret" class="default"></div>
-          <div id="tasks" class="preStart" data-state="idle"></div>
+          <div id="tasks" class="preStart" data-state="preStart"></div>
         </div>
       </div>
     </div>`;
@@ -67,12 +67,12 @@ describe("task stream rendering", () => {
       expect(document.body.textContent).not.toContain(firstPrompt);
     });
 
-    it("carries the `preStart` class and `data-state=idle` (CP-046)", async () => {
+    it("carries the `preStart` class and `data-state` (CP-046, CP-186)", async () => {
       const ui = await loadUi();
       ui.applyPreStart();
       const tasks = document.querySelector("#tasks");
       expect(tasks?.classList.contains("preStart")).toBe(true);
-      expect(tasks?.getAttribute("data-state")).toBe("idle");
+      expect(tasks?.getAttribute("data-state")).toBe("preStart");
     });
 
     it("keeps `preStart` and `blurred` independent (CP-046, CP-084)", async () => {
@@ -105,7 +105,7 @@ describe("task stream rendering", () => {
 
       const tasks = document.querySelector("#tasks");
       expect(tasks?.classList.contains("preStart")).toBe(false);
-      expect(tasks?.getAttribute("data-state")).toBe("active");
+      expect(tasks?.getAttribute("data-state")).toBe("running");
       expect(document.body.textContent).toContain(views[0]?.prompt ?? "");
       expect(tasks?.querySelector(".task.masked")).toBeNull();
     });
@@ -231,7 +231,7 @@ describe("task stream rendering", () => {
       // The committed ones DO show their answer — that is CP-041, and it is
       // exactly the scope C29 permits.
       const hints = document.querySelectorAll(
-        "#tasks .task.incorrect .hints hint",
+        '#tasks .task[data-result="wrong"] .hints hint',
       );
       expect(hints).toHaveLength(8);
       expect(hints[0]?.textContent).toBe(answers[0]);

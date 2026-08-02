@@ -1,5 +1,6 @@
 import { getConfig } from "../../../../config/store";
 import {
+  getSecondsRemaining,
   getTimerText,
   isTimerFlashHidden,
   showLiveStats,
@@ -32,7 +33,10 @@ export function LiveStatsTextTop() {
           }
         >
           {/* flash_text blanks the text instead of fading it, unlike flash_mini */}
-          <div>{isTimerFlashHidden() ? "" : getTimerText()}</div>
+          {/* CP-189 — the timer element carries `data-seconds-remaining`. */}
+          <div data-timer="" data-seconds-remaining={getSecondsRemaining()}>
+            {isTimerFlashHidden() ? "" : getTimerText()}
+          </div>
         </AnimeShow>
       </div>
     </div>

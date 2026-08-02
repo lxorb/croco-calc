@@ -86,8 +86,8 @@ function taskHtml(view: TaskView): string {
       ? `<div class="hints"><hint>${escapeHtml(view.expected ?? "")}</hint></div>`
       : "";
 
-  const result =
-    view.result === undefined ? "" : ` data-result="${view.result}"`;
+  const attr = resultAttr(view);
+  const result = attr === undefined ? "" : ` data-result="${attr}"`;
 
   return (
     `<div class="${classes.join(" ")}" data-taskindex="${view.index}"${result}>` +
@@ -106,9 +106,17 @@ function maskedTaskHtml(index: number): string {
   );
 }
 
-/** The exit-criterion hook: `#tasks` always carries `data-state`. */
-export function setTestState(state: "idle" | "active" | "finished"): void {
+/** CP-186 — `#tasks` always carries `data-state`, with exactly these values. */
+export type TestDomState = "preStart" | "running" | "finished";
+
+export function setTestState(state: TestDomState): void {
   tasksElement().native.dataset["state"] = state;
+}
+
+/** CP-187 — `data-result` is `correct` | `wrong`, never `incorrect`. */
+function resultAttr(view: TaskView): "correct" | "wrong" | undefined {
+  if (view.result === undefined) return undefined;
+  return view.result === "correct" ? "correct" : "wrong";
 }
 
 /** The slice of task indices that should currently be in the document. */
@@ -131,7 +139,7 @@ export function applyPreStart(): void {
   setPreStart(true);
   tasks.addClass("preStart");
   tasks.setStyle({ transition: `${REVEAL_SECONDS}s`, marginTop: "0px" });
-  setTestState("idle");
+  setTestState("preStart");
   renderedLineTop = undefined;
   tasks.setHtml(
     Array.from({ length: RENDER_AHEAD }, (_, i) => maskedTaskHtml(i)).join(""),
@@ -147,7 +155,7 @@ export function revealStream(views: readonly TaskView[]): void {
   setPreStart(false);
   renderStream(views);
   tasksElement().removeClass("preStart");
-  setTestState("active");
+  setTestState("running");
 }
 
 /** Writes the whole visible window. */
@@ -179,7 +187,7 @@ export function commitTask(view: TaskView, nextActive: number): void {
   if (el !== null) {
     el.removeClass("active");
     el.addClass(["typed", view.result === "correct" ? "correct" : "incorrect"]);
-    el.native.dataset["result"] = view.result ?? "";
+    el.native.dataset["result"] = resultAttr(view) ?? "";
     if (view.result === "incorrect") {
       const hints = document.createElement("div");
       hints.className = "hints";
