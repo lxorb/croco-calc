@@ -4,50 +4,18 @@ import * as Validation from "../../src/utils/validation";
 describe("Validation", () => {
   it("isTestTooShort", () => {
     const testCases = [
-      {
-        result: {
-          mode: "time",
-          mode2: 10,
-          customText: undefined,
-          testDuration: 10,
-          bailedOut: false,
-        },
-        expected: true,
-      },
-      {
-        result: {
-          mode: "time",
-          mode2: 15,
-          customText: undefined,
-          testDuration: 15,
-          bailedOut: false,
-        },
-        expected: false,
-      },
-      {
-        result: {
-          mode: "time",
-          mode2: 0,
-          customText: undefined,
-          testDuration: 20,
-          bailedOut: false,
-        },
-        expected: false,
-      },
-      {
-        result: {
-          mode: "time",
-          mode2: 0,
-          customText: undefined,
-          testDuration: 2,
-          bailedOut: false,
-        },
-        expected: true,
-      },
+      // shorter than the shortest configurable test (1 minute)
+      { result: { testDuration: 10 }, expected: true },
+      { result: { testDuration: 59 }, expected: true },
+      // the four legal test lengths
+      { result: { testDuration: 60 }, expected: false },
+      { result: { testDuration: 120 }, expected: false },
+      { result: { testDuration: 240 }, expected: false },
+      { result: { testDuration: 480 }, expected: false },
     ];
 
     testCases.forEach((testCase) => {
-      expect(Validation.isTestTooShort(testCase.result as any)).toBe(
+      expect(Validation.isTestTooShort(testCase.result as never)).toBe(
         testCase.expected,
       );
     });

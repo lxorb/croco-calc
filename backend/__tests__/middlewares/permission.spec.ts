@@ -125,7 +125,7 @@ describe("permission middleware", () => {
       //GIVEN
       const req = givenRequest(
         {
-          requirePermission: ["canReport", "canManageApeKeys"],
+          requirePermission: ["canReport"],
         },
         { uid },
       );
@@ -138,13 +138,13 @@ describe("permission middleware", () => {
       expect(getPartialUserMock).toHaveBeenCalledWith(
         uid,
         "check user permissions",
-        ["canReport", "canManageApeKeys"],
+        ["canReport"],
       );
     });
     it("should fail if authentication is missing", async () => {
       //GIVEN
       const req = givenRequest({
-        requirePermission: ["canReport", "canManageApeKeys"],
+        requirePermission: ["canReport"],
       });
 
       //WHEN
@@ -157,74 +157,6 @@ describe("permission middleware", () => {
             403,
             "Failed to check permissions, authentication required.",
           ),
-        ),
-      );
-    });
-  });
-  describe("quoteMod check", () => {
-    const requireQuoteMod: EndpointMetadata = {
-      requirePermission: "quoteMod",
-    };
-
-    it("should pass for quoteAdmin", async () => {
-      //GIVEN
-      getPartialUserMock.mockResolvedValue({ quoteMod: true } as any);
-      const req = givenRequest(requireQuoteMod, { uid });
-
-      //WHEN
-      await handler(req, res, next);
-
-      //THEN
-      expect(next).toHaveBeenCalledWith();
-      expect(getPartialUserMock).toHaveBeenCalledWith(
-        uid,
-        "check user permissions",
-        ["quoteMod"],
-      );
-    });
-    it("should pass for specific language", async () => {
-      //GIVEN
-      getPartialUserMock.mockResolvedValue({ quoteMod: "english" } as any);
-      const req = givenRequest(requireQuoteMod, { uid });
-
-      //WHEN
-      await handler(req, res, next);
-
-      //THEN
-      expect(next).toHaveBeenCalledWith();
-      expect(getPartialUserMock).toHaveBeenCalledWith(
-        uid,
-        "check user permissions",
-        ["quoteMod"],
-      );
-    });
-    it("should fail for empty string", async () => {
-      //GIVEN
-      getPartialUserMock.mockResolvedValue({ quoteMod: "" } as any);
-      const req = givenRequest(requireQuoteMod, { uid });
-
-      //WHEN
-      await handler(req, res, next);
-
-      //THEN
-      expect(next).toHaveBeenCalledWith(
-        expect.toMatchCrocoError(
-          new CrocoError(403, "You don't have permission to do this."),
-        ),
-      );
-    });
-    it("should fail for missing quoteMod", async () => {
-      //GIVEN
-      getPartialUserMock.mockResolvedValue({} as any);
-      const req = givenRequest(requireQuoteMod, { uid });
-
-      //WHEN
-      await handler(req, res, next);
-
-      //THEN
-      expect(next).toHaveBeenCalledWith(
-        expect.toMatchCrocoError(
-          new CrocoError(403, "You don't have permission to do this."),
         ),
       );
     });
@@ -266,57 +198,6 @@ describe("permission middleware", () => {
       expect(next).toHaveBeenCalledWith();
     });
     it("should pass if canReport is not set", async () => {
-      //GIVEN
-      getPartialUserMock.mockResolvedValue({} as any);
-      const req = givenRequest(requireCanReport, { uid });
-
-      //WHEN
-      await handler(req, res, next);
-
-      //THEN
-      expect(next).toHaveBeenCalledWith();
-    });
-  });
-  describe("canManageApeKeys check", () => {
-    const requireCanReport: EndpointMetadata = {
-      requirePermission: "canManageApeKeys",
-    };
-
-    it("should fail if user cannot report", async () => {
-      //GIVEN
-      getPartialUserMock.mockResolvedValue({ canManageApeKeys: false } as any);
-      const req = givenRequest(requireCanReport, { uid });
-
-      //WHEN
-      await handler(req, res, next);
-
-      //THEN
-      expect(next).toHaveBeenCalledWith(
-        expect.toMatchCrocoError(
-          new CrocoError(
-            403,
-            "You have lost access to ape keys, please contact support",
-          ),
-        ),
-      );
-      expect(getPartialUserMock).toHaveBeenCalledWith(
-        uid,
-        "check user permissions",
-        ["canManageApeKeys"],
-      );
-    });
-    it("should pass if user can report", async () => {
-      //GIVEN
-      getPartialUserMock.mockResolvedValue({ canManageApeKeys: true } as any);
-      const req = givenRequest(requireCanReport, { uid });
-
-      //WHEN
-      await handler(req, res, next);
-
-      //THEN
-      expect(next).toHaveBeenCalledWith();
-    });
-    it("should pass if canManageApeKeys is not set", async () => {
       //GIVEN
       getPartialUserMock.mockResolvedValue({} as any);
       const req = givenRequest(requireCanReport, { uid });

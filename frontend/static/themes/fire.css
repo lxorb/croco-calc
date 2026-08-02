@@ -35,8 +35,6 @@
 }
 
 #caret,
-.pageSettings .section .buttons .button.active,
-.pageSettings .section.languages .buttons .language.active,
 .pageAccount .group.filterButtons .buttons .button.active {
   animation: fire-bg 5s linear infinite;
 }
@@ -64,29 +62,12 @@ a:not(.button):not([data-ui-variant="button"]):hover {
   animation: fire 5s linear infinite;
 }
 
-#words {
+#tasks {
   --correct-letter-animation: fire 5s linear infinite;
 }
 
-#words.flipped {
+#tasks.flipped {
   --untyped-letter-color: var(--sub-color);
   --correct-letter-animation: none;
   --untyped-letter-animation: fire 5s linear infinite;
-}
-
-#words.highlight-off .word letter,
-#words.highlight-off .word.typed letter {
-  animation: fire 5s linear infinite;
-}
-
-#words .word.typed letter.correct,
-#words.highlight-word .word.typed letter,
-#words.highlight-next-word .word.typed letter,
-#words.highlight-next-two-words .word.typed letter,
-#words.highlight-next-three-words .word.typed letter {
-  animation: fire 5s linear infinite;
-}
-
-#words.flipped .word.typed letter {
-  animation: none;
 }

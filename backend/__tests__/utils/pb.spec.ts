@@ -2,43 +2,8 @@ import { describe, it, expect } from "vitest";
 import * as pb from "../../src/utils/pb";
 import { Mode, PersonalBests } from "@croco-calc/schemas/shared";
 import { Result } from "@croco-calc/schemas/results";
-import { FunboxName } from "@croco-calc/schemas/configs";
 
 describe("Pb Utils", () => {
-  describe("funboxCatGetPb", () => {
-    const testCases: { funbox: FunboxName[] | undefined; expected: boolean }[] =
-      [
-        {
-          funbox: ["plus_one"],
-          expected: true,
-        },
-        {
-          funbox: [],
-          expected: true,
-        },
-        {
-          funbox: undefined,
-          expected: true,
-        },
-        {
-          funbox: ["nausea", "plus_one"],
-          expected: true,
-        },
-        {
-          funbox: ["arrows"],
-          expected: false,
-        },
-      ];
-
-    it.each(testCases)(
-      "canFunboxGetPb with $funbox = $expected",
-      ({ funbox, expected }) => {
-        const result = pb.canFunboxGetPb({ funbox } as any);
-        expect(result).toBe(expected);
-      },
-    );
-  });
-
   describe("checkAndUpdatePb", () => {
     it("should update personal best", () => {
       const userPbs: PersonalBests = {

@@ -1,7 +1,3 @@
-.word.error {
-  border-bottom: dotted 2px var(--text-color);
-}
-
 [data-nav-item="test"] {
   background: var(--caret-color);
   border-radius: 50%;

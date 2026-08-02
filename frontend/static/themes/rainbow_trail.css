@@ -32,18 +32,13 @@ header [data-ui-element="logoSubtext"],
 button.text:hover,
 .textButton:hover,
 footer a:hover,
-footer a:hover > i,
+footer a:hover > .icon,
 footer button:hover,
-footer button:hover > i,
-footer button:hover > .relative > i,
-#restartTestButton:hover > i,
-#showWordHistoryButton:hover > i,
-#saveScreenshotButton:hover > i,
-#restartTestButtonWithSameWordset:hover > i,
-#nextTestButton:hover > i,
-#practiseWordsButton:hover > i,
-#watchReplayButton:hover > i,
-#watchVideoAdButton:hover > i {
+footer button:hover > .icon,
+footer button:hover > .relative > .icon,
+#restartTestButton:hover > .icon,
+#saveScreenshotButton:hover > .icon,
+#nextTestButton:hover > .icon {
   background: linear-gradient(
     90deg,
     #60b6ce,
@@ -63,7 +58,7 @@ footer button:hover > .relative > i,
   transition: all 1s ease;
 }
 
-#words {
+#tasks {
   --correct-letter-animation: rainbow-infinite-loop 5s linear infinite;
   --incorrect-letter-animation: rainbow-error-infinite-loop 1s alternate
     ease-in-out infinite;
@@ -71,34 +66,9 @@ footer button:hover > .relative > i,
     infinite;
 }
 
-#words.highlight-off .word letter,
-#words.highlight-off .word.typed letter {
-  animation: rainbow-infinite-loop 5s linear infinite;
-}
-
-#words .word.typed letter.correct,
-#words.highlight-word .word.typed letter,
-#words.highlight-next-word .word.typed letter,
-#words.highlight-next-two-words .word.typed letter,
-#words.highlight-next-three-words .word.typed letter {
-  animation: rainbow 7.5s ease-in-out forwards;
-}
-
-#words .word.error {
-  animation: rainbow-error 7.5s ease-in-out forwards;
-}
-
-#words.highlight-word .word.active letter {
-  animation: var(--correct-letter-animation);
-}
-
-#words.flipped {
+#tasks.flipped {
   --correct-letter-animation: none;
   --untyped-letter-animation: rainbow-infinite-loop 5s linear infinite;
-}
-
-#words.flipped .word.typed letter {
-  animation: none;
 }
 
 footer button:hover {
