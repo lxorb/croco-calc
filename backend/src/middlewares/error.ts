@@ -7,7 +7,6 @@ import type { NextFunction, Response } from "express";
 import { isCustomCode } from "../constants/croco-status-codes";
 
 import { isDevEnvironment } from "../utils/misc";
-import { version } from "../version";
 import { addLog } from "../dal/logs";
 import { ExpressRequestWithContext } from "../api/types";
 

@@ -268,18 +268,13 @@ export async function applyCustomBackground(): Promise<void> {
     backgroundUrl = localBackgroundFile;
   }
 
-  // hide the filter section initially and always
-  qs(
-    ".pageSettings .section[data-config-name='customBackgroundFilter']",
-  )?.hide();
-
   if (backgroundUrl === "") {
-    qs("#words")?.removeClass("noErrorBorder");
-    qs("#resultWordsHistory")?.removeClass("noErrorBorder");
+    qs("#tasks")?.removeClass("noErrorBorder");
+    qs("#resultTaskHistory")?.removeClass("noErrorBorder");
     qs(".customBackground img")?.remove();
   } else {
-    qs("#words")?.addClass("noErrorBorder");
-    qs("#resultWordsHistory")?.addClass("noErrorBorder");
+    qs("#tasks")?.addClass("noErrorBorder");
+    qs("#resultTaskHistory")?.addClass("noErrorBorder");
 
     //use setAttribute for possible unsafe customBackground value
     const container = document.querySelector(".customBackground");
@@ -290,13 +285,6 @@ export async function applyCustomBackground(): Promise<void> {
       "onError",
       "javascript:this.style.display='none'; window.dispatchEvent(new Event('customBackgroundFailed'))",
     );
-    img.onload = () => {
-      // show the filter section only if the image loads successfully
-      qs(
-        ".pageSettings .section[data-config-name='customBackgroundFilter']",
-      )?.show();
-    };
-
     container?.replaceChildren(img);
 
     applyCustomBackgroundFilters();

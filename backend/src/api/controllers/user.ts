@@ -1,12 +1,8 @@
 import * as UserDAL from "../../dal/user";
-import CrocoError, {
-  getErrorMessage,
-  isFirebaseError,
-} from "../../utils/error";
+import CrocoError, { isFirebaseError } from "../../utils/error";
 import { CrocoResponse } from "../../utils/croco-response";
 import {
   buildAgentLog,
-  getFrontendUrl,
   omit,
   replaceObjectId,
   replaceObjectIds,
@@ -21,7 +17,6 @@ import { purgeUserFromXpLeaderboards } from "../../services/weekly-xp-leaderboar
 import { v4 as uuidv4 } from "uuid";
 import { ObjectId } from "mongodb";
 import * as ReportDAL from "../../dal/report";
-import FirebaseAdmin from "../../init/firebase-admin";
 import * as AuthUtil from "../../utils/auth";
 import * as Dates from "date-fns";
 import { UTCDateMini } from "@date-fns/utc";

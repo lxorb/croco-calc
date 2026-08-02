@@ -14,9 +14,6 @@ export default s.router(resultsContract, {
   add: {
     handler: async (r) => callController(ResultController.addResult)(r),
   },
-  updateTags: {
-    handler: async (r) => callController(ResultController.updateTags)(r),
-  },
   deleteAll: {
     handler: async (r) => callController(ResultController.deleteAll)(r),
   },

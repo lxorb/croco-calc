@@ -9,7 +9,6 @@ import {
   type Filter,
 } from "mongodb";
 import { flattenObjectDeep, isPlainObject, WithObjectId } from "../utils/misc";
-import { getCachedConfiguration } from "../init/configuration";
 import { getDayOfYear } from "date-fns";
 import { UTCDate } from "@date-fns/utc";
 import {
@@ -31,7 +30,6 @@ import {
 import { addImportantLog } from "./logs";
 import { Result as ResultType } from "@croco-calc/schemas/results";
 import { Configuration } from "@croco-calc/schemas/configuration";
-import { isToday, isYesterday } from "@croco-calc/util/date-and-time";
 import { aggregateWithAcceptedConnections } from "./connections";
 
 export type DBUser = Omit<

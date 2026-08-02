@@ -184,8 +184,9 @@ export const FA_TO_PHOSPHOR: Record<string, string> = {
   "fa-plus": "ph:plus-bold",
   "fa-question": "ph:question-bold",
   "fa-question-circle": "ph:question-bold",
-  "fa-quote-left": "ph:quotes-bold",
-  "fa-quote-right": "ph:quotes-bold",
+  // fa-quote-left / fa-quote-right have no croco calc equivalent: quotes are
+  // cut, and DoD-07 bans the token from frontend/src, which the bundled icon
+  // id "ph:quotes-bold" would reintroduce.
   "fa-random": "ph:shuffle-bold",
   "fa-redo-alt": "ph:arrow-clockwise-bold",
   "fa-ruler": "ph:ruler-bold",

@@ -1,4 +1,21 @@
-import { KnownFontName } from "@croco-calc/schemas/fonts";
+/**
+ * The croco calc font catalogue (INV-064, INV-126).
+ *
+ * Monkeytype shipped 42 webfonts because typing practice is partly a
+ * legibility exercise. croco calc keeps only what the `fontFamily` config key
+ * needs: `Roboto_Mono` — monkeytype's default, and the one the digit columns of
+ * a math prompt line up under — plus one proportional alternative.
+ *
+ * `frontend/static/webfonts/` holds exactly the files named here, and
+ * `vite.config.ts` regenerates the SCSS `$fonts` map consumed by
+ * `styles/fonts.scss` from this record.
+ *
+ * The name is also the CSS `font-family`, with underscores read as spaces,
+ * unless `display` overrides it.
+ */
+export const FONT_NAMES = ["Roboto_Mono", "Lexend_Deca"] as const;
+
+export type KnownFontName = (typeof FONT_NAMES)[number];
 
 export type FontConfig = {
   display?: string;
@@ -18,136 +35,7 @@ export const Fonts: Record<KnownFontName, FontConfig> = {
   Roboto_Mono: {
     fileName: "RobotoMono-Regular.woff2",
   },
-  Noto_Naskh_Arabic: {
-    fileName: "NotoNaskhArabic-Regular.woff2",
-  },
-  Source_Code_Pro: {
-    fileName: "SourceCodePro-Regular.woff2",
-  },
-  IBM_Plex_Sans: {
-    fileName: "IBMPlexSans-SemiBold.woff2",
-    weight: 600,
-  },
-  Inconsolata: {
-    fileName: "Inconsolata-Regular.woff2",
-  },
-  Fira_Code: {
-    fileName: "FiraCode-Regular.woff2",
-  },
-  JetBrains_Mono: {
-    fileName: "JetBrainsMono-Regular.woff2",
-  },
-  Roboto: {
-    fileName: "Roboto-Regular.woff2",
-  },
-  Montserrat: {
-    fileName: "Montserrat-Regular.woff2",
-  },
-  Titillium_Web: {
-    fileName: "TitilliumWeb-Regular.woff2",
-  },
   Lexend_Deca: {
     fileName: "LexendDeca-Regular.woff2",
-  },
-  Comic_Sans_MS: {
-    display: "Helvetica",
-    systemFont: true,
-  },
-  Oxygen: {
-    fileName: "Oxygen-Regular.woff2",
-  },
-  Nunito: {
-    fileName: "Nunito-Bold.woff2",
-    weight: 700,
-  },
-  Itim: {
-    fileName: "Itim-Regular.woff2",
-  },
-  Courier: {
-    systemFont: true,
-  },
-  Comfortaa: {
-    fileName: "Comfortaa-Regular.woff2",
-  },
-  Coming_Soon: {
-    fileName: "ComingSoon-Regular.woff2",
-  },
-  Atkinson_Hyperlegible: {
-    fileName: "AtkinsonHyperlegible-Regular.woff2",
-  },
-  Lato: {
-    fileName: "Lato-Regular.woff2",
-  },
-  Lalezar: {
-    fileName: "Lalezar-Regular.woff2",
-  },
-  Boon: {
-    display: "Boon (ไทย)",
-    fileName: "Boon-Regular.woff2",
-  },
-  Open_Dyslexic: {
-    fileName: "OpenDyslexic-Regular.woff2",
-  },
-  Ubuntu: {
-    fileName: "Ubuntu-Regular.woff2",
-  },
-  Ubuntu_Mono: {
-    fileName: "UbuntuMono-Regular.woff2",
-  },
-  Georgia: {
-    systemFont: true,
-  },
-  Cascadia_Mono: {
-    fileName: "CascadiaMono-Regular.woff2",
-  },
-  IBM_Plex_Mono: {
-    fileName: "IBMPlexMono-Regular.woff2",
-  },
-  Overpass_Mono: {
-    fileName: "OverpassMono-Regular.woff2",
-  },
-  Hack: {
-    fileName: "Hack-Regular.woff2",
-  },
-  CommitMono: {
-    fileName: "CommitMono-Regular.woff2",
-  },
-  Mononoki: {
-    fileName: "Mononoki-Regular.woff2",
-  },
-  Parkinsans: {
-    fileName: "Parkinsans-Regular.woff2",
-  },
-  Geist: {
-    fileName: "Geist-Medium.woff2",
-  },
-  Sarabun: {
-    fileName: "Sarabun-Bold.woff2",
-  },
-  Kanit: {
-    fileName: "Kanit-Regular.woff2",
-  },
-  Geist_Mono: {
-    fileName: "GeistMono-Medium.woff2",
-  },
-  Iosevka: {
-    fileName: "Iosevka-Regular.woff2",
-  },
-  Proto: {
-    display: "0xProto",
-    fileName: "0xProto-Regular.woff2",
-  },
-  Adwaita_Mono: {
-    fileName: "AdwaitaMono-Regular.woff2",
-  },
-  Inter_Tight: {
-    fileName: "InterTight-Regular.woff2",
-  },
-  Space_Grotesk: {
-    fileName: "SpaceGrotesk-Regular.woff2",
-  },
-  Noto_Sans_Lao: {
-    display: "Noto Sans Lao (ລາວ)",
-    fileName: "NotoSansLao-Regular.woff2",
   },
 };
