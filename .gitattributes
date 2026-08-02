@@ -1,0 +1,12 @@
+# The whole repo is LF in git and LF on disk. Without this, a Windows
+# checkout with core.autocrlf=true gets CRLF working files and `pnpm
+# format-check` (oxfmt) reports every one of them as misformatted, while CI on
+# Linux sees LF and passes — a gate that disagrees with itself by platform.
+* text=auto eol=lf
+
+# Binary assets must never be touched.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+*.gz binary
