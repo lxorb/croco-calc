@@ -1,10 +1,10 @@
 /**
  * The croco calc font catalogue (INV-064, INV-126).
  *
- * Monkeytype shipped 42 webfonts because typing practice is partly a
+ * The upstream project shipped 42 webfonts because its drill was partly a
  * legibility exercise. croco calc keeps only what the `fontFamily` config key
- * needs: `Roboto_Mono` — monkeytype's default, and the one the digit columns of
- * a math prompt line up under — plus one proportional alternative.
+ * needs: `Roboto_Mono` — the inherited default, and the face whose digits line
+ * a math prompt up in columns — plus one proportional alternative.
  *
  * `frontend/static/webfonts/` holds exactly the files named here, and
  * `vite.config.ts` regenerates the SCSS `$fonts` map consumed by
