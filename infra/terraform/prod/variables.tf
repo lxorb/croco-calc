@@ -26,10 +26,28 @@ variable "container_image" {
   description = <<-EOT
     Fully qualified image reference, always pinned to an immutable SHA tag —
     never `:latest` (INF-043). deploy-backend.yml rolls the app forward with
-    `az containerapp update`, so this value is only the bootstrap image.
+    `az containerapp update`, so this value is only the bootstrap image, but the
+    bootstrap revision is a real deployed revision and INF-043 says "always".
+
+    Deliberately has NO default. A default of `:latest` made the very first
+    apply create the app on a mutable tag, and `ignore_changes` on the image
+    then stopped Terraform from ever correcting it — the app only left `:latest`
+    if and when deploy-backend.yml happened to run. `infra.yml` passes
+    `TF_VAR_container_image` built from the workflow's commit SHA; a local apply
+    must pass `-var container_image=ghcr.io/lxorb/croco-calc-api:<sha>` for a
+    SHA that has already been pushed by deploy-backend.yml (see RUNBOOK).
   EOT
   type        = string
-  default     = "ghcr.io/lxorb/croco-calc-api:latest"
+
+  validation {
+    condition     = can(regex("^[^:]+(:[^:]+)?/[^:]+:[^:]+$", var.container_image))
+    error_message = "container_image must carry an explicit tag, e.g. ghcr.io/lxorb/croco-calc-api:<sha>."
+  }
+
+  validation {
+    condition     = !endswith(var.container_image, ":latest")
+    error_message = "INF-043: the Container App must be pinned to the immutable SHA tag, never :latest."
+  }
 }
 
 variable "container_cpu" {

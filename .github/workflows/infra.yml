@@ -81,6 +81,10 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_firebase_service_account_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           TF_VAR_recaptcha_secret: ${{ secrets.RECAPTCHA_SECRET }}
+          # INF-043 — the Container App is created on the immutable SHA tag.
+          # `container_image` has no default precisely so this cannot silently
+          # fall back to a mutable `:latest`.
+          TF_VAR_container_image: ghcr.io/lxorb/croco-calc-api:${{ github.sha }}
         # No pipe. GitHub's default shell is `bash -e {0}` WITHOUT pipefail, so
         # `terraform plan | tee plan.txt` would report the exit status of `tee`
         # and a failed plan would sail through green with its error text posted
@@ -179,6 +183,10 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_firebase_service_account_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           TF_VAR_recaptcha_secret: ${{ secrets.RECAPTCHA_SECRET }}
+          # INF-043 — the Container App is created on the immutable SHA tag.
+          # `container_image` has no default precisely so this cannot silently
+          # fall back to a mutable `:latest`.
+          TF_VAR_container_image: ghcr.io/lxorb/croco-calc-api:${{ github.sha }}
         run: terraform apply -input=false -auto-approve
 
       # INF-080: a second consecutive apply must report no changes.
@@ -192,6 +200,10 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_firebase_service_account_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           TF_VAR_recaptcha_secret: ${{ secrets.RECAPTCHA_SECRET }}
+          # INF-043 — the Container App is created on the immutable SHA tag.
+          # `container_image` has no default precisely so this cannot silently
+          # fall back to a mutable `:latest`.
+          TF_VAR_container_image: ghcr.io/lxorb/croco-calc-api:${{ github.sha }}
         run: terraform plan -input=false -detailed-exitcode
 
       # INF-086a: the deployed FQDN is written back as a repository variable so
