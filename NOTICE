@@ -1,0 +1,53 @@
+croco calc
+Copyright (C) 2026 the croco calc contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See the LICENSE file for the full text.
+
+--------------------------------------------------------------------------------
+Attribution
+--------------------------------------------------------------------------------
+
+croco calc is a derivative work of Monkeytype
+(https://github.com/monkeytypegame/monkeytype), licensed GPL-3.0.
+
+It was created by adapting the Monkeytype codebase in place: this repository
+retains Monkeytype's full git history, and a substantial part of the design
+system, theme catalogue, configuration machinery, build tooling and backend
+scaffolding originates there. Monkeytype is
+
+  Copyright (C) Jack Coulter (Miodec) and the Monkeytype contributors
+  https://github.com/monkeytypegame/monkeytype
+  Licensed under the GNU General Public License v3.0
+
+--------------------------------------------------------------------------------
+Licence consequences
+--------------------------------------------------------------------------------
+
+Because croco calc is a derivative of GPL-3.0 software, the following are
+obligations, not choices:
+
+1. croco calc remains licensed under GPL-3.0. It may not be relicensed to MIT,
+   Apache, or any proprietary licence.
+2. The root LICENSE file is retained verbatim and must not be replaced or
+   truncated.
+3. The retained Monkeytype git history must not be rewritten to strip
+   Monkeytype authorship. Attribution to the original authors is a GPL-3.0
+   section 5(a) / 7(b) obligation.
+4. Any hosted modification of croco calc obligates source availability of the
+   whole combined work — including the backend service and the frontend worker
+   deployment, not just the parts that were changed.
+5. The public source repository is what satisfies that obligation. It must not
+   be switched to private while a build is publicly served.
+
+--------------------------------------------------------------------------------
+Third-party assets
+--------------------------------------------------------------------------------
+
+The theme palettes and theme CSS under frontend/static/themes/ originate from
+Monkeytype and are covered by the same GPL-3.0 licence.
+
+Bundled fonts under frontend/static/webfonts/ carry their own upstream licences
+(SIL Open Font License and similar); those licences are unaffected by this file.
