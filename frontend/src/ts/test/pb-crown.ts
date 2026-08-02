@@ -1,9 +1,19 @@
+/**
+ * The PB crown on the results screen (CP-095, INV-092).
+ *
+ * Kept verbatim from upstream apart from its host: the crown now hangs off
+ * `.group.score`, because a personal best is measured in `score` (CP-110,
+ * master C40).
+ */
+
 import { applyReducedMotion } from "../utils/misc";
 import { qs } from "../utils/dom";
 
+const CROWN_SELECTOR = "#result .stats .score .crown";
+
 export function hide(): void {
   visible = false;
-  qs("#result .stats .wpm .crown")?.setStyle({ opacity: "0" })?.hide();
+  qs(CROWN_SELECTOR)?.setStyle({ opacity: "0" })?.hide();
 }
 
 export type CrownType =
@@ -23,7 +33,7 @@ export function getCurrentType(): CrownType {
 export function show(): void {
   if (visible) return;
   visible = true;
-  const el = qs("#result .stats .wpm .crown");
+  const el = qs(CROWN_SELECTOR);
 
   el?.animate({
     opacity: [0, 1],
@@ -36,7 +46,7 @@ export function show(): void {
 
 export function update(type: CrownType): void {
   currentType = type;
-  qs("#result .stats .wpm .crown")
+  qs(CROWN_SELECTOR)
     ?.removeClass("ineligible")
     ?.removeClass("pending")
     ?.removeClass("error")
