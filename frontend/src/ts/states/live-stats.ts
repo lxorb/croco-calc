@@ -1,8 +1,8 @@
 /**
  * Derived live-stat text (CP-073 … CP-081).
  *
- * Every branch for word-count / quote / zen / custom mode is gone — croco calc
- * is time-limited only (CP-073) — which is what collapses monkeytype's
+ * Every branch for length / passage / zen / custom mode is gone — croco calc
+ * is time-limited only (CP-073) — which is what collapses the upstream
  * `live-stats.ts` to this. Live burst is removed (CP-078); the live readouts
  * are the timer, live **acc** and live **tpm** (master C13).
  */

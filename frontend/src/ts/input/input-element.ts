@@ -1,14 +1,15 @@
 /**
  * The hidden capture textarea (CP-053, CP-054).
  *
- * Renamed from `#wordsInput`. Every anti-interference attribute monkeytype
- * carried is preserved in `test.html`, plus `inputmode="decimal"` so mobile
+ * Renamed from the upstream capture field's id. Every anti-interference
+ * attribute upstream carried is preserved in `test.html`, plus
+ * `inputmode="decimal"` so mobile
  * browsers open a numeric keypad — which is exactly why the CP-191 symbol row
  * exists, since that keypad has no `/` and no `-`.
  *
- * Unlike monkeytype there is no leading-space sentinel and the element's value
+ * Unlike upstream there is no leading-space sentinel and the element's value
  * is never read: the input listeners `preventDefault()` everything and feed
- * characters straight to the engine, so the textarea is a pure focus target.
+ * each keystroke straight to the engine, so the textarea is a pure focus target.
  */
 
 const el = document.querySelector("#tasksInput") as HTMLTextAreaElement | null;

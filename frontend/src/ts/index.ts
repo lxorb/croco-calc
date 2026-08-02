@@ -90,5 +90,5 @@ addToGlobal({
 mountComponents();
 
 // Build the first (masked) task stream once the page exists. Nothing is legible
-// and no clock runs until the first accepted character (CP-046, CP-049, CP-075).
+// and no clock runs until the first accepted keystroke (CP-046, CP-049, CP-075).
 TestLogic.restart({ initial: true });

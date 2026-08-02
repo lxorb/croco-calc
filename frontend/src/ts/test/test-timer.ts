@@ -1,13 +1,13 @@
 /**
  * The countdown (CP-073 … CP-077, CP-189).
  *
- * croco calc is time-limited only, so monkeytype's word/quote/zen branches and
+ * croco calc is time-limited only, so the upstream length/passage/zen branches and
  * its `time = 0` infinite mode are gone. What is kept is the drift-corrected
  * scheduling: each tick is scheduled against the *absolute* start time rather
  * than by chaining `setInterval`, so an 8-minute test does not accumulate the
  * timer's own lateness.
  *
- * The timer starts on the first accepted input character and never on page
+ * The timer starts on the first accepted input symbol and never on page
  * load, focus, or restart (CP-075) — `TestLogic` is the only caller of
  * {@link start}, and it calls it from the same event that lifts the pre-start
  * blur (CP-049).

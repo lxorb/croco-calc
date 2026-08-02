@@ -1,14 +1,14 @@
 /**
  * The versioned test event log (INV-089, INV-197).
  *
- * monkeytype's architecture is kept — a flat, timestamped, replayable event
+ * The upstream architecture is kept — a flat, timestamped, replayable event
  * stream from which stats and charts are derived post hoc — but the vocabulary
  * is the math one INV-089 specifies: `taskShown` / `answerSubmitted` / `timer`.
  * The keystroke-level `keydown` / `keyup` / `input` / `composition` events are
- * gone; croco calc scores whole answers, not characters (CP-036, ME-152).
+ * gone; croco calc scores whole answers, not keystrokes (CP-036, ME-152).
  *
  * **C29:** no event carries the expected answer of any task. `answerSubmitted`
- * records what the *user* typed and whether it was right, never what was right.
+ * records what the *user* entered and whether it was right, never what was right.
  */
 
 export const EVENT_LOG_VERSION = 2;

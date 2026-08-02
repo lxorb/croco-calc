@@ -1,7 +1,7 @@
 /**
  * Physical-keyboard capture (CP-037, CP-050, CP-055, CP-059).
  *
- * The whole per-character correctness machinery monkeytype ran here is gone:
+ * The whole per-keystroke correctness machinery upstream ran here is gone:
  * CP-036 forbids any pre-commit feedback, so a keystroke either enters the
  * buffer, commits, deletes, or is ignored. Nothing else.
  */

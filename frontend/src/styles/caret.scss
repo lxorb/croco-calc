@@ -1,7 +1,6 @@
 // The caret is KEPT (master C11 overrules INV-068 / INV-160): CP-053 keeps the
 // hidden capture textarea, so there is no native browser caret to fall back on.
-// The pace caret is gone (CP-071), and so are the `carrot` / `banana` /
-// `monkey` image carets (CP-069).
+// The pace caret is gone (CP-071), and so are the three image carets (CP-069).
 
 #caret {
   height: 1.2em;

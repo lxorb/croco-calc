@@ -8,7 +8,7 @@ import {
 import { Icon } from "../../common/Icon";
 
 /**
- * CP-083 — appears after 1 s of lost focus, with monkeytype's two messages
+ * CP-083 — appears after 1 s of lost focus, with the upstream two messages
  * unchanged. CP-085: regaining focus lifts *this* blur and never the pre-start
  * one, which is a separate class on a separate signal.
  */

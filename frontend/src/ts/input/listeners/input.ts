@@ -2,7 +2,7 @@
  * Soft-keyboard capture (CP-054, CP-180).
  *
  * `keydown` is unreliable on Android soft keyboards, which frequently report
- * `Unidentified`. `beforeinput` carries the real character in `event.data`, so
+ * `Unidentified`. `beforeinput` carries the real symbol in `event.data`, so
  * the mobile path goes through here. Desktop keystrokes never reach it because
  * `key.ts` has already called `preventDefault()`.
  *

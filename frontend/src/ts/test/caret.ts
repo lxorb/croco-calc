@@ -23,7 +23,7 @@ export function hide(): void {
   caret.hide();
 }
 
-/** CP-088 — restart puts the caret back on task 0, character 0. */
+/** CP-088 — restart puts the caret back on task 0, position 0. */
 export function resetPosition(): void {
   caret.stopAllAnimations();
   caret.clearMargins();

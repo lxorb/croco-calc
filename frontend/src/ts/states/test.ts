@@ -6,7 +6,7 @@
  * booleans. Nothing here holds a `Task`, so master C29 cannot be violated
  * through a signal.
  *
- * Cut relative to monkeytype: quotes, challenges, keymap/layout resources,
+ * Cut relative to upstream: passages, challenges, keymap resources,
  * IME composition, RTL/Korean flags, `bailedOut` (master C38) and the pace
  * caret (CP-071).
  */
@@ -89,7 +89,7 @@ export const [isTestRestarting, setIsTestRestarting] = createSignal(false);
 
 /**
  * CP-046 / CP-052 — true from page load and from every restart until the first
- * accepted input character reveals the stream.
+ * accepted input symbol reveals the stream.
  */
 export const [isPreStart, setPreStart] = createSignal(true);
 

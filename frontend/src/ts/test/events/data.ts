@@ -1,8 +1,8 @@
 /**
  * The event-log recorder (INV-089, INV-197).
  *
- * monkeytype kept five parallel arrays plus a pressed-key map because it had to
- * reconstruct a word from raw key events. croco calc's engine already owns the
+ * Upstream kept five parallel arrays plus a pressed-key map because it had to
+ * reconstruct a prompt from raw key events. croco calc's engine already owns the
  * authoritative task log (ME-159), so this module is what it always should have
  * been: an append-only, timestamped stream for replay and debugging.
  *

@@ -22,7 +22,7 @@ type AnswerSymbol = {
   char: string;
   /** What is drawn — U+2212 for the minus (CP-033). */
   label: string;
-  /** CP-196 — the character named in words. */
+  /** CP-196 — the symbol spelled out for screen readers. */
   ariaLabel: string;
   visible: () => boolean;
 };
