@@ -1,6 +1,6 @@
 import { Config } from "../../config/store";
 import { setConfig } from "../../config/setters";
-import { capitalizeFirstLetterOfEachWord } from "../../utils/strings";
+import { capitalizeEachSegment } from "../../utils/strings";
 import * as ThemeController from "../../controllers/theme-controller";
 import { Command, CommandsSubgroup } from "../types";
 import { ThemesList, ThemeWithName } from "../../constants/themes";
@@ -18,7 +18,7 @@ const isFavorite = (theme: ThemeWithName): boolean =>
  */
 const createThemeCommand = (theme: ThemeWithName): Command => {
   return {
-    id: `changeTheme${capitalizeFirstLetterOfEachWord(theme.name)}`,
+    id: `changeTheme${capitalizeEachSegment(theme.name)}`,
     display: theme.name.replace(/_/g, " "),
     configValue: theme.name,
     // customStyle: `color:${theme.main};background:${theme.bg};`,

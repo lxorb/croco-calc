@@ -155,10 +155,9 @@ describe("CommandlineUtils", () => {
               alias: "alias",
             },
           },
+          // C10/SB-062: flat iconify id, not monkeytype's `fa` sub-object.
           configMeta: {
-            fa: {
-              icon: "fa-keyboard",
-            },
+            icon: "ph:keyboard-bold",
           },
           schema,
         });
@@ -178,7 +177,7 @@ describe("CommandlineUtils", () => {
           defaultValue: expect.anything(),
           alias: "alias",
           input: true,
-          icon: "fa-keyboard",
+          icon: "ph:keyboard-bold",
           exec: expect.anything(),
           hover: undefined,
           configValue: undefined,
@@ -204,10 +203,10 @@ describe("CommandlineUtils", () => {
             alias: "alias",
           },
         },
+        // C10/SB-062: `icon` is a flat iconify id now; monkeytype's `fa`
+        // sub-object is superseded along with font awesome itself.
         configMeta: {
-          fa: {
-            icon: "fa-keyboard",
-          },
+          icon: "ph:keyboard-bold",
         },
         schema,
       });
@@ -219,7 +218,7 @@ describe("CommandlineUtils", () => {
           display: "custom test...",
           alias: "alias",
           input: true,
-          icon: "fa-keyboard",
+          icon: "ph:keyboard-bold",
         }),
       );
     });

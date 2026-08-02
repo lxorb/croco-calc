@@ -129,9 +129,9 @@ function blockIfAllOff<K extends keyof ConfigSchemas.Config>(key: K) {
  * a bar click, the mobile modal, the palette, an imported settings JSON, a
  * shared-settings URL and the server config applied at login.
  */
-function couplingOverride<K extends "multiplication" | "fractionMultiplication">(
-  key: K,
-) {
+function couplingOverride<
+  K extends "multiplication" | "fractionMultiplication",
+>(key: K) {
   return ({
     value,
     currentConfig,
@@ -141,7 +141,10 @@ function couplingOverride<K extends "multiplication" | "fractionMultiplication">
   }): Partial<ConfigSchemas.Config> => {
     const next = applyCoupling({ ...currentConfig, [key]: value }, key);
     const changes: Partial<ConfigSchemas.Config> = {};
-    if (key !== "multiplication" && next.multiplication !== currentConfig.multiplication) {
+    if (
+      key !== "multiplication" &&
+      next.multiplication !== currentConfig.multiplication
+    ) {
       changes.multiplication = next.multiplication;
     }
     if (
@@ -553,5 +556,17 @@ export const configMetadata: ConfigMetadataObject = {
     displayString: "account chart",
     changeRequiresRestart: false,
     group: "hidden",
+    // AC-085 extends the tuple from four toggles to five (`Per minute`), but
+    // monkeytype's guard on the first two still applies: index 0 is `Score`
+    // and index 1 is `Accuracy`, and with both off the history chart has
+    // nothing left to draw. Turning the *other* one on means the toggle the
+    // user just clicked keeps the state they asked for.
+    overrideValue: ({ value, currentValue }) => {
+      if (value[0] === "off" && value[1] === "off") {
+        const changedIndex = value[0] === currentValue[0] ? 0 : 1;
+        value[changedIndex] = "on";
+      }
+      return value;
+    },
   },
 };

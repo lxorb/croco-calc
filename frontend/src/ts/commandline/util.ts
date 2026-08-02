@@ -1,6 +1,10 @@
 import { Config } from "../config/store";
 import { setConfig } from "../config/setters";
-import { ConfigMetadata, configMetadata } from "../config/metadata";
+import {
+  ConfigMetadata,
+  configMetadata,
+  OptionMetadata,
+} from "../config/metadata";
 import { capitalizeFirstLetter } from "../utils/strings";
 import {
   CommandlineConfigMetadata,
@@ -110,7 +114,12 @@ function buildCommandWithSubgroup<K extends keyof ConfigSchemas.Config>(
     );
   }
   const list = values.map((value) =>
-    buildSubgroupCommand<K>(key, value, subgroupProps),
+    buildSubgroupCommand<K>(
+      key,
+      value,
+      configMeta?.optionsMetadata as Record<string, OptionMetadata> | undefined,
+      subgroupProps,
+    ),
   );
 
   list.sort((a, b) => {
@@ -149,7 +158,7 @@ function buildCommandWithSubgroup<K extends keyof ConfigSchemas.Config>(
  * 5. finally the raw value.
  */
 function resolveOptionDisplay(
-  key: keyof ConfigSchemas.Config,
+  optionsMetadata: Record<string, OptionMetadata> | undefined,
   value: ConfigSchemas.ConfigValue,
   explicit: string | undefined,
 ): string {
@@ -157,14 +166,13 @@ function resolveOptionDisplay(
   if (value === "off" || value === false) return "off";
   if (value === true) return "on";
 
-  const options: Record<string, { displayString?: string }> | undefined =
-    configMetadata[key].optionsMetadata;
-  return options?.[String(value)]?.displayString ?? String(value);
+  return optionsMetadata?.[String(value)]?.displayString ?? String(value);
 }
 
 function buildSubgroupCommand<K extends keyof ConfigSchemas.Config>(
   key: keyof ConfigSchemas.Config,
   value: ConfigSchemas.Config[K],
+  optionsMetadata: Record<string, OptionMetadata> | undefined,
   {
     afterExec,
     hover,
@@ -179,7 +187,7 @@ function buildSubgroupCommand<K extends keyof ConfigSchemas.Config>(
   const val = value;
 
   const displayString = resolveOptionDisplay(
-    key,
+    optionsMetadata,
     value,
     commandDisplay?.(value),
   );

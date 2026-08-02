@@ -1,8 +1,9 @@
-import { describe, it, expect, afterAll, vi } from "vitest";
-import { configMetadata } from "../../src/ts/config/metadata";
-import { __testing } from "../../src/ts/config/testing";
-import { setConfig } from "../../src/ts/config/setters";
 import { ConfigKey, Config as ConfigType } from "@croco-calc/schemas/configs";
+import { afterAll, describe, expect, it, vi } from "vitest";
+
+import { configMetadata } from "../../src/ts/config/metadata";
+import { setConfig } from "../../src/ts/config/setters";
+import { __testing } from "../../src/ts/config/testing";
 
 const { replaceConfig, getConfig } = __testing;
 
@@ -15,7 +16,8 @@ describe("ConfigMeta", () => {
     replaceConfig({});
     vi.resetModules();
   });
-  it("should have changeRequiresRestart defined", () => {
+
+  it("SB-055 - exactly the eight settings-bar keys require a restart", () => {
     const configsRequiringRestarts = Object.entries(configMetadata)
       .filter(([_key, value]) => value.changeRequiresRestart)
       .map(([key]) => key)
@@ -23,107 +25,91 @@ describe("ConfigMeta", () => {
 
     expect(configsRequiringRestarts).toEqual(
       [
-        "punctuation",
-        "numbers",
-        "words",
+        "addition",
+        "multiplication",
+        "division",
+        "fractionAddition",
+        "fractionMultiplication",
+        "decimals",
+        "negatives",
         "time",
-        "mode",
-        "quoteLength",
-        "language",
-        "difficulty",
-        "minWpmCustomSpeed",
-        "minWpm",
-        "minAcc",
-        "minAccCustom",
-        "minBurst",
-        "minBurstCustomSpeed",
-        "britishEnglish",
-        "funbox",
-        "customLayoutfluid",
-        "strictSpace",
-        "stopOnError",
-        "lazyMode",
-        "layout",
-        "codeUnindentOnBackspace",
       ].sort(),
     );
   });
 
   it("should have triggerResize defined", () => {
-    const configsWithTriggeResize = Object.entries(configMetadata)
+    const configsWithTriggerResize = Object.entries(configMetadata)
       .filter(([_key, value]) => value.triggerResize === true)
       .map(([key]) => key)
       .sort();
 
-    expect(configsWithTriggeResize).toEqual(
+    // monkeytype's `keymapSize`, `tapeMode` and `tapeMargin` are gone with the
+    // keymap and the tape (SB-159, section 6.1).
+    expect(configsWithTriggerResize).toEqual(
+      ["fontFamily", "fontSize", "maxLineWidth"].sort(),
+    );
+  });
+
+  it("SB-130 - the eight settings-bar keys are all in the test group", () => {
+    const testGroup = Object.entries(configMetadata)
+      .filter(([_key, value]) => value.group === "test")
+      .map(([key]) => key)
+      .sort();
+
+    expect(testGroup).toEqual(
       [
-        "fontSize",
-        "keymapSize",
-        "maxLineWidth",
-        "tapeMode",
-        "tapeMargin",
+        "addition",
+        "multiplication",
+        "division",
+        "fractionAddition",
+        "fractionMultiplication",
+        "decimals",
+        "negatives",
+        "time",
       ].sort(),
     );
   });
+
   describe("overrideValue", () => {
     const testCases: TestsByConfig<{
       given?: Partial<ConfigType>;
       expected: Partial<ConfigType>;
     }> = {
-      punctuation: [
-        { value: true, expected: { punctuation: true } },
-        {
-          value: true,
-          given: { mode: "quote" },
-          expected: { punctuation: false },
-        },
-      ],
-      numbers: [
-        { value: true, expected: { numbers: true } },
-        {
-          value: true,
-          given: { mode: "quote" },
-          expected: { numbers: false },
-        },
-      ],
-      customLayoutfluid: [
-        {
-          value: ["qwerty", "qwerty", "qwertz"],
-          expected: { customLayoutfluid: ["qwerty", "qwertz"] },
-        },
-      ],
-      customPolyglot: [
-        {
-          value: ["english", "polish", "english"],
-          expected: { customPolyglot: ["english", "polish"] },
-        },
-      ],
-      keymapSize: [
-        { value: 1, expected: { keymapSize: 1 } },
-        { value: 1.234, expected: { keymapSize: 1.2 } },
-        { value: 0.4, expected: { keymapSize: 0.5 } },
-        { value: 3.6, expected: { keymapSize: 3.5 } },
-      ],
       customBackground: [
         {
           value: " https://example.com/test.jpg ",
           expected: { customBackground: "https://example.com/test.jpg" },
         },
       ],
+      fontSize: [
+        { value: 1.5, expected: { fontSize: 1.5 } },
+        { value: 1.234, expected: { fontSize: 1.2 } },
+        { value: -3, expected: { fontSize: 1 } },
+      ],
+      maxLineWidth: [
+        { value: 0, expected: { maxLineWidth: 0 } },
+        { value: 5, expected: { maxLineWidth: 20 } },
+        { value: 5000, expected: { maxLineWidth: 1000 } },
+        { value: 100, expected: { maxLineWidth: 100 } },
+      ],
+      // AC-085 (master section 6.1 arity note): five toggles, not monkeytype's
+      // four - the fifth is `Per minute`. The guard on the first two (Score,
+      // Accuracy) is unchanged: they may not both be off, or the history chart
+      // has nothing left to draw.
       accountChart: [
         {
-          value: ["on", "off", "off", "off"],
-          expected: { accountChart: ["on", "off", "off", "off"] },
+          value: ["on", "off", "off", "off", "on"],
+          expected: { accountChart: ["on", "off", "off", "off", "on"] },
         },
         {
-          value: ["off", "off", "off", "off"],
-          given: { accountChart: ["on", "off", "off", "off"] },
-          expected: { accountChart: ["off", "on", "off", "off"] },
+          value: ["off", "off", "off", "off", "on"],
+          given: { accountChart: ["on", "off", "off", "off", "on"] },
+          expected: { accountChart: ["off", "on", "off", "off", "on"] },
         },
         {
-          value: ["off", "off", "on", "on"],
-          given: { accountChart: ["off", "on", "off", "off"] },
-          expected: { accountChart: ["on", "off", "on", "on"] },
+          value: ["off", "off", "on", "on", "off"],
+          given: { accountChart: ["off", "on", "off", "off", "on"] },
+          expected: { accountChart: ["on", "off", "on", "on", "off"] },
         },
       ],
     };
@@ -139,38 +125,87 @@ describe("ConfigMeta", () => {
         replaceConfig(given ?? {});
 
         //WHEN
-        setConfig(key, value as any);
+        setConfig(key, value as never);
 
         //THEN
         expect(getConfig()).toMatchObject(expected);
       },
     );
   });
+
   describe("isBlocked", () => {
+    const allGeneratorsOff = {
+      addition: "off",
+      multiplication: "off",
+      division: "off",
+      fractionAddition: "off",
+      fractionMultiplication: false,
+    } as const satisfies Partial<ConfigType>;
+
     const testCases: TestsByConfig<{
       given?: Partial<ConfigType>;
       fail?: true;
     }> = {
-      funbox: [
+      // SB-101 / SB-215 (master C36): the guard is evaluated post-cascade.
+      addition: [
+        { value: "off", given: { ...allGeneratorsOff, division: "tables" } },
         {
-          value: ["gibberish"],
-          given: { mode: "quote" },
+          value: "off",
+          given: { ...allGeneratorsOff, addition: "1000" },
           fail: true,
         },
       ],
-      showAllLines: [
-        { value: true, given: { tapeMode: "off" } },
-        { value: false, given: { tapeMode: "word" } },
-        { value: true, given: { tapeMode: "word" }, fail: true },
+      multiplication: [
+        {
+          value: "off",
+          given: {
+            ...allGeneratorsOff,
+            multiplication: "100",
+            addition: "100",
+          },
+        },
+        {
+          value: "off",
+          given: {
+            ...allGeneratorsOff,
+            multiplication: "100",
+            fractionMultiplication: true,
+          },
+          fail: true,
+        },
       ],
-      monkey: [{ value: false, given: { liveSpeedStyle: "text" } }],
-      liveSpeedStyle: [
-        { value: "mini", given: { monkey: true } },
-        { value: "text", given: { monkey: true } },
+      fractionMultiplication: [
+        {
+          value: false,
+          given: {
+            ...allGeneratorsOff,
+            multiplication: "100",
+            fractionMultiplication: true,
+          },
+        },
       ],
-      liveAccStyle: [
-        { value: "mini", given: { monkey: true } },
-        { value: "text", given: { monkey: true } },
+      division: [
+        {
+          value: "off",
+          given: { ...allGeneratorsOff, division: "tables" },
+          fail: true,
+        },
+      ],
+      fractionAddition: [
+        {
+          value: "off",
+          given: { ...allGeneratorsOff, fractionAddition: "99" },
+          fail: true,
+        },
+      ],
+      // SB-106: time is never blocked, not even with a single generator on.
+      time: [{ value: 1, given: { ...allGeneratorsOff, addition: "1000" } }],
+      // SB-098: the two modifiers are never blocked either.
+      decimals: [
+        { value: false, given: { ...allGeneratorsOff, addition: "1000" } },
+      ],
+      negatives: [
+        { value: false, given: { ...allGeneratorsOff, addition: "1000" } },
       ],
     };
 
@@ -185,7 +220,7 @@ describe("ConfigMeta", () => {
         replaceConfig(given ?? {});
 
         //WHEN
-        const applied = setConfig(key, value as any);
+        const applied = setConfig(key, value as never);
 
         //THEN
         expect(applied).toEqual(!fail);
@@ -198,110 +233,38 @@ describe("ConfigMeta", () => {
       given: Partial<ConfigType>;
       expected?: Partial<ConfigType>;
     }> = {
-      mode: [
-        { value: "time", given: { numbers: true, punctuation: true } },
+      // SB-090 / SB-091 - the only coupling in croco calc (master C21).
+      fractionMultiplication: [
         {
-          value: "custom",
-          given: { numbers: true, punctuation: true },
-          expected: { numbers: false, punctuation: false },
-        },
-        {
-          value: "quote",
-          given: { numbers: true, punctuation: true },
-          expected: { numbers: false, punctuation: false },
-        },
-        {
-          value: "zen",
-          given: { numbers: true, punctuation: true },
-          expected: { numbers: false, punctuation: false },
-        },
-      ],
-      numbers: [{ value: false, given: { mode: "quote" } }],
-      freedomMode: [
-        {
-          value: false,
-          given: { confidenceMode: "on" },
-          expected: { confidenceMode: "on" },
+          value: true,
+          given: { multiplication: "off", fractionMultiplication: false },
+          expected: { multiplication: "100", fractionMultiplication: true },
         },
         {
           value: true,
-          given: { confidenceMode: "on" },
-          expected: { confidenceMode: "off" },
+          given: { multiplication: "20", fractionMultiplication: false },
+          expected: { multiplication: "20", fractionMultiplication: true },
         },
-      ],
-      stopOnError: [
-        {
-          value: "off",
-          given: { confidenceMode: "on" },
-          expected: { confidenceMode: "on" },
-        },
-        {
-          value: "word",
-          given: { confidenceMode: "on" },
-          expected: { confidenceMode: "off" },
-        },
-      ],
-      confidenceMode: [
-        {
-          value: "off",
-          given: { freedomMode: true, stopOnError: "word" },
-          expected: { freedomMode: true, stopOnError: "word" },
-        },
-        {
-          value: "on",
-          given: { freedomMode: true, stopOnError: "word" },
-          expected: { freedomMode: false, stopOnError: "off" },
-        },
-      ],
-      monkey: [
         {
           value: false,
-          given: { liveSpeedStyle: "text", liveAccStyle: "text" },
-          expected: {
-            liveSpeedStyle: "text",
-            liveAccStyle: "text",
+          given: { multiplication: "20", fractionMultiplication: true },
+          expected: { multiplication: "20", fractionMultiplication: false },
+        },
+      ],
+      multiplication: [
+        {
+          value: "off",
+          given: {
+            addition: "1000",
+            multiplication: "100",
+            fractionMultiplication: true,
           },
+          expected: { multiplication: "off", fractionMultiplication: false },
         },
         {
-          value: true,
-          given: { liveSpeedStyle: "text", liveAccStyle: "text" },
-          expected: { liveSpeedStyle: "mini", liveAccStyle: "mini" },
-        },
-      ],
-      liveSpeedStyle: [
-        {
-          value: "mini",
-          given: { monkey: true },
-          expected: { monkey: true },
-        },
-        {
-          value: "text",
-          given: { monkey: true },
-          expected: { monkey: false },
-        },
-      ],
-      liveAccStyle: [
-        {
-          value: "mini",
-          given: { monkey: true },
-          expected: { monkey: true },
-        },
-        {
-          value: "text",
-          given: { monkey: true },
-          expected: { monkey: false },
-        },
-      ],
-      tapeMode: [
-        {
-          value: "off",
-          given: { showAllLines: true },
-          expected: { showAllLines: true },
-        },
-        {
-          value: "letter",
-          given: { showAllLines: true },
-          expected: { showAllLines: false },
+          value: "12",
+          given: { multiplication: "100", fractionMultiplication: true },
+          expected: { multiplication: "12", fractionMultiplication: true },
         },
       ],
       theme: [
@@ -309,66 +272,6 @@ describe("ConfigMeta", () => {
           value: "8008",
           given: { customTheme: true },
           expected: { customTheme: false },
-        },
-      ],
-      keymapLayout: [
-        {
-          value: "3l",
-          given: { keymapMode: "react" },
-          expected: { keymapMode: "react" },
-        },
-        {
-          value: "3l",
-          given: { keymapMode: "off" },
-          expected: { keymapMode: "static" },
-        },
-      ],
-      keymapStyle: [
-        {
-          value: "alice",
-          given: { keymapMode: "react" },
-          expected: { keymapMode: "react" },
-        },
-        {
-          value: "alice",
-          given: { keymapMode: "off" },
-          expected: { keymapMode: "static" },
-        },
-      ],
-      keymapLegendStyle: [
-        {
-          value: "dynamic",
-          given: { keymapMode: "react" },
-          expected: { keymapMode: "react" },
-        },
-        {
-          value: "dynamic",
-          given: { keymapMode: "off" },
-          expected: { keymapMode: "static" },
-        },
-      ],
-      keymapKeys: [
-        {
-          value: "minimal_numrow",
-          given: { keymapMode: "react" },
-          expected: { keymapMode: "react" },
-        },
-        {
-          value: "minimal_numrow",
-          given: { keymapMode: "off" },
-          expected: { keymapMode: "static" },
-        },
-      ],
-      keymapSize: [
-        {
-          value: 2,
-          given: { keymapMode: "react" },
-          expected: { keymapMode: "react" },
-        },
-        {
-          value: 2,
-          given: { keymapMode: "off" },
-          expected: { keymapMode: "static" },
         },
       ],
     };
@@ -384,7 +287,7 @@ describe("ConfigMeta", () => {
         replaceConfig(given);
 
         //WHEN
-        setConfig(key, value as any);
+        setConfig(key, value as never);
 
         //THEN
         expect(getConfig()).toMatchObject(expected ?? {});
