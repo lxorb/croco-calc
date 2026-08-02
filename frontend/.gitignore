@@ -1,0 +1,4 @@
+# Wrangler / Cloudflare local state and secrets (INF-027).
+.wrangler/
+.dev.vars
+.dev.vars.*

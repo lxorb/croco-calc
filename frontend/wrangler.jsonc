@@ -1,0 +1,38 @@
+{
+  // croco calc frontend — an assets-only Cloudflare Worker (INF-014).
+  // There is deliberately no "main": no Worker script runs, Cloudflare serves
+  // ./dist directly. Deploy with `pnpm --filter @croco-calc/frontend deploy`
+  // from a tree where `frontend/dist` has just been built (INF-026).
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "croco-calc",
+  "account_id": "b0e98c15b1f905a394ecd6a849e8e99f",
+  "compatibility_date": "2026-08-01",
+
+  // Kept enabled so a deploy can be smoke-tested on its workers.dev URL before
+  // DNS is looked at. The production origin is the custom domain below (D1).
+  "workers_dev": true,
+
+  // Workers Custom Domains, not Workers Routes: Cloudflare creates and owns the
+  // DNS records and the certificate, and this works at the zone apex without a
+  // hand-rolled CNAME-flattening record (docs/infra-domain.md §5).
+  // Zone crococalc.com = 16b25af306fcd3f45a28b54f65602e9a.
+  "routes": [
+    { "pattern": "crococalc.com", "custom_domain": true },
+    { "pattern": "www.crococalc.com", "custom_domain": true },
+  ],
+
+  "assets": {
+    "directory": "./dist",
+    // Client-side routes (/test, /account, /leaderboards, …) fall back to the
+    // SPA shell, which reproduces the Firebase Hosting rewrites this replaces
+    // without maintaining a route list (INF-016).
+    "not_found_handling": "single-page-application",
+    // Reproduces cleanUrls + trailingSlash:false, so /privacy-policy serves
+    // privacy-policy.html (INF-017).
+    "html_handling": "auto-trailing-slash",
+  },
+
+  "observability": {
+    "enabled": true,
+  },
+}
