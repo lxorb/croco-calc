@@ -104,7 +104,15 @@ let engine: TestEngine | undefined;
 /** ME-169 — the uint32 the whole run is reproducible from (CP-089). */
 let seed = 0;
 
-/** Reads the seven task-shaping settings plus `time` off the live config. */
+/**
+ * Reads the seven task-shaping settings plus `time` off the live config.
+ *
+ * ME-006 — this is the ONLY place the live config may be read for generation
+ * purposes, and it may only be called from {@link restart}, which freezes the
+ * result onto the engine. Everything downstream (the submitted payload above
+ * all) MUST read `engine.settings` instead, so the settings that describe a run
+ * are always the settings the run was generated from.
+ */
 function readMathSettings(): MathSettings {
   return {
     addition: Config.addition,
@@ -301,7 +309,11 @@ export function commitAnswer(): void {
 function buildCompletedEvent(
   active: TestEngine,
 ): Omit<CompletedEvent, "hash" | "uid"> {
-  const settings = readMathSettings();
+  // ME-006 — the frozen snapshot the sequence was generated from, never the
+  // live config. Reading `Config` here would let a mid-run settings change ship
+  // a `mathSettings` that does not regenerate the submitted `taskLog`, which
+  // the server answers with `prompt-mismatch` and an anti-cheat strike.
+  const settings = active.settings;
   const taskLog = active.taskLog();
   const metrics = computeMetrics(taskLog, active.durationSeconds);
   const samples = active.chartSamples();
