@@ -29,7 +29,13 @@ export function DailyActivityChart(props: {
     groupByDay: true,
   });
 
-  const formatScore = (score: number): string =>
+  /**
+   * A stored `score` is a whole number (AC-003), so the best of a day renders
+   * as an integer; a daily mean genuinely has a fraction, so it keeps two
+   * decimal places.
+   */
+  const formatScore = (score: number): string => props.format.score(score);
+  const formatMeanScore = (score: number): string =>
     props.format.decimals(score, { showDecimalPlaces: true });
 
   return (
@@ -166,7 +172,7 @@ Time Spent: ${secondsToString(Math.round(item.timeSpent), true, true)}
 Tests Completed: ${item.completed}
 Restarts per test: ${roundTo2(item.restarted / item.completed)}
 Highest score: ${formatScore(item.maxScore)}
-Average score: ${formatScore(item.avgScore)}
+Average score: ${formatMeanScore(item.avgScore)}
 Average Accuracy: ${props.format.accuracy(item.avgAcc, { showDecimalPlaces: true })}
                       `;
                     },

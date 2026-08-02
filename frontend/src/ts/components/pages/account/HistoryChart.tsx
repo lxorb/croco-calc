@@ -43,6 +43,8 @@ export function HistoryChart(props: {
     props.format.accuracy(accuracy, { showDecimalPlaces: true });
   const formatNumber = (value: number): string =>
     props.format.decimals(value, { showDecimalPlaces: true });
+  /** AC-003 — a stored `score` is a whole number, unlike `tpm`. */
+  const formatScore = (value: number): string => props.format.score(value);
 
   const isPerMinute = (): boolean =>
     getConfig.accountChart[TOGGLE.perMinute] === "on";
@@ -295,7 +297,7 @@ export function HistoryChart(props: {
 
                     //AC-087: the duration is present whether or not `Per minute` is on.
                     return [
-                      `score: ${formatNumber(result.score)}`,
+                      `score: ${formatScore(result.score)}`,
                       `tpm: ${formatNumber(result.tpm)}`,
                       `acc: ${formatAccuracy(result.acc)}`,
                       `correct/wrong: ${result.correct}/${result.wrong}`,

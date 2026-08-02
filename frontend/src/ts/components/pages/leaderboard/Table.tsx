@@ -184,6 +184,17 @@ const userColumn = ({
     },
   });
 
+/**
+ * AC-131 columns 4–7 — the split/merged responsive pair, otherwise identical to
+ * the reference helper.
+ *
+ * The one deviation: `format` receives the whole row as an optional second
+ * argument. Upstream the second cell of the `tpm` pair read a single stored
+ * field, but AC-131 column 7 is `{correct}/{wrong}` and the leaderboard entry
+ * schema stores those as two separate fields with no combined one, so the value
+ * alone cannot produce the cell. The change is purely additive — every call
+ * site that ignores the second argument still typechecks unchanged.
+ */
 function defineResponsivePair<T>() {
   return <KA extends string & keyof T, KB extends string & keyof T>({
     columns,
