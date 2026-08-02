@@ -117,7 +117,9 @@ async function main(): Promise<void> {
   const uri = process.env["DB_URI"];
   const dbName = process.env["DB_NAME"] ?? "crococalc";
   if (uri === undefined || uri === "") {
-    console.error("DB_URI is not set. Read it from Key Vault secret mongodb-uri.");
+    console.error(
+      "DB_URI is not set. Read it from Key Vault secret mongodb-uri.",
+    );
     process.exit(2);
   }
 
@@ -155,14 +157,19 @@ async function main(): Promise<void> {
     }
 
     for (const suffix of ["results", "users", "snapshots"]) {
-      await db.collection(`${prefix}_${suffix}`).drop().catch(() => undefined);
+      await db
+        .collection(`${prefix}_${suffix}`)
+        .drop()
+        .catch(() => undefined);
     }
   } finally {
     await client.close();
   }
 
   if (failed.length === 0) {
-    console.log("\nAll three clauses passed -> Atlas M0 is the database (INF-057).");
+    console.log(
+      "\nAll three clauses passed -> Atlas M0 is the database (INF-057).",
+    );
     process.exit(0);
   }
 

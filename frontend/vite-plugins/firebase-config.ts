@@ -54,7 +54,10 @@ export function firebaseConfig(options: {
       const module = `// Generated at build time by vite-plugins/firebase-config.ts. Do not commit.\nexport const firebaseConfig = {\n${body}\n};\n`;
 
       mkdirSync(CONSTANTS_DIR, { recursive: true });
-      writeFileSync(path.join(CONSTANTS_DIR, "firebase-config-live.ts"), module);
+      writeFileSync(
+        path.join(CONSTANTS_DIR, "firebase-config-live.ts"),
+        module,
+      );
       // The non-live module is what the type-checker and dev server import; only
       // create it when the developer has no local one to preserve.
       const local = path.join(CONSTANTS_DIR, "firebase-config.ts");
