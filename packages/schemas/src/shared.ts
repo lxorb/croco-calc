@@ -1,83 +1,43 @@
-import { literal, z } from "zod";
-import { StringNumberSchema } from "./util";
-import { LanguageSchema } from "./languages";
+import { z } from "zod";
+import { MathGeneratorSettingsSchema, SettingsIdSchema } from "./math";
+import { ScoreSchema } from "./util";
 
-//used by config and shared
-export const DifficultySchema = z.enum(["normal", "expert", "master"]);
-export type Difficulty = z.infer<typeof DifficultySchema>;
+/**
+ * croco calc has exactly one test mode, so `mode` is retained purely so that
+ * monkeytype's personal-best storage shape and `utils/pb.ts` keep working
+ * unchanged (AC-008, master C31). `mode2` is the test length in minutes.
+ */
+export const Mode2Schema = z.enum(["1", "2", "4", "8"], {
+  errorMap: () => ({ message: 'Needs to be "1", "2", "4" or "8".' }),
+});
 
-//used by user and config
+/**
+ * AC-064: personal bests carry the croco calc metrics plus the settings snapshot
+ * they were achieved under. Master C4 rules that the signature field is
+ * `settingsId`. Consistency is deliberately absent (master C5, AC-064).
+ */
 export const PersonalBestSchema = z.object({
+  score: ScoreSchema,
+  correct: z.number().int().nonnegative(),
+  wrong: z.number().int().nonnegative(),
   acc: z.number().nonnegative().max(100),
-  consistency: z.number().nonnegative().max(100),
-  difficulty: DifficultySchema,
-  lazyMode: z.boolean().optional(),
-  language: LanguageSchema,
-  punctuation: z.boolean().optional(),
-  numbers: z.boolean().optional(),
-  raw: z.number().nonnegative(),
-  wpm: z.number().nonnegative(),
+  tpm: z.number().nonnegative(),
+  spm: z.number(),
+  settings: MathGeneratorSettingsSchema,
+  settingsId: SettingsIdSchema,
   timestamp: z.number().nonnegative(),
 });
 export type PersonalBest = z.infer<typeof PersonalBestSchema>;
 
-//used by user and config
+/** AC-064: `{ time: Record<"1"|"2"|"4"|"8", PersonalBest[]> }` and nothing else. */
 export const PersonalBestsSchema = z.object({
-  time: z.record(
-    StringNumberSchema.describe("Number of seconds as string"),
-    z.array(PersonalBestSchema),
-  ),
-  words: z.record(
-    StringNumberSchema.describe("Number of words as string"),
-    z.array(PersonalBestSchema),
-  ),
-  quote: z.record(StringNumberSchema, z.array(PersonalBestSchema)),
-  custom: z.record(z.literal("custom"), z.array(PersonalBestSchema)),
-  zen: z.record(z.literal("zen"), z.array(PersonalBestSchema)),
+  time: z.record(Mode2Schema, z.array(PersonalBestSchema)),
 });
 export type PersonalBests = z.infer<typeof PersonalBestsSchema>;
 
-export const DefaultWordsModeSchema = z.union([
-  z.literal("10"),
-  z.literal("25"),
-  z.literal("50"),
-  z.literal("100"),
-]);
-
-export const DefaultTimeModeSchema = z.union([
-  z.literal("15"),
-  z.literal("30"),
-  z.literal("60"),
-  z.literal("120"),
-]);
-
-export const QuoteLengthSchema = z.union([
-  z.literal("short"),
-  z.literal("medium"),
-  z.literal("long"),
-  z.literal("thicc"),
-]);
-
-// // Step 1: Define the schema for specific string values "10" and "25"
-// const SpecificKeySchema = z.union([z.literal("10"), z.literal("25")]);
-
-// // Step 2: Use this schema as the key schema for another object
-// export const ExampleSchema = z.record(SpecificKeySchema, z.string());
-
-// //used by user, config, public
 export const ModeSchema = PersonalBestsSchema.keyof();
 export type Mode = z.infer<typeof ModeSchema>;
-
-export const Mode2Schema = z.union(
-  [StringNumberSchema, literal("zen"), literal("custom")],
-  {
-    errorMap: () => ({
-      message: 'Needs to be either a number, "zen" or "custom".',
-    }),
-  },
-);
 
 export type Mode2<M extends Mode> = M extends M
   ? keyof PersonalBests[M]
   : never;
-export type Mode2Custom<M extends Mode> = Mode2<M> | "custom";

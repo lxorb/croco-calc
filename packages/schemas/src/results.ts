@@ -1,16 +1,18 @@
 import { z } from "zod";
 import {
-  CustomTextLimitModeSchema,
-  CustomTextModeSchema,
   IdSchema,
   PercentageSchema,
+  ScoreSchema,
+  TasksPerMinuteSchema,
   token,
-  WpmSchema,
 } from "./util";
-import { LanguageSchema } from "./languages";
 import { Mode, Mode2, Mode2Schema, ModeSchema } from "./shared";
-import { DifficultySchema, FunboxSchema } from "./configs";
-import { ChallengeNameSchema } from "./challenges";
+import {
+  MathGeneratorSettingsSchema,
+  MathSettingsSchema,
+  SettingsIdSchema,
+  TaskKindSchema,
+} from "./math";
 
 export const IncompleteTestSchema = z.object({
   acc: PercentageSchema,
@@ -18,89 +20,92 @@ export const IncompleteTestSchema = z.object({
 });
 export type IncompleteTest = z.infer<typeof IncompleteTestSchema>;
 
-export const OldChartDataSchema = z.object({
-  wpm: z.array(z.number().nonnegative()).max(122),
-  raw: z.array(z.number().int().nonnegative()).max(122),
-  err: z.array(z.number().nonnegative()).max(122),
-});
-export type OldChartData = z.infer<typeof OldChartDataSchema>;
+/**
+ * One data point per elapsed second (CP-113). The cap is 481 — indices 0…480
+ * inclusive, covering the longest (8-minute) test. monkeytype's 122 was its own
+ * 120 s maximum plus slack (master C7).
+ */
+export const CHART_DATA_MAX_POINTS = 481;
 
 export const ChartDataSchema = z.object({
-  wpm: z.array(z.number().nonnegative()).max(122),
-  burst: z.array(z.number().int().nonnegative()).max(122),
-  err: z.array(z.number().nonnegative()).max(122),
+  /** cumulative `correct - wrong` after each second (CP-114) */
+  score: z.array(z.number().int()).max(CHART_DATA_MAX_POINTS),
+  /** running-average tasks per minute (CP-115) */
+  tpm: z.array(z.number().nonnegative()).max(CHART_DATA_MAX_POINTS),
+  /** wrong answers committed in each second (CP-116) */
+  wrong: z.array(z.number().int().nonnegative()).max(CHART_DATA_MAX_POINTS),
 });
 export type ChartData = z.infer<typeof ChartDataSchema>;
 
-export const KeyStatsSchema = z.object({
-  average: z.number().nonnegative(),
-  sd: z.number().nonnegative(),
-});
-export type KeyStats = z.infer<typeof KeyStatsSchema>;
+/** ME-159: one entry per committed task. */
+export const TaskLogEntrySchema = z
+  .object({
+    i: z.number().int().nonnegative(),
+    kind: TaskKindSchema,
+    prompt: z.string().max(64),
+    /** the canonical exact answer */
+    expected: z.string().max(64),
+    /** the normalised input the user committed */
+    given: z.string().max(64),
+    correct: z.boolean(),
+    /** ms from test start */
+    tStart: z.number().nonnegative(),
+    /** ms from test start */
+    tEnd: z.number().nonnegative(),
+  })
+  .strict();
+export type TaskLogEntry = z.infer<typeof TaskLogEntrySchema>;
 
-export const CompletedEventCustomTextSchema = z.object({
-  textLen: z.number().int().nonnegative(),
-  mode: CustomTextModeSchema,
-  pipeDelimiter: z.boolean(),
-  limit: z.object({
-    mode: CustomTextLimitModeSchema,
-    value: z.number().nonnegative(),
-  }),
-});
-export type CompletedEventCustomText = z.infer<
-  typeof CompletedEventCustomTextSchema
->;
+export const TASK_LOG_MAX_ENTRIES = 1000;
 
-export const CustomTextSettingsSchema = CompletedEventCustomTextSchema.omit({
-  textLen: true,
-}).extend({
-  text: z.array(z.string()).min(1),
-});
-
-export type CustomTextSettings = z.infer<typeof CustomTextSettingsSchema>;
-
-export const CharStatsSchema = z.tuple([
-  z.number().int().nonnegative(),
-  z.number().int().nonnegative(),
-  z.number().int().nonnegative(),
-  z.number().int().nonnegative(),
-]);
-export type CharStats = z.infer<typeof CharStatsSchema>;
+/**
+ * ME-176: degrades to the literal `"toolong"` past 1000 entries, following the
+ * precedent monkeytype set for its key-timing arrays. Server-side revalidation
+ * then falls back to a deterministic sample of 50 indices.
+ */
+export const TaskLogSchema = z
+  .array(TaskLogEntrySchema)
+  .max(TASK_LOG_MAX_ENTRIES)
+  .or(z.literal("toolong"));
+export type TaskLog = z.infer<typeof TaskLogSchema>;
 
 const ResultBaseSchema = z.object({
-  wpm: WpmSchema,
-  rawWpm: WpmSchema,
-  charStats: CharStatsSchema,
-  acc: PercentageSchema.min(50),
+  /** AC-003 (master C40): `correct - wrong`, the headline metric. MAY be negative. */
+  score: ScoreSchema,
+  correct: z.number().int().nonnegative(),
+  wrong: z.number().int().nonnegative(),
+  /**
+   * AC-004: `correct / (correct + wrong) * 100`, `0` when nothing was answered.
+   * There is deliberately no lower bound — a math trainer legitimately scores
+   * below 50 % and monkeytype's `.min(50)` silently discarded genuine runs (BL-5).
+   */
+  acc: PercentageSchema,
+  /** AC-005: `(correct + wrong) / (testDuration / 60)` */
+  tpm: TasksPerMinuteSchema,
+  /** AC-006: `score / (testDuration / 60)`, so runs of different lengths share an axis. MAY be negative. */
+  spm: z.number(),
+  /** ME-165 (master C5): kogasa over per-task response times. */
+  consistency: PercentageSchema,
   mode: ModeSchema,
   mode2: Mode2Schema,
-  quoteLength: z.number().int().nonnegative().max(3).optional(),
   timestamp: z.number().int().nonnegative(),
   testDuration: z.number().min(1),
-  consistency: PercentageSchema,
-  keyConsistency: PercentageSchema,
   chartData: ChartDataSchema.or(z.literal("toolong")),
   uid: IdSchema,
+  /** AC-009: the seven task-shaping settings, as C2 canonical stored literals. */
+  settings: MathGeneratorSettingsSchema,
+  /** SB-170 (master C4): immutable once written, never recomputed on read (SB-178). */
+  settingsId: SettingsIdSchema,
 
   //required on POST but optional in the database and might be removed to save space
   restartCount: z.number().int().nonnegative().optional(),
   incompleteTestSeconds: z.number().nonnegative().optional(),
+  /** persisted as `afkDuration`, displayed as `idle` (master C37) */
   afkDuration: z.number().nonnegative().optional(),
-  tags: z.array(IdSchema).optional(),
-  bailedOut: z.boolean().optional(),
-  blindMode: z.boolean().optional(),
-  lazyMode: z.boolean().optional(),
-  funbox: FunboxSchema.optional(),
-  language: LanguageSchema.optional(),
-  difficulty: DifficultySchema.optional(),
-  numbers: z.boolean().optional(),
-  punctuation: z.boolean().optional(),
 });
 
 export const ResultSchema = ResultBaseSchema.extend({
   _id: IdSchema,
-  keySpacingStats: KeyStatsSchema.optional(),
-  keyDurationStats: KeyStatsSchema.optional(),
   name: z.string(),
   isPb: z.boolean().optional(), //true or undefined
 });
@@ -115,8 +120,6 @@ export type Result<M extends Mode> = Omit<
 
 export const ResultMinifiedSchema = ResultSchema.omit({
   name: true,
-  keySpacingStats: true,
-  keyDurationStats: true,
   chartData: true,
 });
 export type ResultMinified = z.infer<typeof ResultMinifiedSchema>;
@@ -125,59 +128,71 @@ export const CompletedEventSchema = ResultBaseSchema.required({
   restartCount: true,
   incompleteTestSeconds: true,
   afkDuration: true,
-  tags: true,
-  bailedOut: true,
-  blindMode: true,
-  lazyMode: true,
-  funbox: true,
-  language: true,
-  difficulty: true,
-  numbers: true,
-  punctuation: true,
 })
   .extend({
-    charTotal: z.number().int().nonnegative(),
-    challenge: ChallengeNameSchema.optional(),
-    customText: CompletedEventCustomTextSchema.optional(),
     hash: token().max(100),
-    keyDuration: z.array(z.number().nonnegative()).or(z.literal("toolong")),
-    keySpacing: z.array(z.number().nonnegative()).or(z.literal("toolong")),
-    keyOverlap: z.number().nonnegative(),
-    lastKeyToEnd: z.number().nonnegative(),
-    startToFirstKey: z.number().nonnegative(),
-    wpmConsistency: PercentageSchema,
-    stopOnLetter: z.boolean(),
+    /** ME-169: uint32 drawn from `crypto.getRandomValues` at test start. */
+    mathSeed: z.number().int().nonnegative().max(4294967295),
+    /** ME-173: the full eight-key snapshot the server regenerates the tasks from. */
+    mathSettings: MathSettingsSchema,
+    /** ME-177: the engine version the client generated with. */
+    engineVersion: z.string().max(32),
+    taskLog: TaskLogSchema,
     incompleteTests: z.array(IncompleteTestSchema),
   })
   .strict();
 
 export type CompletedEvent = z.infer<typeof CompletedEventSchema>;
 
+/** AC-036: exactly these keys, in this display order. */
 export const XpBreakdownSchema = z.object({
   base: z.number().int().optional(),
   fullAccuracy: z.number().int().optional(),
-  quote: z.number().int().optional(),
-  corrected: z.number().int().optional(),
-  punctuation: z.number().int().optional(),
-  numbers: z.number().int().optional(),
-  funbox: z.number().int().optional(),
-  streak: z.number().int().optional(),
-  incomplete: z.number().int().optional(),
-  daily: z.number().int().optional(),
+  modes: z.number().int().optional(),
   accPenalty: z.number().int().optional(),
   configMultiplier: z.number().int().optional(),
+  daily: z.number().int().optional(),
 });
 export type XpBreakdown = z.infer<typeof XpBreakdownSchema>;
 
 export const PostResultResponseSchema = z.object({
   insertedId: IdSchema,
   isPb: z.boolean(),
-  tagPbs: z.array(IdSchema),
   dailyLeaderboardRank: z.number().int().nonnegative().optional(),
   weeklyXpLeaderboardRank: z.number().int().nonnegative().optional(),
   xp: z.number().int().nonnegative(),
   dailyXpBonus: z.boolean(),
   xpBreakdown: XpBreakdownSchema,
-  streak: z.number().int().nonnegative(),
 });
 export type PostResultResponse = z.infer<typeof PostResultResponseSchema>;
+
+/**
+ * AC-100: the CSV export contract. This header string is normative and is
+ * consumed by the account page's export; the seven setting columns carry the C2
+ * canonical stored literals so a re-imported CSV round-trips.
+ */
+export const RESULT_CSV_COLUMNS = [
+  "_id",
+  "isPb",
+  "score",
+  "correct",
+  "wrong",
+  "acc",
+  "tpm",
+  "spm",
+  "mode2",
+  "testDuration",
+  "afkDuration",
+  "restartCount",
+  "addition",
+  "multiplication",
+  "division",
+  "fractionAddition",
+  "fractionMultiplication",
+  "decimals",
+  "negatives",
+  "settingsId",
+  "timestamp",
+] as const;
+
+export const RESULT_CSV_HEADER = RESULT_CSV_COLUMNS.join(",");
