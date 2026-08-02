@@ -34,6 +34,17 @@ import Test from "supertest/lib/test";
 const { mockApp, uid, mockAuth } = setup();
 const configuration = Configuration.getCachedConfiguration();
 
+/**
+ * The router runs with `jsonQuery: true` (`src/api/routes/index.ts`), so every
+ * query value arrives JSON-**decoded** — and the ts-rest client on the frontend
+ * JSON-**encodes** them to match (`frontend/src/ts/ape/adapters/ts-rest-adapter.ts`).
+ * supertest does neither, so a bare `mode2=8` reaches `Mode2Schema`
+ * (`z.enum(["1", "2", "4", "8"])`) as the *number* 8 and is rejected with a 422
+ * no real client could provoke. Only numeric-looking values need this:
+ * `JSON.parse("time")` throws and ts-rest falls back to the raw string.
+ */
+const jsonQuery = (value: string): string => JSON.stringify(value);
+
 describe("user controller test", () => {
   describe("user signup", () => {
     const blocklistContainsMock = vi.spyOn(BlocklistDal, "contains");
@@ -1251,61 +1262,28 @@ describe("user controller test", () => {
     });
   });
   describe("add result filter preset", () => {
+    // AC-078 / AC-081: the filter dimensions are the croco calc settings plus
+    // `time`, `pb` and `date`, and nothing else (AC-079). Keys are the C2
+    // canonical stored literals. monkeytype's difficulty / mode / words / quote /
+    // punctuation / numbers / tags / language / funbox axes are all gone.
     const validPreset = {
       _id: "66c61b7a2a65715e66a0cc95",
       name: "newPreset",
-      pb: { no: true, yes: true },
-      difficulty: { normal: true, expert: false, master: false },
-      mode: {
-        words: false,
-        time: false,
-        quote: true,
-        zen: false,
-        custom: false,
-      },
-      words: {
-        "10": false,
-        "25": false,
-        "50": false,
-        "100": false,
-        custom: false,
-      },
-      time: {
-        "15": false,
-        "30": false,
-        "60": false,
-        "120": false,
-        custom: false,
-      },
-      quoteLength: {
-        short: false,
-        medium: false,
-        long: false,
-        thicc: false,
-      },
-      punctuation: {
-        on: false,
-        off: true,
-      },
-      numbers: {
-        on: false,
-        off: true,
-      },
+      pb: { true: true, false: true },
+      time: { "1": false, "2": false, "4": true, "8": true },
+      addition: { off: false, "100": true, "1000": false },
+      multiplication: { off: false, "12": true, "20": false, "100": false },
+      division: { off: true, tables: false, threeByTwo: false },
+      fractionAddition: { off: true, "12": false, "99": false },
+      fractionMultiplication: { true: false, false: true },
+      decimals: { true: false, false: true },
+      negatives: { true: false, false: true },
       date: {
         last_day: false,
         last_week: false,
         last_month: false,
         last_3months: false,
         all: true,
-      },
-      tags: {
-        none: false,
-      },
-      language: {
-        english: true,
-      },
-      funbox: {
-        none: true,
       },
     };
     const generatedId = new ObjectId();
@@ -1352,21 +1330,20 @@ describe("user controller test", () => {
       //THEN
       expect(body).toEqual({
         message: "Invalid request data schema",
+        // AC-079: exactly these dimensions, and nothing else.
         validationErrors: [
           '"_id" Required',
           '"name" Required',
           '"pb" Required',
-          '"difficulty" Required',
-          '"mode" Required',
-          '"words" Required',
           '"time" Required',
-          '"quoteLength" Required',
-          '"punctuation" Required',
-          '"numbers" Required',
+          '"addition" Required',
+          '"multiplication" Required',
+          '"division" Required',
+          '"fractionAddition" Required',
+          '"fractionMultiplication" Required',
+          '"decimals" Required',
+          '"negatives" Required',
           '"date" Required',
-          '"tags" Required',
-          '"language" Required',
-          '"funbox" Required',
         ],
       });
     });
@@ -1447,14 +1424,15 @@ describe("user controller test", () => {
       updateLbMemoryMock.mockClear().mockResolvedValue();
     });
 
+    // INV-153: the leaderboard has no language axis, so `language` is gone from
+    // the request and from `UserDAL.updateLbMemory`. Mode2 is "1" | "2" | "4" | "8".
     it("should update lb", async () => {
       //WHEN
       const { body } = await mockApp
         .patch("/users/leaderboardMemory")
         .send({
           mode: "time",
-          mode2: "60",
-          language: "english",
+          mode2: "8",
           rank: 7,
         })
         .set("Authorization", `Bearer ${uid}`)
@@ -1466,13 +1444,7 @@ describe("user controller test", () => {
         data: null,
       });
 
-      expect(updateLbMemoryMock).toHaveBeenCalledWith(
-        uid,
-        "time",
-        "60",
-        "english",
-        7,
-      );
+      expect(updateLbMemoryMock).toHaveBeenCalledWith(uid, "time", "8", 7);
     });
 
     it("should fail without mandatory properties", async () => {
@@ -1487,8 +1459,7 @@ describe("user controller test", () => {
         message: "Invalid request data schema",
         validationErrors: [
           '"mode" Required',
-          '"mode2" Needs to be either a number, "zen" or "custom".',
-          '"language" Required',
+          '"mode2" Needs to be "1", "2", "4" or "8".',
           '"rank" Required',
         ],
       });
@@ -1500,8 +1471,7 @@ describe("user controller test", () => {
         .set("Authorization", `Bearer ${uid}`)
         .send({
           mode: "time",
-          mode2: "60",
-          language: "english",
+          mode2: "8",
           rank: 7,
           extra: "value",
         })
@@ -1774,7 +1744,7 @@ describe("user controller test", () => {
       const { body } = await mockApp
         .get("/users/personalBests")
         .set("Authorization", `Bearer ${uid}`)
-        .query({ mode: "time", mode2: "15" })
+        .query({ mode: "time", mode2: jsonQuery("8") })
         .expect(200);
 
       //THEN
@@ -1782,7 +1752,7 @@ describe("user controller test", () => {
         message: "Personal bests retrieved",
         data: personalBest,
       });
-      expect(getPBMock).toHaveBeenCalledWith(uid, "time", "15");
+      expect(getPBMock).toHaveBeenCalledWith(uid, "time", "8");
     });
     it("should fail without mandatory query parameters", async () => {
       //WHEN
@@ -1802,7 +1772,7 @@ describe("user controller test", () => {
       const { body } = await mockApp
         .get("/users/personalBests")
         .set("Authorization", `Bearer ${uid}`)
-        .query({ mode: "time", mode2: "15", extra: "value" })
+        .query({ mode: "time", mode2: jsonQuery("8"), extra: "value" })
         .expect(422);
 
       //THEN
@@ -1821,11 +1791,12 @@ describe("user controller test", () => {
         .expect(422);
 
       //THEN
+      // SB-176 / INV-153: `time` is the only mode croco calc has.
       expect(body).toEqual({
         message: "Invalid query schema",
         validationErrors: [
-          `"mode" Invalid enum value. Expected 'time' | 'words' | 'quote' | 'custom' | 'zen', received 'mood'`,
-          `"mode2" Needs to be a number or a number represented as a string e.g. "10".`,
+          `"mode" Invalid enum value. Expected 'time', received 'mood'`,
+          `"mode2" Needs to be "1", "2", "4" or "8".`,
         ],
       });
     });
@@ -2078,12 +2049,11 @@ describe("user controller test", () => {
     const getPartialUserMock = vi.spyOn(UserDal, "getPartialUser");
     const updateProfileMock = vi.spyOn(UserDal, "updateProfile");
 
+    // AC-052: the profile is `bio` plus socials. monkeytype's `keyboard` field is
+    // dropped, and C16/INV-190 cut badges, so there is no `inventory` to read and
+    // `UserDAL.updateProfile` takes no badge argument.
     beforeEach(async () => {
-      getPartialUserMock.mockClear().mockResolvedValue({
-        inventory: {
-          badges: [{ id: 4, selected: true }, { id: 2 }, { id: 3 }],
-        },
-      } as any);
+      getPartialUserMock.mockClear().mockResolvedValue({} as any);
       updateProfileMock.mockClear().mockResolvedValue();
       await enableProfiles(true);
     });
@@ -2092,8 +2062,6 @@ describe("user controller test", () => {
       //GIVEN
       const newProfile = {
         bio: "newBio",
-        keyboard: "newKeyboard",
-
         socialProfiles: {
           github: "github",
           twitter: "twitter",
@@ -2106,10 +2074,7 @@ describe("user controller test", () => {
       const { body } = await mockApp
         .patch("/users/profile")
         .set("Authorization", `Bearer ${uid}`)
-        .send({
-          ...newProfile,
-          selectedBadgeId: 2,
-        })
+        .send(newProfile)
         .expect(200);
 
       //THEN
@@ -2117,29 +2082,20 @@ describe("user controller test", () => {
         message: "Profile updated",
         data: newProfile,
       });
-      expect(updateProfileMock).toHaveBeenCalledWith(
-        uid,
-        {
-          bio: "newBio",
-          keyboard: "newKeyboard",
-          socialProfiles: {
-            github: "github",
-            twitter: "twitter",
-            website: "https://crococalc.com",
-          },
-          showActivityOnPublicProfile: false,
+      expect(updateProfileMock).toHaveBeenCalledWith(uid, {
+        bio: "newBio",
+        socialProfiles: {
+          github: "github",
+          twitter: "twitter",
+          website: "https://crococalc.com",
         },
-        {
-          badges: [{ id: 4 }, { id: 2, selected: true }, { id: 3 }],
-        },
-      );
+        showActivityOnPublicProfile: false,
+      });
     });
     it("should update with empty strings", async () => {
       //GIVEN
       const newProfile = {
         bio: "",
-        keyboard: "",
-
         socialProfiles: {
           github: "",
           twitter: "",
@@ -2151,10 +2107,7 @@ describe("user controller test", () => {
       const { body } = await mockApp
         .patch("/users/profile")
         .set("Authorization", `Bearer ${uid}`)
-        .send({
-          ...newProfile,
-          selectedBadgeId: -1,
-        })
+        .send(newProfile)
         .expect(200);
 
       //THEN
@@ -2162,21 +2115,14 @@ describe("user controller test", () => {
         message: "Profile updated",
         data: newProfile,
       });
-      expect(updateProfileMock).toHaveBeenCalledWith(
-        uid,
-        {
-          bio: "",
-          keyboard: "",
-          socialProfiles: {
-            github: "",
-            twitter: "",
-            website: "",
-          },
+      expect(updateProfileMock).toHaveBeenCalledWith(uid, {
+        bio: "",
+        socialProfiles: {
+          github: "",
+          twitter: "",
+          website: "",
         },
-        {
-          badges: [{ id: 4 }, { id: 2 }, { id: 3 }],
-        },
-      );
+      });
     });
     it("should fail with unknown properties", async () => {
       //WHEN
@@ -2207,20 +2153,14 @@ describe("user controller test", () => {
         .set("Authorization", `Bearer ${uid}`)
         .send({
           bio: "Line1\n\n\nLine2\n\n\n\nLine3",
-          keyboard: "  string     with      many      spaces      ",
         })
         .expect(200);
 
       //THEN
-      expect(updateProfileMock).toHaveBeenCalledWith(
-        uid,
-        {
-          bio: "Line1\n\nLine2\n\nLine3",
-          keyboard: "string  with  many  spaces",
-          socialProfiles: {},
-        },
-        expect.objectContaining({}),
-      );
+      expect(updateProfileMock).toHaveBeenCalledWith(uid, {
+        bio: "Line1\n\nLine2\n\nLine3",
+        socialProfiles: {},
+      });
     });
     it("should fail with disallowed word", async () => {
       //WHEN
@@ -2229,7 +2169,6 @@ describe("user controller test", () => {
         .set("Authorization", `Bearer ${uid}`)
         .send({
           bio: "miodec",
-          keyboard: "miodec",
           socialProfiles: {
             twitter: "miodec",
             github: "miodec",
@@ -2243,7 +2182,6 @@ describe("user controller test", () => {
         message: "Invalid request data schema",
         validationErrors: [
           '"bio" Disallowed word detected. Please remove it. If you believe this is a mistake, please contact us (miodec).',
-          '"keyboard" Disallowed word detected. Please remove it. If you believe this is a mistake, please contact us (miodec).',
           '"socialProfiles.twitter" Disallowed word detected. Please remove it. If you believe this is a mistake, please contact us (miodec).',
           '"socialProfiles.github" Disallowed word detected. Please remove it. If you believe this is a mistake, please contact us (miodec).',
           '"socialProfiles.website" Disallowed word detected. Please remove it. If you believe this is a mistake, please contact us (https://i-luv-miodec.com).',
@@ -2257,7 +2195,6 @@ describe("user controller test", () => {
         .set("Authorization", `Bearer ${uid}`)
         .send({
           bio: new Array(251).fill("x").join(""),
-          keyboard: new Array(76).fill("x").join(""),
           socialProfiles: {
             twitter: new Array(16).fill("x").join(""),
             github: new Array(40).fill("x").join(""),
@@ -2273,7 +2210,6 @@ describe("user controller test", () => {
         message: "Invalid request data schema",
         validationErrors: [
           '"bio" String must contain at most 250 character(s)',
-          '"keyboard" String must contain at most 75 character(s)',
           '"socialProfiles.twitter" String must contain at most 15 character(s)',
           '"socialProfiles.github" String must contain at most 39 character(s)',
           '"socialProfiles.website" String must contain at most 200 character(s)',

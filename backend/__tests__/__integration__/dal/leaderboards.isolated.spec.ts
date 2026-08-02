@@ -116,7 +116,7 @@ describe("LeaderboardsDal", () => {
 
       //WHEN
       await LeaderboardsDal.update("time", "4");
-      const result = await PublicDal.getScoreHistogram("time", "4");
+      const result = await PublicDal.getScoreHistogram(4);
 
       //THEN
       expect(result).toEqual({ "10": 1, "20": 2, "30": 1 });
@@ -131,7 +131,7 @@ describe("LeaderboardsDal", () => {
 
       //WHEN
       await LeaderboardsDal.update("time", "8");
-      const result = await PublicDal.getScoreHistogram("time", "8");
+      const result = await PublicDal.getScoreHistogram(8);
 
       //THEN
       expect(result).toEqual({ "20": 2, "110": 2 });

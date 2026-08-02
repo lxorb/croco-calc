@@ -63,10 +63,7 @@ function getValue(
   }
 
   if (result === undefined || result === null) {
-    throw new CrocoError(
-      500,
-      `Required configuration doesnt exist: "${path}"`,
-    );
+    throw new CrocoError(500, `Required configuration doesnt exist: "${path}"`);
   }
   if (typeof result !== "boolean") {
     throw new CrocoError(

@@ -88,14 +88,16 @@ describe("ConfigController", () => {
         .patch("/configs")
         .set("Authorization", `Bearer ${uid}`)
         .accept("application/json")
-        .send({ autoSwitchTheme: "yes", confidenceMode: "pretty" })
+        // `confidenceMode` was a typing-only key and is gone; `addition` is the
+        // croco calc equivalent enum (C2 canonical stored literals).
+        .send({ autoSwitchTheme: "yes", addition: "pretty" })
         .expect(422);
 
       //THEN
       expect(body).toStrictEqual({
         message: "Invalid request data schema",
         validationErrors: [
-          `"confidenceMode" Invalid enum value. Expected 'off' | 'on' | 'max', received 'pretty'`,
+          `"addition" Invalid enum value. Expected 'off' | '100' | '1000', received 'pretty'`,
           `"autoSwitchTheme" Expected boolean, received string`,
         ],
       });

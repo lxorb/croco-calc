@@ -7,20 +7,22 @@ describe("PublicDAL", function () {
     await PublicDAL.updateStats(1, 15);
   });
 
-  it("should be able to get site stats", async function () {
-    const siteStats = await PublicDAL.getSiteStats();
-    expect(siteStats).toHaveProperty("testsCompleted");
-    expect(siteStats).toHaveProperty("testsStarted");
-    expect(siteStats).toHaveProperty("timeSpent");
+  // CP-135: the wire shape is `timeTraining`; the stored document still counts
+  // into `timeSpent` and `getTrainingStats` maps it on the way out.
+  it("should be able to get training stats", async function () {
+    const trainingStats = await PublicDAL.getTrainingStats();
+    expect(trainingStats).toHaveProperty("testsCompleted");
+    expect(trainingStats).toHaveProperty("testsStarted");
+    expect(trainingStats).toHaveProperty("timeTraining");
   });
 
   it("should increment stats on update", async function () {
     // checks that both functions are working on the same data in mongo
-    const priorStats = await PublicDAL.getSiteStats();
+    const priorStats = await PublicDAL.getTrainingStats();
     await PublicDAL.updateStats(1, 60);
-    const afterStats = await PublicDAL.getSiteStats();
+    const afterStats = await PublicDAL.getTrainingStats();
     expect(afterStats.testsCompleted).toBe(priorStats.testsCompleted + 1);
     expect(afterStats.testsStarted).toBe(priorStats.testsStarted + 2);
-    expect(afterStats.timeSpent).toBe(priorStats.timeSpent + 60);
+    expect(afterStats.timeTraining).toBe(priorStats.timeTraining + 60);
   });
 });

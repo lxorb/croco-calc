@@ -658,12 +658,9 @@ describe("UserDal", () => {
       //WHEN
       const read = await UserDAL.getUser(user.uid, "read");
 
+      // SB-176 / INV-153: `time` is the only mode croco calc has.
       expect(read.personalBests).toEqual({
-        custom: {},
-        quote: {},
         time: {},
-        words: {},
-        zen: {},
       });
     });
   });
@@ -676,12 +673,9 @@ describe("UserDal", () => {
       //WHEN
       const read = await UserDAL.getUserByName(user.name, "read");
 
+      // SB-176 / INV-153: `time` is the only mode croco calc has.
       expect(read.personalBests).toEqual({
-        custom: {},
-        quote: {},
         time: {},
-        words: {},
-        zen: {},
       });
     });
   });
@@ -715,12 +709,9 @@ describe("UserDal", () => {
         "personalBests",
       ]);
 
+      // SB-176 / INV-153: `time` is the only mode croco calc has.
       expect(read.personalBests).toEqual({
-        custom: {},
-        quote: {},
         time: {},
-        words: {},
-        zen: {},
       });
     });
   });
@@ -751,7 +742,7 @@ describe("UserDal", () => {
     it("should reset", async () => {
       //given
       const { uid } = await UserTestData.createUser({
-        personalBests: { custom: { custom: [{ acc: 1 } as any] } } as any,
+        personalBests: { time: { "4": [{ acc: 1 } as any] } },
       });
 
       //when
@@ -761,10 +752,6 @@ describe("UserDal", () => {
       const read = await UserDAL.getUser(uid, "read");
       expect(read.personalBests).toStrictEqual({
         time: {},
-        words: {},
-        quote: {},
-        zen: {},
-        custom: {},
       });
     });
   });
@@ -1070,13 +1057,12 @@ describe("UserDal", () => {
       await UserDAL.updateLbMemory(uid, "time", "4", 4711);
 
       //THEN
+      // INV-153: lbMemory is `mode -> mode2 -> rank`; the language level is gone.
       const read = await UserDAL.getUser(uid, "read");
       expect(read.lbMemory).toStrictEqual({
         time: {
-          "15": {
-            english: 4711,
-          },
-          "30": {},
+          "4": 4711,
+          "8": 12,
         },
       });
     });

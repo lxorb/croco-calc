@@ -27,6 +27,19 @@ type ErrorData = {
   uid: string;
 };
 
+/**
+ * body-parser raises an `http-errors` instance with `type: "entity.too.large"`
+ * when the JSON body exceeds `JSON_BODY_LIMIT` (see `app.ts`).
+ */
+function isPayloadTooLargeError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "type" in error &&
+    error.type === "entity.too.large"
+  );
+}
+
 async function errorHandlingMiddleware(
   error: Error,
   req: ExpressRequestWithContext,
@@ -47,6 +60,14 @@ async function errorHandlingMiddleware(
     } else if (error instanceof URIError || error instanceof SyntaxError) {
       status = 400;
       message = "Unprocessable request";
+    } else if (isPayloadTooLargeError(error)) {
+      // body-parser rejected the body before any route ran. Without this branch
+      // it falls through to the generic 500 below, which both lies to the client
+      // and records a client-side condition in the `errors` collection as a
+      // server fault. Sibling of the SyntaxError branch above: both are
+      // body-parser transport failures, not application errors.
+      status = 413;
+      message = "Request body too large";
     } else if (error instanceof CrocoError) {
       message = error.message;
       status = error.status;

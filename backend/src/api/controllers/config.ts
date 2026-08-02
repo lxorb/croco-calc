@@ -4,9 +4,7 @@ import { CrocoResponse } from "../../utils/croco-response";
 import { GetConfigResponse } from "@croco-calc/contracts/configs";
 import { CrocoRequest } from "../types";
 
-export async function getConfig(
-  req: CrocoRequest,
-): Promise<GetConfigResponse> {
+export async function getConfig(req: CrocoRequest): Promise<GetConfigResponse> {
   const { uid } = req.ctx.decodedToken;
   const data = (await ConfigDAL.getConfig(uid))?.config ?? null;
 
@@ -24,9 +22,7 @@ export async function saveConfig(
   return new CrocoResponse("Config updated", null);
 }
 
-export async function deleteConfig(
-  req: CrocoRequest,
-): Promise<CrocoResponse> {
+export async function deleteConfig(req: CrocoRequest): Promise<CrocoResponse> {
   const { uid } = req.ctx.decodedToken;
 
   await ConfigDAL.deleteConfig(uid);

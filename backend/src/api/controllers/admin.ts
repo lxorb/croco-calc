@@ -5,6 +5,7 @@ import * as ReportDAL from "../../dal/report";
 import {
   AcceptReportsRequest,
   RejectReportsRequest,
+  SendForgotPasswordEmailRequest,
   ToggleBanRequest,
   ToggleBanResponse,
 } from "@croco-calc/contracts/admin";
@@ -15,6 +16,23 @@ import { CrocoRequest } from "../types";
 
 export async function test(_req: CrocoRequest): Promise<CrocoResponse> {
   return new CrocoResponse("OK", null);
+}
+
+/**
+ * C24 / INF-053 / INF-053a — there is no backend mail transport in croco calc,
+ * so an admin cannot trigger a reset mail server-side either. See the long note
+ * on `verificationEmail` in `controllers/user.ts`. Answered with 503 rather than
+ * a 200 no-op so the caller is never told an email was sent that was not, and
+ * kept only so the ts-rest router stays type-complete; the route itself belongs
+ * in the deletion WP-03 must make to `packages/contracts/src/admin.ts`.
+ */
+export async function sendForgotPasswordEmail(
+  _req: CrocoRequest<undefined, SendForgotPasswordEmailRequest>,
+): Promise<CrocoResponse> {
+  throw new CrocoError(
+    503,
+    "This endpoint is disabled: croco calc sends account email through Firebase Auth, not the backend.",
+  );
 }
 
 export async function toggleBan(

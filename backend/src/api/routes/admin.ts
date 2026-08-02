@@ -19,4 +19,9 @@ export default s.router(adminContract, {
   rejectReports: {
     handler: async (r) => callController(AdminController.rejectReports)(r),
   },
+  // C24: vestigial, answers 503. See controllers/admin.ts.
+  sendForgotPasswordEmail: {
+    handler: async (r) =>
+      callController(AdminController.sendForgotPasswordEmail)(r),
+  },
 });
