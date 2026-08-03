@@ -49,6 +49,7 @@ function setupDom(): void {
           <textarea id="tasksInput"></textarea>
           <div id="caret" class="default"></div>
           <div id="tasks" class="preStart" data-state="preStart"></div>
+          <div id="taskAnnouncer" aria-live="polite" aria-atomic="true"></div>
         </div>
       </div>
     </div>`;
@@ -456,6 +457,62 @@ describe("task stream rendering", () => {
       for (const letter of letters) {
         expect(letter.className).toBe("");
       }
+    });
+  });
+
+  /**
+   * CP-183 / DoD-36. The stream is `user-select: none` and pre-start carries no
+   * prompt text, so the live region is the only route by which a screen-reader
+   * user can perceive the task. These assert the two halves that matter: it
+   * says the right thing once running, and it says *nothing* before the start.
+   */
+  describe("the aria-live region (CP-183, DoD-36)", () => {
+    function announcer(): HTMLElement {
+      return document.querySelector("#taskAnnouncer") as HTMLElement;
+    }
+
+    it("is a polite, atomic live region", () => {
+      const el = announcer();
+      expect(el.getAttribute("aria-live")).toBe("polite");
+      expect(el.getAttribute("aria-atomic")).toBe("true");
+    });
+
+    it("announces the active task's prompt once the stream is revealed", async () => {
+      const ui = await loadUi();
+      const engine = createTestEngine({ seed: 31337, settings: SETTINGS });
+      const first = engine.viewAt(0) as TaskView;
+      ui.revealStream([first]);
+
+      expect(announcer().textContent).toBe(first.prompt.trim());
+    });
+
+    it("follows the active task as it advances", async () => {
+      const ui = await loadUi();
+      const engine = createTestEngine({ seed: 31337, settings: SETTINGS });
+      const views = [0, 1, 2].map((i) => engine.viewAt(i) as TaskView);
+      ui.revealStream(views);
+
+      ui.updateActiveElement(2);
+      expect(announcer().textContent).toBe(
+        (views[2] as TaskView).prompt.trim(),
+      );
+    });
+
+    it("stays empty while pre-start, so it cannot leak a prompt (CP-047)", async () => {
+      const ui = await loadUi();
+      ui.applyPreStart();
+      expect(announcer().textContent).toBe("");
+    });
+
+    it("is cleared by a restart", async () => {
+      const ui = await loadUi();
+      const engine = createTestEngine({ seed: 31337, settings: SETTINGS });
+      const first = engine.viewAt(0) as TaskView;
+      ui.revealStream([first]);
+      expect(announcer().textContent).not.toBe("");
+
+      ui.applyPreStart();
+      expect(announcer().textContent).toBe("");
     });
   });
 });

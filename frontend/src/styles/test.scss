@@ -55,6 +55,23 @@
 // which is why the transition below names `opacity` and `filter` explicitly
 // rather than using the `all` shorthand — a transitioned margin would fight
 // the line-jump animation.
+// CP-183 — the live region that carries the active task's prompt to assistive
+// technology. Removed from the visual layout without being removed from the
+// accessibility tree: `display: none`, `visibility: hidden` and `hidden` would
+// all silence it, so it is clipped to a 1px box instead.
+#taskAnnouncer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 #tasks {
   height: fit-content;
   padding-bottom: 0.5em; // to account for hints of the bottom line

@@ -368,7 +368,9 @@ export function AboutPage(): JSXElement {
               those times and mapped onto a scale from 0 to 100.
             </dd>
 
-            <dt class="col-1 mr-4">afk</dt>
+            {/* C37 — the user-visible label is `idle`; the results screen
+                renders `12s idle`, so the glossary must match it. */}
+            <dt class="col-1 mr-4">idle</dt>
             <dd class="col-2">
               - seconds during the test in which you pressed no key.
             </dd>

@@ -97,6 +97,33 @@ function tasksElement(): ReturnType<typeof qsr> {
   return qsr("#tasks");
 }
 
+/**
+ * CP-183 — announce the active task's prompt.
+ *
+ * `#tasks` is `user-select: none` and, before the reveal, holds no prompt text
+ * at all, so a screen-reader user would otherwise get an unannounced blank
+ * region. The prompt is read back out of the DOM rather than threaded through
+ * every call site, which keeps this correct for all three paths that move the
+ * active marker (reveal, commit, re-render) without widening their signatures.
+ *
+ * Reading the DOM is also what makes this safe for C29/CP-047: while pre-start
+ * the rendered prompts are empty, and the `isPreStart()` guard means we do not
+ * even look. A prompt can only be announced once it is already on screen.
+ */
+function announceTask(activeIndex: number): void {
+  const announcer = qs("#taskAnnouncer");
+  if (announcer === null) return;
+  if (isPreStart()) {
+    announcer.native.textContent = "";
+    return;
+  }
+  const prompt = qs(
+    `#tasks .task[data-taskindex="${activeIndex}"] .prompt`,
+  )?.native.textContent?.trim();
+  if (prompt === undefined || prompt === "") return;
+  announcer.native.textContent = prompt;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -182,6 +209,9 @@ export function applyPreStart(): void {
   tasks.setHtml(
     Array.from({ length: RENDER_AHEAD }, (_, i) => maskedTaskHtml(i)).join(""),
   );
+  // CP-183 — a restart must not leave the previous run's last prompt sitting in
+  // the live region, where a screen reader would re-read it as if it were live.
+  announceTask(0);
   resetStreamOffset();
   // Not just `applyGeometry`: every restart path funnels through here,
   // including the initial build, so this is the one place guaranteed to run
@@ -267,6 +297,10 @@ export function updateActiveElement(
     if (stale !== next) stale.classList.remove("active");
   }
   next.classList.add("active");
+
+  // CP-183. Every path that moves the active marker funnels through here, so
+  // this is the single place the live region needs updating.
+  announceTask(activeIndex);
 
   scrollActiveIntoView(next, instant);
   Caret.updatePosition(instant);
