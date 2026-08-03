@@ -32,4 +32,6 @@ concurrent_requests = 50
 alert_email        = "me@emilvinu.de"
 log_daily_quota_gb = 0.2
 log_retention_days = 30
-budget_amount      = 50
+# CHF, not USD — the subscription bills in CHF. USD 50 = CHF 40.4 at Azure's
+# own list-price ratio (0.808); see variables.tf and INF-143.
+budget_amount = 40

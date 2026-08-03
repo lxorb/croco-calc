@@ -165,9 +165,22 @@ variable "log_retention_days" {
 }
 
 variable "budget_amount" {
-  description = "Monthly subscription budget in USD (INF-143). This is the brief's hard ceiling."
+  description = <<-EOT
+    Monthly budget for rg-croco-calc-prod, in the subscription's BILLING
+    CURRENCY, which is CHF — not USD (INF-143).
+
+    The brief's ceiling is USD 50. Azure's own price list quotes the identical
+    meter at CHF 0.0201 and USD 0.0249 per hour (Retail Prices API,
+    `Azure DocumentDB` / `Burstable 1 vCore` / westeurope, 2026-08-03), i.e.
+    CHF/USD = 0.808, so USD 50 = CHF 40.4. The previous value of 50 was CHF 50
+    = USD 61.9 and therefore let the stack run ~24 % over the stated ceiling
+    before it alerted at all.
+
+    40 rounds the conversion down, so the budget errs strict — which is the
+    correct direction for a ceiling.
+  EOT
   type        = number
-  default     = 50
+  default     = 40
 }
 
 variable "budget_start_date" {
