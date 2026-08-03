@@ -29,6 +29,10 @@ they were read from, relative to the reference checkout
 - **INF-004** Total recurring cloud spend MUST stay below USD 50/month. This is a hard ceiling from the brief.
   A budget with alerts, **scoped to `rg-croco-calc-prod`**, MUST enforce visibility of it (INF-143). The
   subscription bills in **CHF**, so the ceiling is enforced as its CHF equivalent, CHF 40.4 — see INF-143.
+  **Current expectation (2026-08-03, after INF-144's sizing lever): ≈ USD 30.5 – 35.6 ≡ CHF 24.6 – 28.8,
+  i.e. 29 – 39 % headroom under the ceiling.** Two budgets now exist and they measure different things —
+  INF-143's CHF 40 one measures croco calc, INF-143a's CHF 500 one measures the whole subscription and is
+  **not** croco calc's.
 
 ### Naming and region conventions
 
@@ -203,7 +207,7 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
 
 | Option | Fit | Est. USD/month | Verdict |
 |---|---|---|---|
-| **Azure Container Apps (Consumption), min 1 replica, 0.5 vCPU / 1 GiB** | Container-native, HTTPS + free FQDN included, no registry cost when pulling a public ghcr image, per-second billing with cheap "idle" rate | **~11** | **CHOSEN** |
+| **Azure Container Apps (Consumption), min 1 replica, 0.25 vCPU / 0.5 GiB** | Container-native, HTTPS + free FQDN included, no registry cost when pulling a public ghcr image, per-second billing with cheap "idle" rate | **~7.9 – 13.0** | **CHOSEN** (sized down from 0.5 vCPU / 1 GiB on 2026-08-03, INF-144) |
 | Azure Container Apps with `minReplicas = 0` (scale to zero) | Cheapest (~0) but breaks in-process cron jobs and adds 10–30 s cold starts | ~0–3 | Rejected, see INF-034 |
 | Azure App Service Linux **B1** | Simple, Always On available, predictable | ~12.4 | Viable runner-up; rejected because ACA gives the same price with better scaling and a cleaner container story |
 | Azure App Service **F1 free** | 60 CPU-min/day quota, no Always On | 0 | Rejected — cron jobs and idle keep-alive impossible |
@@ -223,8 +227,40 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
   first request. Additionally a cold start pays for
   Node boot + Mongo connect + live-configuration fetch (`backend/src/server.ts` lines 28–37) on the user's
   first request.
-- **INF-035** Container resources MUST be `cpu = 0.5`, `memory = "1Gi"` (a valid ACA Consumption combination).
-- **INF-036** A single HTTP scale rule MUST be configured with `concurrentRequests = 50`.
+- **INF-035 (AMENDED 2026-08-03 by INF-144 — applied)** Container resources MUST be `cpu = 0.25`,
+  `memory = "0.5Gi"`. The stack launched on `0.5` / `"1Gi"`; that figure was never grounded in measurement and
+  the measurement, once taken, did not support it — the settled replica drew **0.0050 vCPU** and **~99 MiB**
+  (INF-037a). 0.25 / 0.5 GiB still leaves ~50× CPU and ~5× memory headroom and halves both ACA meters.
+
+  ACA Consumption accepts only **fixed** vCPU/memory pairs, at exactly **2 GiB per vCPU**
+  ([containers#vcpu-and-memory-allocation-requirements](https://learn.microsoft.com/en-us/azure/container-apps/containers),
+  retrieved 2026-08-03): `0.25`→`0.5Gi`, `0.5`→`1.0Gi`, `0.75`→`1.5Gi`, … So **"give it 0.75 GiB" is not an
+  available option**: the next step up from 0.5 GiB is 1.0 GiB, which also doubles the vCPU back to 0.5. If
+  this allocation ever proves too tight, the only move is back to `0.5` / `"1Gi"`.
+
+  **Verified in production 2026-08-03:** revision `ca-croco-calc-api--0000003` started on 0.25 / 0.5 GiB
+  **healthy, first try, with `restartCount = 0`** — no OOM. Cold boot took **0.6 s** end to end (Mongo connect
+  → Firebase init → live-configuration fetch → cron start → listening), the startup CPU burst peaked at
+  **0.114 vCPU** (46 % of the new allocation, so it fits with room), and `GET /` answered **200 in 188 ms**.
+- **INF-036 (RE-EXAMINED 2026-08-03 — unchanged, deliberately)** A single HTTP scale rule MUST be configured
+  with `concurrentRequests = 50`, `minReplicas = 1`, `maxReplicas = 3`. Halving the replica size raises the
+  obvious question of whether the app now scales out sooner and whether that erodes INF-144's saving. The
+  ruling is **change nothing**, for three reasons:
+  1. **Scaling out is cost-neutral per unit of load.** Two 0.25 vCPU replicas bill exactly what one 0.5 vCPU
+     replica billed. The saving INF-144 banks comes from the **always-on minimum replica**, which is
+     unchanged at 1 and is now half the size. Lowering the threshold to 25 to "preserve" the old
+     vCPU-per-request ratio would therefore not cost anything either — but it would buy nothing at current
+     load, so it is not done.
+  2. **There is no load to tune against.** Measured traffic is **0 requests** and 0 B/s ingress (INF-037a).
+     Moving a scale threshold on zero data is guesswork, not tuning.
+  3. **`maxReplicas = 3` is the budget-relevant number and it must stay.** Above the minimum, *every* replica
+     bills at the active rate; 3 × 0.25 vCPU sustained active is ≈ $67/mo of vCPU alone, already over the
+     ceiling. Raising `maxReplicas` to compensate for smaller replicas would raise the tail risk against a
+     hard limit, so it is explicitly rejected.
+
+  **What to re-measure if real traffic ever arrives:** whether one 0.25 vCPU replica actually serves 50
+  concurrent requests at acceptable latency. That is the one claim here still resting on no data — the app is
+  I/O-bound on Mongo so it is plausible, but it is unproven, and the symptom would be latency, not cost.
 
 ### Cost estimate (chosen stack)
 
@@ -249,8 +285,8 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
 
   | Resource | SKU / assumption | Arithmetic | USD/mo | source (retrieved 2026-08-03) |
   |---|---|---|---|---|
-  | Container App vCPU | 1 replica × 0.5 vCPU × 2,628,000 s, **no free grant available** (see above). Range spans all-idle → the 26 % active share measured on this subscription's other ACA apps | idle 1,314,000 × $0.000004 = 5.26; at 26 % active = 11.62 + 3.89 | **5.26 – 15.51** | Retail API `Standard vCPU Idle Usage` / `Standard vCPU Active Usage`; grant scope: [container-apps/billing](https://learn.microsoft.com/en-us/azure/container-apps/billing) |
-  | Container App memory | 1 replica × 1 GiB × 2,628,000 s. The idle and active memory rates are **identical** ($0.000004/GiB-s), so this row does not vary with load | 2,628,000 × 0.000004 | **10.51** | Retail API `Standard Memory Idle Usage` = `Standard Memory Active Usage` |
+  | Container App vCPU | 1 replica × **0.25 vCPU** × 2,628,000 s = 657,000 vCPU-s, **no free grant available** (see above). Range spans all-idle → the 26 % active share measured on this subscription's other ACA apps | idle 657,000 × $0.000004 = 2.63; at 26 % active = 5.81 + 1.94 | **2.63 – 7.75** | Retail API `Standard vCPU Idle Usage` $0.000004/s, `Standard vCPU Active Usage` $0.000034/s; grant scope: [container-apps/billing](https://learn.microsoft.com/en-us/azure/container-apps/billing) |
+  | Container App memory | 1 replica × **0.5 GiB** × 2,628,000 s = 1,314,000 GiB-s. The idle and active memory rates are **identical** ($0.000004/GiB-s), so this row does not vary with load | 1,314,000 × 0.000004 | **5.26** | Retail API `Standard Memory Idle Usage` = `Standard Memory Active Usage` |
   | Container App requests | first 2 M requests/mo free; load is ~single-user. Health probes are explicitly non-billable | — | **0** | [container-apps/billing](https://learn.microsoft.com/en-us/azure/container-apps/billing) |
   | Container Apps environment | Consumption workload profile | no per-environment charge (Dedicated plan management fee applies only to Dedicated profiles) | **0** | [container-apps/billing](https://learn.microsoft.com/en-us/azure/container-apps/billing) |
   | **Database — DocumentDB M10 compute** | 1 burstable vCore / 2 GiB, `westeurope`, no HA | $0.0249/h × 730 h | **18.18** | Retail API `Azure DocumentDB` / `Burstable 1 vCore` |
@@ -267,10 +303,10 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
   | Cloudflare Workers + DNS + Email Routing | Free plan | — | **0** | Cloudflare free plan |
   | Firebase Auth | Spark plan, well under 50k MAU | — | **0** | Firebase Spark |
   | Resource-group budget + alerts | `azurerm_consumption_budget_resource_group` scoped to `rg-croco-calc-prod` | — | **0** | INF-143 |
-  | **TOTAL — deployed default (M10, `westeurope`)** | all-idle → 26 % active | | **≈ 38.4 – 48.6** | sum of rows |
-  | **TOTAL — free-tier lever (Free, `northeurope`)** | subtract $18.18 compute + $4.38 storage | | **≈ 15.8 – 26.1** | INF-062 |
-  | **TOTAL — INF-144 sizing lever (0.25 vCPU / 0.5 GiB)** | halves both ACA meters | | **≈ 30.5 – 35.6** | INF-144 |
-  | **TOTAL — both levers** | free tier + 0.25 vCPU / 0.5 GiB | | **≈ 7.9 – 13.1** | — |
+  | Subscription budget + alerts | `azurerm_consumption_budget_subscription`, CHF 500 — **not croco calc's**, and outside this resource group either way | — | **0** | INF-143a |
+  | **TOTAL — deployed default (0.25 vCPU / 0.5 GiB, M10, `westeurope`)** | all-idle → 26 % active | | **≈ 30.5 – 35.6** | sum of rows |
+  | **TOTAL — free-tier lever (Free, `northeurope`)** | subtract $18.18 compute + $4.38 storage | | **≈ 7.9 – 13.1** | INF-062 |
+  | ~~TOTAL — pre-INF-144 sizing (0.5 vCPU / 1 GiB)~~ | **SUPERSEDED 2026-08-03** — the sizing lever was applied, so this is no longer the deployed shape | | ~~≈ 38.4 – 48.6~~ | INF-144 |
 
   > The single-figure totals published on 2026-08-02 (`≈ 39.42` / `≈ 16.86`) are **withdrawn**. They rested on
   > a free grant croco calc does not get and on a 0 %-active assumption that the subscription's own billing
@@ -281,11 +317,18 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
      idle only while it is at the minimum count, has started, is processing no HTTP request, is under
      0.01 vCPU and is under 1,000 B/s of network. The active vCPU rate is **8.5×** the idle rate
      ($0.000034 vs $0.000004) — but note this multiplier applies to the **vCPU meter only**: the memory
-     meter bills the same rate in both states, so the *Container App line* varies by 3.5×, not 8.5×, and the
-     *stack total* by ~1.3×. See "idle eligibility, resolved" below.
+     meter bills the same rate in both states, so the *Container App line* varies by 3.5×, not 8.5× (that
+     3.5× is scale-invariant — it is unchanged by INF-144's halving), and the *stack total* by ~1.17×
+     across the quoted idle→26 % range. See "idle eligibility, resolved" below.
   2. Every figure is a list price excluding tax and any subscription-level credit.
   3. Prices are quoted in **USD**, but this subscription **bills in CHF** — see INF-143 for the ruling and
-     the conversion. USD 50 ≡ CHF 40.4.
+     the conversion. USD 50 ≡ CHF 40.4, and the deployed total **≈ USD 30.5 – 35.6 ≡ CHF 24.6 – 28.8** at
+     CHF/USD 0.808. That ratio is not a market rate; it is read off Azure's own list price for identical
+     meters quoted in both currencies, and three independent meters agree to within 0.2 %: `Burstable 1 vCore`
+     0.0201/0.0249 = 0.8072, `General Purpose Storage Data Stored` 0.1108/0.137 = 0.8088, and
+     `Standard Requests` 0.4531/0.56 = 0.8091 (Retail Prices API, `westeurope`, retrieved 2026-08-03). Note
+     the CHF **per-second** ACA meters are useless for this: the API rounds them to 4 decimals and they all
+     read `0.0000`, which is why the arithmetic above is done in USD and converted, not done in CHF.
 
 - **INF-037a ✚ (added 2026-08-03) — idle eligibility, resolved.** This was recorded as "the single largest
   cost risk in the stack". It is now settled with measurements rather than assumption:
@@ -295,37 +338,56 @@ speaking to MongoDB via the official `mongodb` driver (`backend/src/init/db.ts`)
   | `min_replicas` / `max_replicas` as deployed | 1 / 3 — the revision sits **at** the minimum, so it is *eligible* for idle billing | `az containerapp show` |
   | croco calc CPU, settled window (08:45 UTC) | **avg 0.0050 vCPU**, max 0.0115 vCPU — average is half the 0.01 vCPU idle threshold | `UsageNanoCores` metric |
   | croco calc ingress + requests, post-startup | **0 B/s, 0 requests** — far under the 1,000 B/s threshold | `RxBytes` / `Requests` metrics |
-  | croco calc memory working set | **~102 MiB** of the 1 GiB allocated (10 %) | `WorkingSetBytes` metric |
-  | Active share on this subscription's *other* ACA apps, July 2026 | **26 %** (memory: 7.40/(7.40+20.50) CHF; vCPU: 25.9 % via the 8.5× rate ratio) — same 0.5 vCPU / 1 GiB shape as croco calc | Cost Management, `Azure Container Apps` meters |
+  | croco calc memory working set | **~99 MiB steady state** (98.5–98.8 MiB across the 09:07–09:13 UTC window) — was 10 % of the old 1 GiB, is **19 % of the 0.5 GiB** now allocated | `WorkingSetBytes` metric |
+  | Active share on this subscription's *other* ACA apps, July 2026 | **26 %** (memory: 7.40/(7.40+20.50) CHF; vCPU: 25.9 % via the 8.5× rate ratio) — those apps are 0.5 vCPU / 1 GiB, the shape croco calc *used* to have; the *share* is what is borrowed, and it is dimensionless, so it survives the resize | Cost Management, `Azure Container Apps` meters |
+  | Startup burst on the new 0.25 vCPU allocation | **peak 0.114 vCPU** (46 % of allocation) for one minute, then back under 0.01 | `UsageNanoCores`, revision `--0000003` |
 
   **Ruling:** croco calc's replica qualifies for the idle rate the great majority of the time — its measured
   steady-state CPU is half the threshold and it receives no traffic. But 0 % active is not credible: the
   backend runs four in-process cron jobs (`update-leaderboards` fires **4×/hour**) plus MongoDB heartbeats,
   and the measured CPU *maximum* already crosses 0.0115 vCPU. The 26 % figure from the user's own comparable
-  Container Apps is the honest upper anchor, so the table quotes **5.26 – 15.51** for the vCPU row rather
-  than the previous flat $4.46. The residual risk is no longer "idle vs active" but **scaling above one
-  replica** — when a revision exceeds its minimum, *every* replica bills at the active rate.
+  Container Apps is the honest upper anchor, so the table quotes **2.63 – 7.75** for the vCPU row (it read
+  5.26 – 15.51 before INF-144 halved the allocation, and a flat $4.46 before that). The residual risk is no
+  longer "idle vs active" but **scaling above one replica** — when a revision exceeds its minimum, *every*
+  replica bills at the active rate. See INF-036 for why the scale rule was nevertheless left alone.
 
-- **INF-038 (AMENDED 2026-08-02; RE-AMENDED 2026-08-03)** The original rule — total ≤ $20/mo, i.e. 60 %
-  headroom under the $50 ceiling — is **breached by the deployed default**: ≈ $38.4–48.6 leaves only
-  **3–23 % headroom**, not the ~20–27 % recorded on 2026-08-02. This is recorded as a deliberate,
-  user-accepted trade, not an oversight:
+  **Note on the idle threshold after the resize.** The idle condition is worded *"the replica is using less
+  than 0.01 vCPU cores"* — an **absolute** figure, not a fraction of the allocation
+  ([container-apps/billing](https://learn.microsoft.com/en-us/azure/container-apps/billing), retrieved
+  2026-08-03). Azure does not scale it down with the container, so halving the allocation does *not* make idle
+  eligibility harder to achieve: the same measured 0.0050 vCPU still sits at half the threshold. This was
+  checked rather than assumed, because the opposite reading would have quietly pushed the whole vCPU row to
+  the active rate and wiped out INF-144's saving.
+
+- **INF-038 (AMENDED 2026-08-02; RE-AMENDED 2026-08-03; SIZING LEVER APPLIED 2026-08-03)** The original rule —
+  total ≤ $20/mo, i.e. 60 % headroom under the $50 ceiling — is **still not met**, but the gap is now much
+  narrower than it was. Current position:
+
+  | | Total USD/mo | CHF/mo | Headroom under USD 50 |
+  |---|---|---|---|
+  | As launched, 0.5 vCPU / 1 GiB | ≈ 38.4 – 48.6 | ≈ 31.0 – 39.3 | **3 – 23 %** |
+  | **Deployed now, 0.25 vCPU / 0.5 GiB (INF-144 applied)** | **≈ 30.5 – 35.6** | **≈ 24.6 – 28.8** | **29 – 39 %** |
+  | Plus INF-062's free-tier lever (unapplied) | ≈ 7.9 – 13.1 | ≈ 6.4 – 10.6 | 74 – 84 % |
+
+  The remaining shortfall against the 60 % rule is recorded as a deliberate, user-accepted trade, not an
+  oversight:
   * the user explicitly accepted cost ("even though this will result in some costs") in exchange for the
-    database being Azure-hosted;
-  * ≈ $38.4–48.6 remains **under the brief's hard $50 ceiling**, which is the requirement that actually binds
-    (INF-004), and INF-143's machine-enforced budget now measures croco calc alone, so it applies for real;
-  * the 60 % rule is recoverable at any time by one two-line change — INF-062's free-tier lever brings the
-    total to **≈ $15.8–26.1**, and adding INF-144's sizing lever brings it to **≈ $7.9–13.1**.
+    database being Azure-hosted — and the database is now **74 % of the entire bill** ($22.56 of $30.5), so
+    the 60 % rule is unreachable without giving that up;
+  * ≈ $30.5–35.6 is comfortably **under the brief's hard $50 ceiling**, which is the requirement that actually
+    binds (INF-004), and INF-143's machine-enforced budget measures croco calc alone, so it applies for real;
+  * the 60 % rule remains recoverable at any time by INF-062's two-line free-tier lever.
 
-  Because headroom is now **thin at the top of the range — $48.6 is 97 % of the ceiling** — the following are
-  **mandatory** rather than advisory:
-  * INF-144's 7-day actual-spend check MUST be performed;
-  * INF-144's sizing lever (drop the Container App to 0.25 vCPU / 0.5 GiB) SHOULD be applied **now, not
-    conditionally**. Measurement makes it free: the app uses 0.0050 vCPU (2 % of a 0.25 vCPU allocation) and
-    102 MiB (20 % of a 0.5 GiB allocation), so the lever costs ~50× CPU and ~5× memory headroom it does not
-    use, and saves **$7.9–13.0/mo** — the difference between 3 % and 29 % headroom;
+  **The sizing lever was applied on 2026-08-03 and is no longer a recommendation.** Measurement made it
+  nearly free: the app draws 0.0050 vCPU (2 % of the 0.25 vCPU allocation) and ~99 MiB (19 % of the 0.5 GiB
+  allocation), so it retains ~50× CPU and ~5× memory headroom, and it saves **$7.9–13.0/mo** — the difference
+  between 3 % and 29 % headroom at the pessimistic end. Still mandatory:
+  * INF-144's 7-day actual-spend check MUST still be performed — every figure above is a *projection* from
+    list prices and a 26 % active share borrowed from other apps. **No croco calc invoice has been observed
+    yet**; `currentSpend` on both budgets reads CHF 0.00, which reflects the 8–24 h cost-data lag on a stack
+    deployed today, not a bill of zero.
   * any sustained load that scales the app above one replica MUST be treated as a budget event, because all
-    replicas then bill at the active rate.
+    replicas then bill at the active rate (INF-036).
 - **INF-156 ✚ (added by the master document, gap 23) — GATE CLEARED 2026-08-02** `terraform apply` MUST NOT
   be run while any row of INF-037 still reads `UNVERIFIED`. Verification is a documented, repeatable step:
   record the source and the date in the `source` column, commit the updated table, then apply.
@@ -1021,25 +1083,62 @@ croco calc keeps monkeytype's Firebase Auth integration unchanged in shape:
     CHF 50 = **USD 61.9**, i.e. it permitted ~24 % more than the stated ceiling before alerting at all.
     `amount` is now **40**, rounding the conversion *down* so the budget errs strict.
 
-  **Consequence to expect:** at the corrected scope and amount, expected spend of CHF 31–39 (INF-037) is
-  **77–97 % of the CHF 40 budget**, so the 50 % notification *will* fire every month and the 80 % one
-  probably will. That is accurate signalling, not noise — it reflects the stack genuinely running near the
-  brief's ceiling. The fix is INF-144's sizing lever, not a larger budget.
-- **INF-143a ✚ (added 2026-08-03) — subscription-level guard.** INF-143's budget deliberately no longer
-  watches total Azure spend. The subscription's own run rate is material and independent of croco calc
-  (June 2026 CHF 223.21, July 2026 CHF 358.80, early August ~CHF 6–8/day), so a **second, clearly-named**
-  budget MAY be added to catch a runaway. It MUST NOT be named as if it belonged to croco calc, MUST sit
-  well above the historical baseline, and SHOULD omit the *Forecasted* notification — a forecast
-  notification is precisely what produced the false alarm this requirement exists to prevent. Not created
-  as of 2026-08-03: the threshold depends on the user's intent for their other projects.
+  **Consequence to expect (UPDATED 2026-08-03, after INF-144's sizing lever was applied).** The earlier note
+  here said expected spend of CHF 31–39 would be 77–97 % of the CHF 40 budget, so the 50 % notification would
+  fire every month and the 80 % one probably would. **That is superseded.** Expected spend is now
+  **CHF 24.6–28.8**, i.e. **62–72 % of the CHF 40 budget**:
+  * the **50 % notification will still fire every month** — 62 % is over it even in the all-idle case. This
+    is expected and is not a fault;
+  * the **80 % notification should now stay quiet**, where before it was likely to fire. If it does fire, it
+    is real signal: something exceeded the projection and INF-144's spend check applies;
+  * the 100 % notification firing means the brief's ceiling is genuinely at risk.
+
+  The fix for a breach remains INF-062's free-tier lever, not a larger budget. The budget amount is a
+  translation of the brief's ceiling and MUST NOT be raised to silence an alert.
+- **INF-143a ✚ (added 2026-08-03; CREATED 2026-08-03)** — **subscription-level guard.** INF-143's budget
+  deliberately no longer watches total Azure spend. The subscription's own run rate is material and
+  independent of croco calc (June 2026 CHF 223.21, July 2026 CHF 358.80, early August ~CHF 6–8/day) and until
+  now had **no budget monitoring at all**. A second, clearly-named budget therefore exists:
+
+  | Property | Value | Why |
+  |---|---|---|
+  | Name | `budget-azure-subscription-total` | Must not read as croco calc's. It is not. |
+  | Scope | `/subscriptions/48317e81-…` (whole subscription) | It guards the other ~11 projects. |
+  | Amount | **CHF 500** | ~1.4× the July 2026 peak (CHF 358.80), ~2.2× June (CHF 223.21). A runaway detector, not a target — set near the baseline it would cry wolf monthly and be ignored. |
+  | Notifications | **Actual 80 % and Actual 100 % only** | |
+  | Forecasted notification | **Deliberately absent** | A Forecasted threshold on the old subscription-scoped budget is exactly what produced the false "forecasted to reach CHF 331.27" alarm on 2026-08-03 that this requirement exists to prevent. |
+  | Routing | `contact_emails = ["me@emilvinu.de"]` | **Not** `ag-croco-calc-prod`. That action group lives inside `rg-croco-calc-prod` and would be destroyed with croco calc, leaving this budget alive but mute. |
+
+  **It MUST NOT live in the `prod` Terraform stack.** `prod` is what gets destroyed when croco calc is
+  decommissioned, and a `terraform destroy` there would take the user's only subscription-wide cost guard with
+  it — a resource protecting spend that has nothing to do with this project. It is declared in
+  **`infra/terraform/bootstrap/`** instead, which is (a) already where this repo keeps subscription-scope
+  concerns — see the `Cost Management Contributor` assignment at `/subscriptions/<id>` — and (b) applied once,
+  by hand, by the operator rather than by CI on every dispatch. It additionally carries
+  `lifecycle { prevent_destroy = true }`, so even `terraform destroy` **in `bootstrap/`** fails loudly rather
+  than silently unguarding the subscription; removing it must be a deliberate commit.
+
+  **Known limitation, stated rather than hidden:** `bootstrap/` uses **local, gitignored state**
+  (INF-072 — it is what creates the remote backend). So this budget's state lives on the operator's machine
+  only. If that state is lost the budget keeps working and keeps alerting — it simply becomes unmanaged, and
+  a re-apply would need `terraform import`. The failure mode is therefore fail-safe (the guard survives), but
+  it is a real caveat and the alternative — a fourth root module with its own remote backend — was judged not
+  worth the operational weight for a single resource.
 - **INF-144** Seven days after go-live, actual spend MUST be checked — **scoped to the resource group**, e.g.
   a Cost Management `MonthToDate` `ActualCost` query against
   `/subscriptions/<sub>/resourceGroups/rg-croco-calc-prod/providers/Microsoft.CostManagement/query`, or
   `az consumption budget list --resource-group rg-croco-calc-prod` — and the real figure recorded next to the
   estimate in INF-037. Cost data lags 8–24 h, so a check run sooner than that reports nothing and MUST NOT be
-  read as "zero spend". If the run-rate projects above CHF 25/mo (≈ USD 31), the stack MUST be re-tuned
-  (first lever: drop `ca-croco-calc-api` to 0.25 vCPU / 0.5 GiB — INF-038 now recommends applying this
-  unconditionally).
+  read as "zero spend". **Status 2026-08-03: not yet performed** — the stack was deployed today, so
+  `currentSpend` on both budgets reads CHF 0.00 purely because of that lag. Nothing in this document has been
+  validated against a real invoice yet.
+
+  **The sizing lever is spent.** `ca-croco-calc-api` was dropped to 0.25 vCPU / 0.5 GiB on 2026-08-03
+  (INF-035, INF-038), so it is no longer available as a response to an overrun. The re-tune threshold is
+  therefore restated against the new projection: **if the run-rate projects above CHF 30/mo (≈ USD 37) — i.e.
+  materially above the CHF 24.6–28.8 this document now predicts — the projection is wrong and the remaining
+  lever is INF-062's free-tier database move**, which removes CHF ~18 (USD 22.56) at the cost of backups and
+  HA. Do not respond by raising INF-143's budget amount; it is a translation of the brief's hard ceiling.
 - **INF-145** A short runbook MUST be committed at `docs/RUNBOOK.md` covering: how to roll back the backend
   (activate the previous ACA revision), how to roll back the frontend (`wrangler rollback` / redeploy a prior
   version), how to rotate the Cloudflare token, the database administrator password and the Firebase service account, how to
