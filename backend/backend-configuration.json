@@ -1,0 +1,80 @@
+{
+  "_comment": [
+    "Production live configuration, applied at boot by",
+    "updateFromConfigurationFile() (backend/src/init/configuration.ts). The",
+    "Dockerfile copies this to /app/backend/dist/backend-configuration.json,",
+    "which is the path that function resolves.",
+    "",
+    "BASE_CONFIGURATION is secure-by-default: every feature ships OFF. That is",
+    "correct for the constant, but it is not a runnable product -- with the base",
+    "values nobody can sign up and no result can be saved. This file is the",
+    "deliberate, reviewable opt-in, so the deployed behaviour lives in git",
+    "rather than in a hand-edited Mongo document.",
+    "",
+    "Only keys that differ from BASE_CONFIGURATION are listed. mergeConfigurations",
+    "merges by common key and same type, so anything omitted keeps its base value.",
+    "",
+    "Deliberately NOT enabled:",
+    "  admin.endpointsEnabled  - no admin UI ships; leaving it off keeps the",
+    "                            admin surface unreachable in production.",
+    "  results.objectHashCheckEnabled and users.lastHashesCheck - anti-cheat",
+    "                            hash gates. Turning either on makes the backend",
+    "                            reject every result whose hash it recomputes",
+    "                            differently from the client, and that round trip",
+    "                            has no end-to-end test yet. Enable only together",
+    "                            with a test that submits a real client payload.",
+    "  leaderboards.weeklyXp   - needs xpRewardBrackets designed first; an empty",
+    "                            bracket list would award nothing.",
+    "  leaderboards.minTimeSpent - left at the AC-120.3 default of 7200 s."
+  ],
+  "configuration": {
+    "results": {
+      "savingEnabled": true,
+      "filterPresets": {
+        "enabled": true,
+        "maxPresetsPerUser": 5
+      }
+    },
+    "users": {
+      "signUp": true,
+      "profiles": {
+        "enabled": true
+      },
+      "xp": {
+        "enabled": true,
+        "gainMultiplier": 1,
+        "maxDailyBonus": 1000,
+        "minDailyBonus": 200
+      },
+      "inbox": {
+        "enabled": true,
+        "maxMail": 100
+      },
+      "reporting": {
+        "enabled": true,
+        "maxReports": 5,
+        "contentReportLimit": 5
+      }
+    },
+    "rateLimiting": {
+      "badAuthentication": {
+        "enabled": true,
+        "penalty": 1,
+        "flaggedStatusCodes": [401]
+      }
+    },
+    "dailyLeaderboards": {
+      "enabled": true,
+      "leaderboardExpirationTimeInDays": 2,
+      "maxResults": 1000,
+      "validModeRules": [{ "mode": "time", "mode2": "(4|8)" }],
+      "scheduleRewardsModeRules": [{ "mode": "time", "mode2": "(4|8)" }],
+      "topResultsToAnnounce": 3,
+      "xpRewardBrackets": []
+    },
+    "connections": {
+      "enabled": true,
+      "maxPerUser": 100
+    }
+  }
+}

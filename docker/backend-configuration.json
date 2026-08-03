@@ -13,7 +13,7 @@
       "enabled": false
     },
     "leaderboards": {
-      "minTimeTyping": 0
+      "minTimeSpent": 0
     }
   }
 }

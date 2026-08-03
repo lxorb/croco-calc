@@ -1,47 +1,24 @@
-# Cache and security headers for the Cloudflare Workers static-assets deploy
-# (INF-019 … INF-022). Vite's publicDir copy places this at the root of
-# frontend/dist. Later rules win, so the catch-all comes first and the
-# immutable-asset rules override its Cache-Control.
+# Security headers for the Cloudflare Workers static-assets deploy (INF-021).
+# Vite's publicDir copy places this at the root of frontend/dist.
+#
+# Cache-Control is deliberately NOT set here. Cloudflare APPENDS the values of
+# every matching rule instead of letting the more specific one win, so a `/*`
+# catch-all of `no-store` plus a `/js/*` rule of `immutable` produced
+#
+#   Cache-Control: no-cache, no-store, must-revalidate, public, max-age=31536000, immutable
+#
+# on production, and `no-store` wins per RFC 9111 — the exact opposite of
+# INF-020. Reordering does not help; the concatenation follows file order, not
+# specificity. INF-022 mandates the fallback that is now in place:
+# frontend/worker/index.ts owns Cache-Control and sets it with Headers.set,
+# which replaces rather than appends. Do not reintroduce Cache-Control here —
+# any value added would be appended to the Worker's and could only weaken it.
+#
+# The headers below are single-valued and identical for every path, so appending
+# cannot corrupt them.
 
 /*
   X-Frame-Options: DENY
   Content-Security-Policy: frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
-  Cache-Control: no-cache, no-store, must-revalidate
-
-# Content-hashed output (js/[name].[hash].js, css/…, webfonts/[name]-[hash].*).
-/js/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/css/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/webfonts/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/images/*
-  Cache-Control: public, max-age=31536000
-
-/themes/*
-  Cache-Control: public, max-age=3600
-
-# Never cache the shell or the version probe: a stale index.html pins clients to
-# deleted hashed assets.
-/
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/index.html
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/version.json
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/manifest.json
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/sw.js
-  Cache-Control: no-cache, no-store, must-revalidate
-
-/service-worker.js
-  Cache-Control: no-cache, no-store, must-revalidate

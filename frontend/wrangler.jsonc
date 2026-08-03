@@ -1,9 +1,15 @@
 {
-  // croco calc frontend — an assets-only Cloudflare Worker (INF-014).
-  // There is deliberately no "main": no Worker script runs, Cloudflare serves
-  // ./dist directly. Deploy with `pnpm --filter @croco-calc/frontend deploy`
-  // from a tree where `frontend/dist` has just been built (INF-026).
+  // croco calc frontend — a Cloudflare Worker serving ./dist (INF-014).
+  // Deploy with `pnpm --filter @croco-calc/frontend deploy` from a tree where
+  // `frontend/dist` has just been built (INF-026).
+  //
+  // This was an assets-only Worker with no "main" until the INF-022 fallback had
+  // to be taken: Cloudflare appends `_headers` values instead of letting the
+  // more specific rule win, so the catch-all's `no-store` leaked onto every
+  // hashed asset and defeated INF-020's immutable caching. ./worker/index.ts
+  // sets Cache-Control itself; see the comment there.
   "$schema": "./node_modules/wrangler/config-schema.json",
+  "main": "./worker/index.ts",
   "name": "croco-calc",
   "account_id": "b0e98c15b1f905a394ecd6a849e8e99f",
   "compatibility_date": "2026-08-01",
@@ -23,6 +29,12 @@
 
   "assets": {
     "directory": "./dist",
+    // The Worker needs to see every request to set Cache-Control on it. Without
+    // this, Cloudflare short-circuits any request that matches a static asset
+    // and never invokes fetch() — which is exactly the hashed-asset traffic the
+    // policy is about.
+    "run_worker_first": true,
+    "binding": "ASSETS",
     // Client-side routes (/test, /account, /leaderboards, …) fall back to the
     // SPA shell, which reproduces the Firebase Hosting rewrites this replaces
     // without maintaining a route list (INF-016).

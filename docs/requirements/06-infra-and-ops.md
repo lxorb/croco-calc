@@ -143,6 +143,18 @@ they were read from, relative to the reference checkout
   `assets` binding that sets the headers in `fetch()`, and `wrangler.jsonc` gains `"main"` — the cache policy
   itself is non-negotiable.
 
+  **RESOLVED: the assumption was false and the fallback has been taken.** Verification on production returned
+  `Cache-Control: no-cache, no-store, must-revalidate, public, max-age=31536000, immutable` for
+  `/js/<hashed>.js`: Cloudflare **appends** the values of every matching `_headers` rule instead of letting
+  the more specific one win, and `no-store` then wins per RFC 9111, so INF-020 was inverted for every hashed
+  asset. Reordering the file does not help — the concatenation follows file order, not specificity.
+  `frontend/worker/index.ts` now owns `Cache-Control` and sets it with `Headers.set` (which replaces);
+  `wrangler.jsonc` has `"main"`, `assets.binding: "ASSETS"` and `assets.run_worker_first: true` (without the
+  last one Cloudflare short-circuits asset requests and never invokes `fetch()`). `frontend/static/_headers`
+  keeps only the INF-021 security headers, which are single-valued and cannot be corrupted by appending.
+  The table is unit-tested in `frontend/__tests__/worker/cache-control.spec.ts`, because `wrangler` cannot
+  run on every dev machine (`workerd` has no `win32 arm64` build).
+
 ### workers.dev subdomain and deployment
 
 - **INF-023** The account's workers.dev subdomain MUST be claimed/enabled once (Cloudflare dashboard →

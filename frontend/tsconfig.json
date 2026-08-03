@@ -19,6 +19,7 @@
     "./src/**/*.tsx",
     "./scripts/**/*.ts",
     "vite-plugins/**/*.ts",
+    "worker/**/*.ts",
     "vite.config.ts"
   ],
   "exclude": ["node_modules", "build", "setup-tests.ts", "./__tests__/**/*.*"]

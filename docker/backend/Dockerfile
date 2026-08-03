@@ -38,6 +38,14 @@ RUN mkdir -p /app/backend/dist/logs
 
 COPY ["docker/backend/entry-point.sh", "./"]
 
+# The live server configuration. init/configuration.ts resolves it as
+# `join(__dirname, "../backend-configuration.json")`, and __dirname is
+# /app/backend/dist/init at runtime, so it has to land in dist/ -- which is this
+# WORKDIR. Without it updateFromConfigurationFile() silently does nothing and
+# the server runs on BASE_CONFIGURATION, where signUp and result saving are both
+# off and the site cannot accept a single user.
+COPY ["backend/backend-configuration.json", "./"]
+
 RUN echo "${server_version}" > /app/backend/dist/server.version
 
 # INF-042: MODE and nothing else. monkeytype's image hardcoded three BYPASS_*
