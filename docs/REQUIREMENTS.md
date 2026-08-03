@@ -724,8 +724,8 @@ rule that cannot be satisfied is not a rule; a grep that does not implement the 
 | INF-059 / INF-060 / INF-061 | amended | firewall rule replaces the Atlas IP access list; admin user replaces the Atlas DB user; `mongodump` becomes defence in depth on M10 |
 | INF-005 (single region) | amended | one documented exception: the free-tier lever moves the DB to `northeurope` |
 | INF-074 / INF-086 (providers, secrets) | amended | `mongodbatlas` provider and `MONGODB_ATLAS_*` secrets struck |
-| INF-037 (cost table) | **VERIFIED** | every row now cited from the Azure Retail Prices API for `westeurope`, 2026-08-02; total ≈ $39.42/mo |
-| INF-038 (60 % headroom) | **breached, deliberately** | ≈ $39.42 leaves ~21 % headroom; under the hard $50 ceiling and user-accepted; recoverable to ≈ $16.86 via INF-062's free-tier lever |
+| INF-037 (cost table) | **VERIFIED; CORRECTED 2026-08-03** | every row cited from the Azure Retail Prices API for `westeurope`, re-queried 2026-08-03. The single figure ≈ $39.42/mo is **withdrawn** — it assumed ACA free grants croco calc does not get (they are per-subscription and already spent by the user's other apps) and a 0 %-active replica. Corrected total **≈ $38.4 – 48.6/mo** |
+| INF-038 (60 % headroom) | **breached, deliberately** | ≈ $38.4 – 48.6 leaves only **3 – 23 %** headroom; still under the hard $50 ceiling and user-accepted; recoverable to ≈ $30.5 – 35.6 via INF-144's sizing lever, ≈ $15.8 – 26.1 via INF-062's free-tier lever, ≈ $7.9 – 13.1 via both |
 | INF-156 (cost-table gate) | **cleared** | no row carries the italic marker; `infra.yml`'s grep made precise so INF-156's own prose cannot trip it |
 | **BL-4** (Atlas org + API keys) | **RETIRED** | user decision → no Atlas account needed at all |
 | **B6** (ACA rates from memory) | **RESOLVED** | rates now cited; residual risk is the idle-vs-active assumption, policed by INF-144 |
@@ -742,7 +742,7 @@ rule that cannot be satisfied is not a rule; a grep that does not implement the 
 | DoD-04a, DoD-07, DoD-12, DoD-13a, DoD-14 (grep wording) | **corrected** | C44 |
 | INF-043 (`:latest`) | **restated as testable** | `container_image` has no default and two `validation` blocks; `infra.yml` supplies the SHA |
 | §1 index total (**1111**) | **corrected** | revision 3 added `INF-053a` and `INF-062a`; the true total is **1113**, INF 158 → 160. Evidence: `docs/coverage/requirement-coverage.md` |
-| INF-037 total vs doc 06 range | **corrected** | doc 06 §12's range restated as the single verified figure, ≈ $39.42/mo (recoverable ≈ $16.86) |
+| INF-037 total vs doc 06 range | **corrected, then re-opened 2026-08-03** | the single figure ≈ $39.42/mo is withdrawn; doc 06 now carries a measured range ≈ $38.4 – 48.6/mo, because the ACA vCPU row genuinely is a range |
 
 Everything not in this table is binding as written.
 
@@ -1645,7 +1645,10 @@ A validation stage MUST be able to verify every line below mechanically or by di
 - [ ] **DoD-40** Response headers on `/` and on a hashed asset match INF-020 / INF-021.
 - [ ] **DoD-41** The SPA calls the backend with no CORS error (INF-012, INF-054).
 - [ ] **DoD-42** All three sign-in providers work end to end (INF-104) — **blocked on BL-1/BL-2/BL-3**.
-- [ ] **DoD-43** `az consumption budget list` shows `budget-croco-calc-monthly` at $50 (INF-143).
+- [ ] **DoD-43** `az consumption budget list --resource-group rg-croco-calc-prod` shows
+      `budget-croco-calc-monthly` at **CHF 40** with a `resourceGroups/rg-croco-calc-prod` id (INF-143). The
+      subscription bills in CHF; USD 50 ≡ CHF 40.4. A budget at *subscription* scope is wrong — it measures
+      ~11 unrelated projects, not croco calc.
 - [ ] **DoD-44** `gh api repos/lxorb/croco-calc --jq '.fork,.private,.default_branch'` → `false,false,main`;
       `git branch -r` shows exactly one remote branch.
 - [ ] **DoD-45** Actual spend checked seven days after go-live and recorded next to the INF-037 estimate.
