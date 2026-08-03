@@ -236,15 +236,20 @@ export function restart(options?: {
 }
 
 /**
- * CP-049 — the reveal and the clock start are the same event. Called only from
- * the input pipeline, only for an accepted answer symbol.
+ * CP-049 — the reveal and the clock start are the same event. Reached from two
+ * places: the input pipeline (an accepted answer symbol, where the engine has
+ * already started itself inside `press`) and the start button, which has no
+ * keystroke to feed in. `engine.begin` covers the second case and is a no-op
+ * for the first, so both paths start the clock exactly once.
  */
 export function startTest(): void {
   if (engine === undefined || !isPreStart()) return;
+  const now = performance.now();
+  engine.begin(now);
   setTestActive(true);
   TestUI.revealStream(currentViews(0));
   TestUI.updateActiveElement(0);
-  logTestEvent("taskShown", performance.now(), {
+  logTestEvent("taskShown", now, {
     taskIndex: 0,
     prompt: engine.viewAt(0)?.prompt ?? "",
   });

@@ -1,5 +1,7 @@
+import { normalizeAnswerChar } from "@croco-calc/math-engine";
+
 import * as Misc from "../utils/misc";
-import * as PageTransition from "../legacy-states/page-transition";
+import * as TestLogic from "../test/test-logic";
 import { Config } from "../config/store";
 import { showErrorNotification } from "../states/notifications";
 import { getActivePage } from "../states/core";
@@ -9,8 +11,36 @@ import { isInputElementFocused } from "../input/input-element";
 import { getResultVisible } from "../states/test";
 import { isDevEnvironment } from "../utils/env";
 
+/**
+ * Elements that legitimately own the keyboard. A click on one of these must not
+ * be yanked back to the capture textarea.
+ */
+const INTERACTIVE_SELECTOR =
+  "a, button, input, textarea, select, dialog, [contenteditable], [tabindex]:not([tabindex='-1'])";
+
+/**
+ * Clicking the page background used to strand focus on `<body>` for good: the
+ * autofocus below was the only way back, and it was gated behind
+ * `PageTransition.get()`, which starts `true` and only clears when a page
+ * change runs to completion. A stalled transition therefore left the app
+ * looking live while silently dropping every keystroke.
+ *
+ * Restoring focus on a background click removes that whole failure mode, and
+ * costs nothing when focus is already where it should be.
+ */
+document.addEventListener("pointerdown", (e) => {
+  if (getActivePage() !== "test") return;
+  if (getResultVisible()) return;
+  if (isInputElementFocused()) return;
+  if (Misc.isAnyPopupVisible()) return;
+
+  const target = e.target as HTMLElement | null;
+  if (target?.closest(INTERACTIVE_SELECTOR)) return;
+
+  focusTasks();
+});
+
 document.addEventListener("keydown", (e) => {
-  if (PageTransition.get()) return;
   if (e.key === undefined) return;
 
   if (isDevEnvironment()) {
@@ -36,6 +66,15 @@ document.addEventListener("keydown", (e) => {
     ) {
       //autofocus
       focusTasks();
+      // The keystroke that restored focus was dispatched at `<body>`, so it
+      // never reaches the textarea's own listener. Feeding it to the engine
+      // here is what stops the first digit from being silently eaten — without
+      // it, typing to start needs two presses and looks broken.
+      if (normalizeAnswerChar(e.key) !== null) {
+        e.preventDefault();
+        TestLogic.pressCharacter(e.key);
+        return;
+      }
       if (Config.showOutOfFocusWarning) {
         e.preventDefault();
       }

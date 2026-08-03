@@ -103,6 +103,12 @@ export type TestEngine = {
   /** Draw data for one task. Answers of uncommitted tasks are withheld (C29). */
   viewAt(index: number): TaskView | undefined;
 
+  /**
+   * Starts the clock without consuming a keystroke — the start button's path.
+   * Idempotent: returns `false` if the test is already active or finished, so
+   * the {@link press} path (which starts the engine itself) is unaffected.
+   */
+  begin(nowMs: number): boolean;
   /** CP-049 / CP-055: feed one keystroke. Starts the test on the first accepted one. */
   press(ch: string, nowMs: number): PressResult;
   /** CP-059: delete one symbol, or the whole answer with `whole`. Never crosses a task. */
@@ -233,6 +239,12 @@ export function createTestEngine(options: TestEngineOptions): TestEngine {
     elapsedSeconds = 0;
   }
 
+  function begin(nowMs: number): boolean {
+    if (phase !== "idle") return false;
+    start(nowMs);
+    return true;
+  }
+
   function press(ch: string, nowMs: number): PressResult {
     if (phase === "finished") return "ignored";
     // CP-055 / CP-050: only a keystroke the filter accepts may start the test,
@@ -347,6 +359,7 @@ export function createTestEngine(options: TestEngineOptions): TestEngine {
     buffer: () => buffer,
     materialised: () => tasks.length,
     viewAt,
+    begin,
     press,
     backspace,
     commit,
