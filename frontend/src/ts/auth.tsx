@@ -11,6 +11,7 @@ import {
   linkWithPopup,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
+  sendEmailVerification,
   unlink,
   updateEmail,
   updateProfile,
@@ -142,19 +143,26 @@ const authenticationMemos = Object.fromEntries(
   }),
 );
 
+/**
+ * AC-044 / C24: the backend has no mail transport. Firebase Auth sends the
+ * verification mail itself, from its own domain, and only the client SDK can
+ * trigger it; the link lands on `email-handler.html`, which applies the
+ * `verifyEmail` action code.
+ */
 export async function sendVerificationEmail(): Promise<void> {
-  if (!isAuthAvailable()) {
+  const user = getAuthenticatedUser();
+  if (!isAuthAvailable() || user === null) {
     showErrorNotification("Authentication uninitialized", { durationMs: 3000 });
     return;
   }
 
   showLoaderBar();
-  const response = await Ape.users.verificationEmail();
-  if (response.status !== 200) {
-    hideLoaderBar();
-    showErrorNotification("Failed to request verification email", { response });
+  const { error } = await tryCatch(sendEmailVerification(user));
+  hideLoaderBar();
+
+  if (error !== null) {
+    showErrorNotification("Failed to request verification email", { error });
   } else {
-    hideLoaderBar();
     showSuccessNotification("Verification email sent");
   }
 }

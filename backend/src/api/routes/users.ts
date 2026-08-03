@@ -93,11 +93,4 @@ export default s.router(usersContract, {
   getFriends: {
     handler: async (r) => callController(UserController.getFriends)(r),
   },
-  // C24: vestigial, both answer 503. See controllers/user.ts.
-  verificationEmail: {
-    handler: async (r) => callController(UserController.verificationEmail)(r),
-  },
-  forgotPasswordEmail: {
-    handler: async (r) => callController(UserController.forgotPasswordEmail)(r),
-  },
 });

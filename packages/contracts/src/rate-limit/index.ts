@@ -165,16 +165,6 @@ export const limits = {
     max: 30,
   },
 
-  userRequestVerificationEmail: {
-    window: 15 * 60 * 1000, //15 minutes
-    max: 1,
-  },
-
-  userForgotPasswordEmail: {
-    window: "minute",
-    max: 1,
-  },
-
   userRevokeAllTokens: {
     window: "hour",
     max: 10,

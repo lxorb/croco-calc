@@ -41,7 +41,6 @@ import {
   CreateUserRequest,
   DeleteCustomThemeRequest,
   EditCustomThemeRequst,
-  ForgotPasswordEmailRequest,
   GetCurrentTestActivityResponse,
   GetCustomThemesResponse,
   GetFriendsResponse,
@@ -734,42 +733,6 @@ export async function revokeAllTokens(
   await AuthUtil.revokeTokensByUid(uid);
   void addImportantLog("user_tokens_revoked", "", uid);
   return new CrocoResponse("All tokens revoked", null);
-}
-
-/**
- * C24 / INF-053 / INF-053a — croco calc has **no backend mail transport**. The
- * email client, queue, worker and templates were deleted, `nodemailer` is not a
- * dependency, and no `EMAIL_*` variables are provisioned. Verification and
- * password-reset mail is sent by **Firebase Auth from its own domain**, which
- * only the *client* SDK can trigger (`sendEmailVerification`,
- * `sendPasswordResetEmail`) — `firebase-admin` can generate an action link but
- * cannot deliver it, and returning that link over HTTP would hand anyone a
- * password reset for any address.
- *
- * These two endpoints therefore survive only in the contract. They are answered
- * with 503 ("Endpoint disabled", the sole 5xx the error middleware deliberately
- * does not log as a system fault) rather than a 200 no-op, because a silent 200
- * would make the UI report "verification email sent" when nothing was sent.
- *
- * The endpoints themselves must be deleted from `packages/contracts` (WP-03) and
- * their two callers moved to the Firebase client SDK (WP-08/WP-09) — the pattern
- * already used in `frontend/src/ts/components/modals/GoogleSignUpModal.tsx`.
- * Until then the router must stay type-complete or `createExpressEndpoints`
- * throws at boot and the whole API fails to start.
- */
-const NO_BACKEND_MAIL_MESSAGE =
-  "This endpoint is disabled: croco calc sends account email through Firebase Auth, not the backend. Please use the in-app Firebase flow.";
-
-export async function verificationEmail(
-  _req: CrocoRequest,
-): Promise<CrocoResponse> {
-  throw new CrocoError(503, NO_BACKEND_MAIL_MESSAGE);
-}
-
-export async function forgotPasswordEmail(
-  _req: CrocoRequest<undefined, ForgotPasswordEmailRequest>,
-): Promise<CrocoResponse> {
-  throw new CrocoError(503, NO_BACKEND_MAIL_MESSAGE);
 }
 
 /**

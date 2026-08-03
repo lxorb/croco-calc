@@ -1,7 +1,8 @@
 import { UserEmailSchema } from "@croco-calc/schemas/users";
+import { tryCatch } from "@croco-calc/util/trycatch";
 import { createForm } from "@tanstack/solid-form";
 
-import Ape from "../../ape";
+import { sendPasswordResetEmail } from "../../firebase";
 import { hideLoaderBar, showLoaderBar } from "../../states/loader-bar";
 import { hideModal } from "../../states/modals";
 import {
@@ -66,6 +67,13 @@ export function ForgotPasswordModal() {
   );
 }
 
+/**
+ * C24 / INF-053a: there is no backend endpoint for this — Firebase Auth sends
+ * the reset mail itself and only the client SDK can trigger it. The captcha
+ * (INF-105) therefore stays as a client-side gate only: it still has to be
+ * solved before the form submits, but nothing verifies it server-side, because
+ * no request reaches our server. Firebase applies its own abuse throttling.
+ */
 async function apply(options: {
   email: string;
   captcha: string;
@@ -77,20 +85,24 @@ async function apply(options: {
     return;
   }
 
-  showLoaderBar();
-  const result = await Ape.users.forgotPasswordEmail({
-    body: { email, captcha },
-  });
-
-  hideLoaderBar();
-  if (result.status !== 200) {
-    showErrorNotification(
-      `Failed to send password reset email: ${result.body.message}`,
-    );
+  if (captcha === undefined || captcha === "") {
+    showNoticeNotification("Please complete the captcha");
     return;
   }
 
-  showSuccessNotification(result.body.message, { durationMs: 5000 });
+  showLoaderBar();
+  const { error } = await tryCatch(sendPasswordResetEmail(email));
+  hideLoaderBar();
+
+  if (error !== null) {
+    showErrorNotification("Failed to send password reset email", { error });
+    return;
+  }
+
+  showSuccessNotification(
+    "If an account exists for that email address, a password reset link is on its way",
+    { durationMs: 5000 },
+  );
 
   hideModal("ForgotPassword");
 }

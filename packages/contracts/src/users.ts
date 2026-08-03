@@ -219,14 +219,6 @@ export const ReportUserRequestSchema = z.object({
 });
 export type ReportUserRequest = z.infer<typeof ReportUserRequestSchema>;
 
-export const ForgotPasswordEmailRequestSchema = z.object({
-  captcha: z.string(),
-  email: UserEmailSchema,
-});
-export type ForgotPasswordEmailRequest = z.infer<
-  typeof ForgotPasswordEmailRequestSchema
->;
-
 export const GetTestActivityResponseSchema = responseWithNullableData(
   CountByYearAndDaySchema,
 );
@@ -600,33 +592,6 @@ export const usersContract = c.router(
           path: "users.reporting.enabled",
           invalidMessage: "User reporting is unavailable.",
         },
-      }),
-    },
-    verificationEmail: {
-      summary: "send verification email",
-      description: "Send a verification email",
-      method: "GET",
-      path: "/verificationEmail",
-      responses: {
-        200: MonkeyResponseSchema,
-      },
-      metadata: meta({
-        authenticationOptions: { noCache: true },
-        rateLimit: "userRequestVerificationEmail",
-      }),
-    },
-    forgotPasswordEmail: {
-      summary: "send forgot password email",
-      description: "Send a forgot password email",
-      method: "POST",
-      path: "/forgotPasswordEmail",
-      body: ForgotPasswordEmailRequestSchema.strict(),
-      responses: {
-        200: MonkeyResponseSchema,
-      },
-      metadata: meta({
-        authenticationOptions: { isPublic: true },
-        rateLimit: "userForgotPasswordEmail",
       }),
     },
     revokeAllTokens: {

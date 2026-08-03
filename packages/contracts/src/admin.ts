@@ -42,15 +42,6 @@ export const RejectReportsRequestSchema = z
   .strict();
 export type RejectReportsRequest = z.infer<typeof RejectReportsRequestSchema>;
 
-export const SendForgotPasswordEmailRequestSchema = z
-  .object({
-    email: z.string().email(),
-  })
-  .strict();
-export type SendForgotPasswordEmailRequest = z.infer<
-  typeof SendForgotPasswordEmailRequestSchema
->;
-
 const c = initContract();
 export const adminContract = c.router(
   {
@@ -89,16 +80,6 @@ export const adminContract = c.router(
       method: "POST",
       path: "/report/reject",
       body: RejectReportsRequestSchema,
-      responses: {
-        200: MonkeyResponseSchema,
-      },
-    },
-    sendForgotPasswordEmail: {
-      summary: "send forgot password email",
-      description: "Send a forgot password email to the given user email",
-      method: "POST",
-      path: "/sendForgotPasswordEmail",
-      body: SendForgotPasswordEmailRequestSchema,
       responses: {
         200: MonkeyResponseSchema,
       },

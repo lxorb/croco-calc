@@ -21,6 +21,7 @@ import {
   onAuthStateChanged,
   indexedDBLocalPersistence,
   getAdditionalUserInfo,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
 } from "firebase/auth";
 import { promiseWithResolvers } from "./utils/misc";
 import { isDevEnvironment } from "./utils/env";
@@ -172,6 +173,33 @@ export async function signInWithPopup(
     setUserState(signedInUser.user);
     ignoreAuthCallback = false;
     await readyCallback?.(true, signedInUser.user);
+  }
+}
+
+/**
+ * C24 / INF-053a: croco calc has no backend mail transport. Password-reset mail
+ * is sent by Firebase Auth itself, from its own domain, and only the client SDK
+ * can trigger that send. The link lands on `email-handler.html`, which handles
+ * the `resetPassword` action code.
+ *
+ * Firebase's email-enumeration protection makes this resolve for unknown
+ * addresses too, so callers must not report whether the address exists.
+ */
+export async function sendPasswordResetEmail(email: string): Promise<void> {
+  if (Auth === undefined) throw new Error("Authentication uninitialized");
+
+  const { error } = await tryCatch(firebaseSendPasswordResetEmail(Auth, email));
+  if (error !== null) {
+    if (
+      error instanceof FirebaseError &&
+      error.code === "auth/user-not-found"
+    ) {
+      //swallowed on purpose: reporting it would confirm whether an address has
+      //an account. Firebase does the same when enumeration protection is on.
+      return;
+    }
+    console.error(error);
+    throw translateFirebaseError(error, "Failed to send password reset email");
   }
 }
 
