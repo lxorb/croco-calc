@@ -37,6 +37,10 @@ export async function fetchLatestVersion(): Promise<{
     return null;
   }
 
+  // The repository has published no release yet. Nothing to show and nothing
+  // wrong, so this stays silent — see getLatestReleaseFromGitHub.
+  if (currentVersion === null) return null;
+
   const memoryVersion = memoryLS.get();
   const isNew = memoryVersion === "" ? false : memoryVersion !== currentVersion;
 

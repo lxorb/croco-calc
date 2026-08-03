@@ -106,17 +106,20 @@ const RELEASES_API_URL =
 
 /**
  * Fetches the latest release name from GitHub.
- * @returns A promise that resolves to the latest release name.
+ *
+ * An empty feed is **not** an error: a repository that has published no release
+ * yet is a legitimate state, and croco calc is in it. Throwing on that made
+ * `fetchLatestVersion` log an ERROR on every single page load in production,
+ * which is noise that buries the failures worth reading. `null` says "there is
+ * no release", a rejection still says "the lookup failed".
+ * @returns The latest release name, or `null` if the repository has none.
  */
-export async function getLatestReleaseFromGitHub(): Promise<string> {
+export async function getLatestReleaseFromGitHub(): Promise<string | null> {
   type releaseType = { name: string };
   const releases = await cachedFetchJson<releaseType[]>(
     `${RELEASES_API_URL}?per_page=1`,
   );
-  if (releases[0]?.name === undefined) {
-    throw new Error("No release found");
-  }
-  return releases[0].name;
+  return releases[0]?.name ?? null;
 }
 
 /**
