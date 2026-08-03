@@ -150,7 +150,20 @@ export function Register(): JSXElement {
             onChangeAsync: remoteValidationForm(
               async (name: string) =>
                 Ape.users.getNameAvailability({ params: { name } }),
-              { check: (data) => data.available || "Name not available" },
+              {
+                check: (data) => data.available || "Name not available",
+                // A failure of the *availability probe* must not make signing up
+                // impossible. The default 5xx handling returns an error string,
+                // which marks the field invalid and disables the submit button
+                // (SubmitButton.tsx) — so a single 500 from
+                // `GET /users/checkName/:name` locked every visitor out of
+                // registration. `createNewUser` re-checks the name server-side
+                // and answers 409 "Username unavailable", so downgrading this to
+                // a warning gives up no correctness.
+                on5xx: (message) => ({
+                  warning: `Could not check if this name is taken (${message}). You can still try to sign up.`,
+                }),
+              },
             ),
           }}
           children={(field) => (
