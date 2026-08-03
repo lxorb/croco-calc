@@ -16,6 +16,20 @@ variable "github_repository" {
   default     = "lxorb/croco-calc"
 }
 
+variable "github_repository_immutable" {
+  description = <<-EOT
+    The same repository written with GitHub's immutable numeric ids,
+    `<owner>@<owner_id>/<repo>@<repo_id>`. GitHub now issues OIDC tokens whose
+    `sub` claim uses this form rather than the plain `owner/repo` one, so every
+    federated credential has to be registered twice — once per form. Read the
+    authoritative value from
+    `gh api repos/<owner>/<repo>/actions/oidc/customization/sub` and take the
+    `sub_claim_prefix` field, minus its leading `repo:`.
+  EOT
+  type        = string
+  default     = "lxorb@101118850/croco-calc@1320770265"
+}
+
 variable "github_environments" {
   description = <<-EOT
     GitHub deployment environments whose jobs authenticate to Azure with OIDC.

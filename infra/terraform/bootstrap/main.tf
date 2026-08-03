@@ -148,6 +148,49 @@ resource "azurerm_federated_identity_credential" "cicd_environments" {
   subject             = "repo:${var.github_repository}:environment:${each.value}"
 }
 
+# The three credentials above register the `repo:<owner>/<repo>:…` subject form.
+# That form alone is no longer enough. GitHub has moved the OIDC `sub` claim to
+# an immutable variant that embeds the numeric owner and repository ids:
+#
+#   repo:lxorb@101118850/croco-calc@1320770265:environment:prod
+#
+# and it is issued regardless of `use_immutable_subject` reading false — the
+# authoritative field is `sub_claim_prefix` on
+# `GET /repos/<owner>/<repo>/actions/oidc/customization/sub`. A credential
+# registered only against the plain form fails with AADSTS700213, which is what
+# broke the first three deploy-backend runs. Renaming the repository or transfer-
+# ring it changes the plain form but not this one, so both are kept: Entra ID
+# matches the token against every credential on the identity, and the first hit
+# wins.
+resource "azurerm_federated_identity_credential" "cicd_main_immutable" {
+  name                = "github-main-immutable"
+  resource_group_name = azurerm_resource_group.tfstate.name
+  parent_id           = azurerm_user_assigned_identity.cicd.id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = "https://token.actions.githubusercontent.com"
+  subject             = "repo:${var.github_repository_immutable}:ref:refs/heads/main"
+}
+
+resource "azurerm_federated_identity_credential" "cicd_pull_request_immutable" {
+  name                = "github-pull-request-immutable"
+  resource_group_name = azurerm_resource_group.tfstate.name
+  parent_id           = azurerm_user_assigned_identity.cicd.id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = "https://token.actions.githubusercontent.com"
+  subject             = "repo:${var.github_repository_immutable}:pull_request"
+}
+
+resource "azurerm_federated_identity_credential" "cicd_environments_immutable" {
+  for_each = toset(var.github_environments)
+
+  name                = "github-env-${each.value}-immutable"
+  resource_group_name = azurerm_resource_group.tfstate.name
+  parent_id           = azurerm_user_assigned_identity.cicd.id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = "https://token.actions.githubusercontent.com"
+  subject             = "repo:${var.github_repository_immutable}:environment:${each.value}"
+}
+
 resource "azurerm_role_assignment" "cicd_prod_contributor" {
   scope                = azurerm_resource_group.prod.id
   role_definition_name = "Contributor"
