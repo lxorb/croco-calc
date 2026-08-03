@@ -79,6 +79,27 @@ describe("config/utils.ts", () => {
       expect(result).toEqual(getDefaultConfig());
     });
 
+    it("OQ-16 - defaults to the croco theme", () => {
+      expect(defaultConfig.theme).toBe("croco");
+      expect(migrateConfig({}).theme).toBe("croco");
+    });
+
+    it("OQ-16 - renames the legacy `comfy` theme to `croco` everywhere", () => {
+      const result = migrateConfig({
+        theme: "comfy",
+        themeLight: "comfy",
+        themeDark: "comfy",
+        favThemes: ["comfy", "nord"],
+      });
+
+      // The palette survives the rename rather than being stripped as invalid
+      // and silently reset to the default.
+      expect(result.theme).toBe("croco");
+      expect(result.themeLight).toBe("croco");
+      expect(result.themeDark).toBe("croco");
+      expect(result.favThemes).toEqual(["croco", "nord"]);
+    });
+
     it("should correctly merge properties of various types", () => {
       const result = migrateConfig({
         addition: "100",

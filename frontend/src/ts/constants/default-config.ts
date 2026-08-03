@@ -12,8 +12,9 @@ import { Config, CustomThemeColors } from "@croco-calc/schemas/configs";
  * (SB-112), and so that `buildSettingsId(getDefaultConfig())` equals the frozen
  * `LEADERBOARD_SETTINGS_ID` (SB-171, SB-204).
  *
- * `theme: "serika_dark"` is monkeytype's own default, kept so the first-run
- * screen matches the reference screenshots (OQ-16, INV-082).
+ * `theme: "croco"` is croco calc's own brand default (OQ-16, INV-082): the
+ * palette upstream shipped as `comfy`, renamed for this project. Stored configs
+ * still naming `comfy` are rewritten by `config/utils.ts`.
  */
 const obj: Config = {
   // test — the eight settings-bar controls (SB-110)
@@ -58,7 +59,7 @@ const obj: Config = {
   themeDark: "serika_dark",
   randomTheme: "off",
   favThemes: [],
-  theme: "serika_dark",
+  theme: "croco",
   customTheme: false,
   customThemeColors: [
     "#323437",

@@ -38,7 +38,12 @@ const FAVICON_DIR = path.join(STATIC, "images", "favicon");
 const ICONS_DIR = path.join(STATIC, "images", "icons");
 const LOGO_DIR = path.join(STATIC, "images", "logo");
 
-/** croco calc default theme (`serika_dark` in frontend/src/ts/constants/themes.ts). */
+/**
+ * Colours the shipped icons under `frontend/static/images/` were generated with
+ * (the `serika_dark` palette in frontend/src/ts/constants/themes.ts). The
+ * default theme has since moved to `croco`; these stay pinned so a re-run
+ * reproduces the committed assets rather than silently recolouring them.
+ */
 const BG = "#323437";
 const FG = "#e2b714";
 

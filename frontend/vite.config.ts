@@ -27,8 +27,8 @@ import solidPlugin from "vite-plugin-solid";
 import devtools from "solid-devtools/vite";
 import tailwindcss from "@tailwindcss/vite";
 
-/** Default theme (`serika_dark`), used for the PWA manifest colours (INF-116). */
-const THEME_BACKGROUND = "#323437";
+/** Default theme (`croco`), used for the PWA manifest colours (INF-116). */
+const THEME_BACKGROUND = "#4a5b6e";
 
 function getFontsConfig(): string {
   return `\n${Object.keys(Fonts)
