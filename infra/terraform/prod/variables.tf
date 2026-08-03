@@ -171,7 +171,14 @@ variable "budget_amount" {
 }
 
 variable "budget_start_date" {
-  description = "First day of the budget period, RFC3339. Must be the first of a month and not in the past when first applied."
+  description = <<-EOT
+    First day of the budget period, RFC3339. Must be the first of a month.
+    2026-08-01 is the month the stack was first provisioned, so INF-143's ceiling
+    is enforced from the first billable hour rather than a month later. Azure
+    accepts a past start date as long as it falls inside the current time_grain
+    period; the budget module pins it with `ignore_changes` because the value is
+    immutable once created.
+  EOT
   type        = string
-  default     = "2026-09-01T00:00:00Z"
+  default     = "2026-08-01T00:00:00Z"
 }
