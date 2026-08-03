@@ -9,11 +9,12 @@ from) and the human actions still outstanding.
 | | |
 |---|---|
 | Frontend | Cloudflare Worker `croco-calc` (assets only) → `https://crococalc.com`, `https://www.crococalc.com` |
-| Backend | Azure Container App `ca-croco-calc-api` in `rg-croco-calc-prod`, `westeurope` |
+| Backend | Azure Container App `ca-croco-calc-api` in `rg-croco-calc-prod`, `westeurope`, **0.25 vCPU / 0.5 GiB**, min 1 / max 3 replicas |
 | Database | **Azure DocumentDB** (Azure Cosmos DB for MongoDB **vCore**) cluster `mongo-croco-calc-prod`, tier **M10**, `westeurope`, in `rg-croco-calc-prod` |
 | Secrets | Azure Key Vault `kv-crococalc-prod` |
 | Logs | Log Analytics workspace `log-croco-calc-prod` |
 | Image | `ghcr.io/lxorb/croco-calc-api`, public, pulled anonymously |
+| Budgets | `budget-croco-calc-monthly` CHF 40 on `rg-croco-calc-prod` (croco calc's ceiling) **and** `budget-azure-subscription-total` CHF 500 subscription-wide (**not** croco calc's) — see §7 Spend |
 
 ---
 
@@ -91,12 +92,17 @@ per-second meters and the hourly ones share one basis.
 | Cloudflare Workers Free, static assets | $0 — "requests to static assets are free and unlimited" and do not count against the 100,000/day Worker request allowance | <https://developers.cloudflare.com/workers/platform/pricing/> |
 | Firebase Auth, Spark plan | $0 well below 50k MAU | Firebase pricing |
 
-### Monthly total — deployed default (M10, `westeurope`)
+### Monthly total — deployed default (0.25 vCPU / 0.5 GiB, M10, `westeurope`)
+
+> **Sizing changed 2026-08-03.** The Container App was dropped from 0.5 vCPU / 1 GiB
+> to **0.25 vCPU / 0.5 GiB** (INF-144). Both ACA lines below are therefore half
+> what earlier revisions of this runbook recorded. The pre-change totals were
+> ≈ 38.4 – 48.6; they are superseded, not merely re-estimated.
 
 | Line | Arithmetic | USD/mo |
 |---|---|---|
-| Container App vCPU | 0.5 vCPU × 2,628,000 s = 1,314,000 vCPU-s, **no free grant available**. All-idle: × $0.000004. At 26 % active: 0.26 × $0.000034 + 0.74 × $0.000004 | **5.26 – 15.51** |
-| Container App memory | 1 GiB × 2,628,000 s = 2,628,000 GiB-s, no free grant. Idle and active memory rates are **identical**, so this line does not move with load | **10.51** |
+| Container App vCPU | **0.25 vCPU** × 2,628,000 s = 657,000 vCPU-s, **no free grant available**. All-idle: × $0.000004. At 26 % active: 0.26 × $0.000034 + 0.74 × $0.000004 | **2.63 – 7.75** |
+| Container App memory | **0.5 GiB** × 2,628,000 s = 1,314,000 GiB-s, no free grant. Idle and active memory rates are **identical**, so this line does not move with load | **5.26** |
 | Container App requests | far below the 2M free grant; probes are not billable | 0 |
 | Container Apps environment | Consumption profile — verified `workloadProfiles: null`; the plan-management fee applies only to Dedicated profiles | 0 |
 | Log Analytics ingestion | **measured 0 MB billable**; subscription-wide ingestion also cost CHF 0.00 in July. Bounded by the 0.2 GB/day cap = 6.2 GB × $2.99 | 0 – 18.54 |
@@ -112,10 +118,12 @@ per-second meters and the hourly ones share one basis.
 | Container registry | public ghcr.io image, no ACR provisioned | 0 |
 | Cloudflare Workers | free plan, assets only | 0 |
 | Firebase Auth | Spark | 0 |
-| Budget + alerts | `azurerm_consumption_budget_resource_group`, scoped to `rg-croco-calc-prod` | 0 |
-| **Total, all-idle** | | **≈ 38.4**  (CHF 31.0) |
-| **Total, at the measured 26 % active share** | | **≈ 48.6**  (CHF 39.3) |
-| **Total, pathological 100 % active** | | **≈ 77.8**  (CHF 62.9) — **breaches** |
+| Budget + alerts | `azurerm_consumption_budget_resource_group`, scoped to `rg-croco-calc-prod` (CHF 40) | 0 |
+| Subscription budget + alerts | `azurerm_consumption_budget_subscription` (CHF 500) — **not croco calc's**, and outside this resource group anyway | 0 |
+| **Total, all-idle** | | **≈ 30.5**  (CHF 24.6) |
+| **Total, at the measured 26 % active share** | | **≈ 35.6**  (CHF 28.8) |
+| **Total, pathological 100 % active, still 1 replica** | | **≈ 50.2**  (CHF 40.5) — **still breaches, but only just** |
+| **Total, 3 replicas sustained at the active rate** | | **≈ 105**  (CHF 85) — the real tail risk; see the scale-out note |
 
 ### 1a. Currency ruling (2026-08-03)
 
@@ -133,15 +141,22 @@ Therefore **USD 50 ≡ CHF 40.4**, and `budget_amount` is **40** (rounded down, 
 a ceiling errs strict). The previous `budget_amount = 50` was read as CHF 50 =
 **USD 61.9** and silently permitted ~24 % more than the brief allows.
 
-Expect the budget's **50 % notification to fire every month** and the 80 % one
-to fire often: expected spend is CHF 31–39 against a CHF 40 budget. That is
-correct signalling — the stack really does run near the ceiling. Fix it with the
-sizing lever below, not by raising the budget.
+**Updated 2026-08-03, after the sizing lever was applied.** Expected spend is now
+**CHF 24.6 – 28.8 against the CHF 40 budget, i.e. 62 – 72 %**:
+
+* the **50 % notification will still fire every month** — 62 % clears it even in
+  the all-idle case. Expected, not a fault;
+* the **80 % notification should now stay quiet.** It was previously likely to
+  fire. If it fires, treat it as real signal: something is beyond projection;
+* **never raise `budget_amount` to silence an alert.** It is a translation of the
+  brief's hard ceiling, not a tuning knob. The remaining lever is INF-062's
+  free-tier database move.
 
 ### Monthly total — free-tier cost lever (INF-062)
 
 Subtracting the two database lines ($18.18 + $4.38 = $22.56) gives
-**≈ 15.8 – 26.1/mo** (CHF 12.8 – 21.1). Taking the lever is two lines in
+**≈ 7.9 – 13.0/mo** (CHF 6.4 – 10.5). This is now **the only cost lever left** —
+the sizing lever was spent on 2026-08-03. Taking it is two lines in
 `infra/terraform/prod/terraform.tfvars`:
 
 ```hcl
@@ -163,26 +178,26 @@ adding cross-region latency to every query and to every leaderboard aggregation.
 **Also: a free-tier cluster is paused after 60 days of inactivity**, which is a
 real hazard for a low-traffic app and is not something the paid tier does.
 
-### ⚠ Headroom: thinner than previously documented
+### Headroom: the sizing lever has been applied
 
-At **≈ $38.4 – 48.6/mo** the stack leaves **3 – 23 %** headroom under the brief's
-hard **$50** ceiling — not the ~20 – 27 % recorded on 2026-08-02, and a long way
-from the 60 % (≤ $20) INF-038 originally asked for. This is a user-accepted
-trade: the user asked for MongoDB on Azure "even though this will result in some
-costs". It stays under the ceiling that actually binds (INF-004), and INF-143's
-budget now measures croco calc alone, so its alerts are meaningful for the first
-time.
+At **≈ $30.5 – 35.6/mo (CHF 24.6 – 28.8)** the stack leaves **29 – 39 %** headroom
+under the brief's hard **$50** ceiling. That is the current expectation, replacing
+the 3 – 23 % that stood before 2026-08-03.
 
-**Apply the INF-144 sizing lever now rather than conditionally.** Measurement
-makes it close to free — see the table below. It is the difference between 3 %
-and 29 % headroom.
+It is still short of the 60 % (≤ $20) INF-038 originally asked for, and that is a
+user-accepted trade: the user asked for MongoDB on Azure "even though this will
+result in some costs". The database is **74 % of the whole bill** ($22.56 of
+$30.5), so the 60 % rule is simply unreachable while it stays.
 
-| Lever | USD/mo | vs $50 ceiling |
-|---|---|---|
-| none (deployed default) | 38.4 – 48.6 | 3 – 23 % headroom |
-| **0.25 vCPU / 0.5 GiB** (INF-144) | **30.5 – 35.6** | **29 – 39 % headroom** |
-| DocumentDB free tier (INF-062) | 15.8 – 26.1 | 48 – 68 % headroom |
-| both | 7.9 – 13.1 | 74 – 84 % headroom |
+| Lever | USD/mo | CHF/mo | vs $50 ceiling |
+|---|---|---|---|
+| ~~none — 0.5 vCPU / 1 GiB~~ (superseded) | ~~38.4 – 48.6~~ | ~~31.0 – 39.3~~ | ~~3 – 23 %~~ |
+| **0.25 vCPU / 0.5 GiB (INF-144) — APPLIED 2026-08-03** | **30.5 – 35.6** | **24.6 – 28.8** | **29 – 39 % headroom** |
+| \+ DocumentDB free tier (INF-062), not applied | 7.9 – 13.0 | 6.4 – 10.5 | 74 – 84 % headroom |
+
+**Every figure above is a projection, not an invoice.** They come from Azure list
+prices and a 26 % active share borrowed from the user's other Container Apps. No
+croco calc bill has been observed yet — see the seven-day spend check below.
 
 ### Idle eligibility, resolved (2026-08-03)
 
@@ -202,37 +217,58 @@ What was actually measured on `ca-croco-calc-api`:
 | `minReplicas` / `maxReplicas` | 1 / 3, revision sitting at 1 | eligible for idle billing |
 | `UsageNanoCores`, settled window 08:45 UTC | avg **0.0050 vCPU**, max 0.0115 vCPU | average is **half** the 0.01 threshold |
 | `Requests`, `RxBytes` after startup | **0** and **0 B/s** | far under the 1,000 B/s threshold |
-| `WorkingSetBytes` | **~102 MiB** of 1 GiB allocated | 10 % of the allocation |
+| `WorkingSetBytes` | **~99 MiB** steady state | was 10 % of 1 GiB; now **19 % of the 0.5 GiB** allocated |
 | Active share billed on this subscription's *other* ACA apps, July 2026 | **26 %** | the honest upper anchor |
+
+**The 0.01 vCPU threshold is absolute, not a fraction of the allocation** — the
+billing doc says "the replica is using less than 0.01 vCPU cores". So halving the
+container did **not** make idle eligibility harder to reach; the measured
+0.0050 vCPU still sits at half the threshold. This was checked, not assumed: the
+opposite reading would have moved the whole vCPU line to the active rate and
+cancelled the saving.
 
 **Ruling: the idle rate applies most of the time, but 0 % active is not
 credible.** The backend runs four in-process cron jobs — `update-leaderboards`
 fires **4×/hour** (`30 14/15 * * * *`) — plus MongoDB heartbeats, and the
 measured CPU maximum already crosses the threshold at 0.0115 vCPU. The user's
-own comparable Container Apps (same 0.5 vCPU / 1 GiB shape) bill 26 % active, so
-that is the figure the upper bound uses.
+own comparable Container Apps bill 26 % active. Those apps are 0.5 vCPU / 1 GiB —
+the shape croco calc used to have — but what is borrowed is the *share*, which is
+dimensionless and survives the resize.
 
 Note the 8.5× active-vs-idle multiplier applies to the **vCPU meter only**. The
 memory meter charges $0.000004/GiB-s in *both* states, so the Container App line
-varies by 3.5× and the stack total by only ~1.3×:
+varies by 3.5× (unchanged by the resize — that ratio is scale-invariant) and the
+stack total by only ~1.17× across the quoted range:
 
 | Fraction of seconds billed active | vCPU line | Total (M10 default) | Total (free-tier lever) |
 |---|---|---|---|
-| 0 % | $5.26 | ≈ 38.4 | ≈ 15.8 |
-| 5 % | $7.23 | ≈ 40.3 | ≈ 17.8 |
-| **26 % (measured on comparable apps)** | **$15.51** | **≈ 48.6 — 97 % of the ceiling** | ≈ 26.1 |
-| 100 % | $44.68 | ≈ 77.8 — **BREACHES $50** | ≈ 55.2 |
+| 0 % | $2.63 | ≈ 30.5 | ≈ 7.9 |
+| 5 % | $3.61 | ≈ 31.5 | ≈ 8.9 |
+| **26 % (measured on comparable apps)** | **$7.75** | **≈ 35.6 — 71 % of the ceiling** | ≈ 13.0 |
+| 100 % | $22.34 | ≈ 50.2 — **still breaches $50, but only just** | ≈ 27.6 |
+
+That last row is the quiet win from the resize: at the old sizing, 100 % active
+meant ≈ $77.8, a 56 % overshoot. Now the pathological single-replica case lands
+within rounding distance of the ceiling.
 
 **The residual risk is no longer idle-vs-active — it is scaling.** When a
 revision runs *above* its minimum replica count, **every** replica bills at the
 active rate, so a sustained traffic spike multiplies the vCPU line by up to 3
-(`maxReplicas = 3`) *and* moves it to the active rate. Treat any sustained
-scale-out as a budget event.
+(`maxReplicas = 3`) *and* moves it to the active rate: ≈ **$105/mo (CHF 85)**.
+Treat any sustained scale-out as a budget event.
 
-**Therefore:** INF-144's seven-day spend check is not optional, and the sizing
-lever (0.25 vCPU / 0.5 GiB via `container_cpu` / `container_memory` in
-`infra/terraform/prod/terraform.tfvars`) should be applied now — at 0.0050 vCPU
-and 102 MiB measured, 0.25/0.5 still leaves ~50× CPU and ~5× memory headroom.
+**On the scale rule after the resize (re-examined 2026-08-03, deliberately left
+alone).** A smaller container might be expected to scale out sooner, which would
+partly offset the saving. It does not, and the threshold was **not** changed:
+two 0.25 vCPU replicas bill exactly what one 0.5 vCPU replica billed, so
+scale-out is cost-neutral per unit of load; the saving comes from the always-on
+*minimum* replica, which is unchanged at 1 and now half the size. With measured
+traffic of **0 requests** there is also nothing to tune against.
+`maxReplicas = 3` stays because it bounds the tail above — raising it to
+compensate for smaller replicas would raise the worst case against a hard limit.
+The one open question is whether a 0.25 vCPU replica really serves 50 concurrent
+requests at acceptable latency; that is unproven and would show up as latency,
+not cost. Re-measure it if real traffic ever arrives.
 
 ---
 
@@ -408,6 +444,18 @@ terraform init
 terraform apply          # local state, run once, keep the state file
 ```
 
+`bootstrap` also owns **`budget-azure-subscription-total`** (INF-143a, CHF 500,
+subscription-wide). That is deliberate and is explained in §7 Spend: it is not
+croco calc's budget, so it must not sit in `prod/` where a `terraform destroy`
+of croco calc would delete it. It carries `prevent_destroy = true`, so
+`terraform destroy` **in this directory** will fail on it by design — lift the
+flag in a commit if the removal is actually intended.
+
+> **Keep the bootstrap state file.** It is local and gitignored (INF-072). Losing
+> it does not break anything already created — the subscription budget keeps
+> alerting — but the resources become unmanaged and a re-apply would need
+> `terraform import`.
+
 ### Why `bootstrap` issues four federated credentials, not two
 
 INF-085 names two subjects, `…:ref:refs/heads/main` and `…:pull_request`. Those
@@ -439,7 +487,7 @@ reach:
 | `Storage Blob Data Contributor` | `stcrococalctfstate` | INF-077 — remote state and backups |
 | `Key Vault Secrets Officer` | `kv-crococalc-prod` | INF-085 — granted by the `prod` module itself |
 | `Role Based Access Control Administrator` | `rg-croco-calc-prod` | `Contributor` explicitly **denies** `Microsoft.Authorization/roleAssignments/write`, but the key-vault module creates three role assignments (INF-083, INF-084). Without this, every apply fails there |
-| `Cost Management Contributor` | `/subscriptions/<id>` | INF-143's budget was an `azurerm_consumption_budget_subscription`. Since 2026-08-03 it is an `azurerm_consumption_budget_resource_group`, so this assignment **could now be narrowed to `rg-croco-calc-prod`**; it is left at subscription scope only because nothing has re-tested the CI identity against the tighter grant |
+| `Cost Management Contributor` | `/subscriptions/<id>` | Originally for INF-143's budget when it was an `azurerm_consumption_budget_subscription`. Since 2026-08-03 that budget is resource-group-scoped, and INF-143a's new subscription budget is applied by the **operator** from `bootstrap/`, not by CI — so CI does not strictly need this for either budget. It is retained deliberately: it is the least-privilege built-in for the cost APIs, grants no access to any other resource, and INF-144's spend check queries `Microsoft.CostManagement`, which the resource-group Contributor role does not cover |
 | `Reader` | `id-croco-calc-cicd` | `prod/main.tf` reads the identity with a data source; it lives in `rg-croco-calc-tfstate`, where CI otherwise holds only a *data-plane* storage role |
 
 `prod/providers.tf` also sets `resource_provider_registrations = "none"`: the CI
@@ -603,12 +651,34 @@ zero replicas for 5 minutes.
 
 ### Spend
 
-The budget is scoped to the **resource group**, and so must every spend check
-be — a subscription-wide query reports ~11 unrelated projects of the user's
+**There are two budgets and they measure different things. Do not confuse them.**
+
+| Budget | Scope | Amount | Notifications | Whose is it |
+|---|---|---|---|---|
+| `budget-croco-calc-monthly` | `rg-croco-calc-prod` | **CHF 40** (= USD 50, §1a) | Actual 50 / 80 / 100 %, Forecasted 100 % | **croco calc's.** This is the brief's ceiling. |
+| `budget-azure-subscription-total` | whole subscription | **CHF 500** | **Actual 80 / 100 % only — no Forecasted** | **NOT croco calc's.** A runaway detector for the user's ~11 other projects, which had no monitoring at all before 2026-08-03. |
+
+Notes that matter when reading an alert:
+
+* the CHF 500 one firing says **nothing** about croco calc. Check which budget
+  the email names before touching this stack;
+* it has **no Forecasted notification on purpose**. A forecast alert on the old
+  subscription-scoped budget is what produced the false "forecasted to reach
+  CHF 331.27" alarm on 2026-08-03. Do not add one back;
+* it is declared in **`infra/terraform/bootstrap/`**, not `prod/`, so that a
+  `terraform destroy` of croco calc cannot delete the user's subscription-wide
+  guard. It also carries `prevent_destroy = true`. Bootstrap uses local,
+  gitignored state, so it is applied by hand by the operator, not by CI.
+
+Croco calc's own budget is scoped to the **resource group**, and so must every
+spend check be — a subscription-wide query reports the ~11 unrelated projects
 (CHF 358.80 in July 2026) and tells you nothing about croco calc.
 
 ```bash
-# the budget itself, and what it has counted so far
+# both budgets, and what each has counted so far
+az consumption budget list
+
+# croco calc's budget alone
 az consumption budget list --resource-group rg-croco-calc-prod
 
 # croco calc's actual month-to-date spend, broken down
@@ -622,7 +692,12 @@ Results are in **CHF**. Compare against CHF 40, not USD 50 — see §1a.
 simply because its resources were created that morning at 08:10–08:21 UTC.
 
 INF-144: do this seven days after go-live and record the real figure against
-section 1.
+section 1. **Still outstanding as of 2026-08-03** — nothing in section 1 has been
+checked against a real invoice yet.
+
+If the run rate projects **above CHF 30/mo (≈ USD 37)**, materially above the
+CHF 24.6 – 28.8 section 1 predicts, the projection is wrong. The sizing lever is
+already spent, so the remaining response is INF-062's free-tier database move.
 
 ---
 
@@ -683,7 +758,7 @@ by the same `terraform apply` as the rest of the stack. **Status: not yet run**
 | 7 | Run `infra/terraform/bootstrap` once, locally, with an operator identity, **then set `AZURE_CLIENT_ID`** from its output: `gh secret set AZURE_CLIENT_ID --body "$(terraform output -raw cicd_client_id)"`. As of 2026-08-03 no croco-calc resource exists in the subscription, so the `id-croco-calc-cicd` identity that OIDC authenticates as does not exist either — this is the single blocker for `azure/login` in `deploy-backend`, `infra` and `backup-db` | everything Azure: the backend deploy, `infra` apply, the weekly backup |
 | 8 | **Enable Cloudflare Email Routing** on `crococalc.com` (dashboard → Email → Email Routing is simplest; the API token lacks the scope), add `contact@` and `support@` forwarding to `me@emilvinu.de`, and **click the destination-verification link** Cloudflare mails there. The user has taken this on. The zone holds **zero DNS records** (re-verified 2026-08-02), so Cloudflare's MX/SPF land in a clean zone with nothing to conflict against. Sending needs nothing: Firebase Auth sends all user-facing mail from its own domain | `contact@crococalc.com` and `support@crococalc.com` delivering anything |
 | 9 | Add `croco-calc.<account>.workers.dev` to Firebase authorised domains **only if** sign-in is to be tested on the workers.dev URL. The five custom-domain entries are already in place | workers.dev sign-in testing |
-| 10 | Seven days after go-live, check actual spend **scoped to `rg-croco-calc-prod`** and record it against section 1 (INF-144). **Mandatory, not advisory** — the M10 default leaves only 3–23 % headroom under the $50 ceiling, so this is the control that catches a breach. Apply the 0.25 vCPU / 0.5 GiB sizing lever first; measurement says it is nearly free | the credibility of the whole cost model |
+| 10 | Seven days after go-live, check actual spend **scoped to `rg-croco-calc-prod`** and record it against section 1 (INF-144). **Mandatory, not advisory** — section 1 is entirely projection and no croco calc invoice has been seen yet. The 0.25 vCPU / 0.5 GiB sizing lever was applied 2026-08-03 and lifted headroom to 29–39 %, so the check is no longer a breach-watch but a validation of the model. If it lands above CHF 30/mo, the model is wrong and INF-062's free-tier lever is what is left | the credibility of the whole cost model |
 
 Already done and verified (see `docs/infra-domain.md`): the `crococalc.com` zone
 is active, Firebase authorised domains include `crococalc.com` and
