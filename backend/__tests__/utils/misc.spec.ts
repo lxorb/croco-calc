@@ -44,56 +44,6 @@ describe("Misc Utils", () => {
     );
   });
 
-  describe("kogascore", () => {
-    const testCases = [
-      {
-        wpm: 214.8,
-        acc: 93.04,
-        timestamp: 1653586489000,
-        expectedScore: 1214800930423111,
-      },
-      {
-        wpm: 214.8,
-        acc: 93.04,
-        timestamp: 1653601763000,
-        expectedScore: 1214800930407837,
-      },
-      {
-        wpm: 199.37,
-        acc: 97.69,
-        timestamp: 1653588809000,
-        expectedScore: 1199370976920791,
-      },
-      {
-        wpm: 196.2,
-        acc: 96.07,
-        timestamp: 1653591901000,
-        expectedScore: 1196200960717699,
-      },
-      {
-        wpm: 196.205,
-        acc: 96.075,
-        timestamp: 1653591901000,
-        expectedScore: 1196210960817699,
-      },
-      {
-        // this one is particularly important - in JS 154.39 * 100 is equal to 15438.999999999998
-        // thanks floating point errors!
-        wpm: 154.39,
-        acc: 96.14,
-        timestamp: 1740333827000,
-        expectedScore: 1154390961421373,
-      },
-    ];
-
-    it.each(testCases)(
-      "kogascore with wpm:$wpm, acc:$acc, timestamp:$timestamp = $expectedScore",
-      ({ wpm, acc, timestamp, expectedScore }) => {
-        expect(Misc.kogascore(wpm, acc, timestamp)).toBe(expectedScore);
-      },
-    );
-  });
-
   describe("identity", () => {
     const testCases = [
       {

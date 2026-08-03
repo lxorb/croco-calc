@@ -274,7 +274,7 @@ describe("result controller test", () => {
     const userGetMock = vi.spyOn(UserDal, "getUser");
     const userCheckIfPbMock = vi.spyOn(UserDal, "checkIfPb");
     const userIncrementXpMock = vi.spyOn(UserDal, "incrementXp");
-    const userUpdateTypingStatsMock = vi.spyOn(UserDal, "updateTypingStats");
+    const userUpdateSolveStatsMock = vi.spyOn(UserDal, "updateSolveStats");
     const resultAddMock = vi.spyOn(ResultDal, "addResult");
     const publicUpdateStatsMock = vi.spyOn(PublicDal, "updateStats");
 
@@ -286,7 +286,7 @@ describe("result controller test", () => {
         userGetMock,
         userCheckIfPbMock,
         userIncrementXpMock,
-        userUpdateTypingStatsMock,
+        userUpdateSolveStatsMock,
         resultAddMock,
         publicUpdateStatsMock,
       ].forEach((it) => it.mockClear());

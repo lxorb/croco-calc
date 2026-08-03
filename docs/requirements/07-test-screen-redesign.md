@@ -839,6 +839,31 @@ Every path below was verified to exist in the working tree at the time of writin
 > what was removed and why, which is the same obligation C44 imposes on the struck-config comments (TR-218).
 > §14's typography requirements (`TR-263 … TR-335`) are the part of this document still being implemented.
 
+> **Revision 3 — the repo-wide typing purge, added 2026-08-03.** §9 above is scoped to the test screen. A
+> separate sweep of the whole repo for surviving typing concepts found the frontend already clean: DoD-07,
+> DoD-13 and all three TR-254 greps return nothing but the CP-147 monkeytype attribution, `knip` reports no
+> orphans, and every `caret` hit in `frontend/src` is either a `ph:caret-*` chevron icon, the CSS
+> `caret-color` property, or the `--caret-color` custom property TR-020 deliberately keeps. Four items did
+> survive, all outside the test screen, and are recorded here as **TR-336 … TR-339**:
+>
+> | # | path | what went, and why |
+> |---|---|---|
+> | **TR-336** | `backend/src/utils/misc.ts`, `backend/__tests__/utils/misc.spec.ts` | `kogascore(wpm, acc, timestamp)` and its six-case spec. monkeytype packed rank ordering into one integer because its sorted set had a single dimension; `DailyLeaderboard`'s `RANK_SORT` sorts on three Mongo keys instead and has done since the port, so the helper had **no caller** — dead code whose leading term was a typing metric. The comment in `backend/src/utils/daily-leaderboards.ts` that records the encoding's removal is extended to record the helper's, per C44. |
+> | **TR-337** | `backend/src/dal/user.ts`, `backend/src/api/controllers/result.ts`, `backend/__tests__/api/controllers/result.spec.ts` | `updateTypingStats` → `updateSolveStats`. AC-013 / AC-014 already renamed the schema (`SolveStatsSchema`), the field (`timeTyping` → `timeSpent`) and the wire key (`typingStats` → `testStats`); the DAL function was the last **live identifier** in the backend still calling solving "typing". |
+> | **TR-338** | `backend/__tests__/__integration__/__migration__/testActivity.spec.ts` | The `createResult` fixture built a **monkeytype** result — `wpm`, `rawWpm`, `charStats`, `keyConsistency`, second-based `mode2: "60"` — and smuggled it past the type checker with `as unknown as DBResult`. None of those fields exist on `DBResult`; the cast was the only thing keeping them alive. Replaced with a real croco calc result and the cast dropped, so the shape is now type-checked and cannot drift back. |
+> | **TR-339** | `packages/schemas/__tests__/config.spec.ts` | The `// caret (restored by master C11)` group divider in `EXPECTED_CONFIG_KEYS`. TR-206 / TR-207 deleted the equivalent dividers from `commandline-metadata.ts` and `lists.ts`; this one was missed. It is **not** C44 audit trail — it is a section header for a group that no longer exists, asserting the keys were *restored*, which is now false. The removal is recorded by the TR-203 case immediately below it. |
+>
+> Deliberately **kept**, and why: the monkeytype attribution in LICENSE / NOTICE / `AboutPage.tsx` /
+> `Footer.tsx` / `MONKEYTYPE_REPO_URL` (legal and courtesy, and removing the code does not remove the licence
+> obligation); every `monkeytype …` provenance comment, which is what makes a divergence auditable; the C44
+> comment inventories in `commandline/lists.ts` and `types.ts` (TR-218); the guard specs that assert typing
+> vocabulary is *absent* (`packages/math-engine/__tests__/api.spec.ts`, `metrics.spec.ts`, `themes.spec.ts`'s
+> `C30_REMOVED_SELECTORS`, `frontend/__tests__/utils/config.spec.ts`'s strip case) — these enforce the purge,
+> so deleting them would undo it; the `showAverage === "wpm"` migration in `config/utils.ts`, which reads a
+> stored monkeytype-era *value* and is what stops a real user's setting being silently reset; `keystroke`,
+> which in a math trainer names a physical key press and has no typing-test meaning; and `--caret-color` /
+> `ph:caret-*` / `caret-color`, per TR-020.
+
 ### 9.1 Files deleted outright
 
 | # | path | lines | what it is | why it goes |
@@ -1121,6 +1146,16 @@ individually reversible.
   `body: PartialConfigSchema.strict()` to non-strict, permanently. The frontend already `.strip()`s on read,
   so write-side strictness protects nothing and breaks every future key removal the same way. *This is a
   WP-03 / WP-11 change and needs an owner ruling before the deploy, not before the code.*
+  > **RESOLVED (revision 3, the typing purge).** Implemented as recommended, but the first attempt did not
+  > work and the reason is worth recording. `.strict()` was dropped from the contract and the body left as
+  > bare `body: PartialConfigSchema` — which is **still strict**, because `ConfigSchema` is `.strict()` and
+  > zod's `.partial()` carries `unknownKeys` through to the derived schema. The code read as relaxed and
+  > behaved as strict, with a long comment asserting the former. The fix is the **explicit**
+  > `body: PartialConfigSchema.strip()`. Guarded by `packages/contracts/__test__/configs.spec.ts`, which
+  > fails on 19 cases if the `.strip()` is dropped, and by the rewritten
+  > `backend/__tests__/api/controllers/config.spec.ts` case, which additionally asserts the stripped key never
+  > reaches `ConfigDAL.saveConfig` — otherwise the dotted `$set` would persist it in Mongo forever.
+  > `ConfigSchema` itself stays `.strict()`: this relaxes the wire, not the model.
 - **TR-261** **Renaming the theme custom properties.** *Ambiguity:* C30 froze the 52 theme files to two edit
   classes, and `--correct-letter-color` is in `frontend/static`, which no DoD grep covers. *Decision:*
   **rename** (TR-019, TR-186). *Why:* the user's instruction to purge typing vocabulary is explicit and a

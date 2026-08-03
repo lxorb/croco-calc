@@ -22,7 +22,6 @@ const EXPECTED_CONFIG_KEYS = [
   "quickRestart",
   "resultSaving",
   "singleListCommandLine",
-  // caret (restored by master C11)
   // appearance
   "timerStyle",
   "liveSpeedStyle",

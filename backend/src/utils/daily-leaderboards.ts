@@ -56,7 +56,9 @@ export const getDailyLeaderboardCollection =
  * Ties break on accuracy and then on who got there first. monkeytype packed the
  * same ordering into a single `kogascore` integer because the sorted set it used
  * has only one dimension; MongoDB can sort on three keys directly, so the
- * encoding is dropped.
+ * encoding is dropped. The `kogascore(wpm, acc, timestamp)` helper that produced
+ * it is deleted too — it outlived its only caller and its leading term was a
+ * typing metric this project does not have.
  */
 const RANK_SORT = { score: -1, acc: -1, timestamp: 1 } as const;
 

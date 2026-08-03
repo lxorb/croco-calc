@@ -288,7 +288,7 @@ export async function addResult(
   const afk = completedEvent.afkDuration;
   const totalDurationSolvedSeconds =
     completedEvent.testDuration + completedEvent.incompleteTestSeconds - afk;
-  void UserDAL.updateTypingStats(
+  void UserDAL.updateSolveStats(
     uid,
     completedEvent.restartCount,
     totalDurationSolvedSeconds,
@@ -492,7 +492,7 @@ function assertSettingsConsistent(completedEvent: CompletedEvent): void {
  *    over-long idle makes the base negative, then the total negative, and
  *    AC-034 turns that into a **500**. A client would be able to make the
  *    server report an internal error at will;
- *  * `totalDurationSolvedSeconds` feeds `updateTypingStats` and
+ *  * `totalDurationSolvedSeconds` feeds `updateSolveStats` and
  *    `PublicDAL.updateStats`, so a negative value would run the user's and the
  *    site's lifetime training time *backwards* — silently, and permanently.
  *

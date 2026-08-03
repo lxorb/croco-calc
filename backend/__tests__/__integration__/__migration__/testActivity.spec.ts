@@ -1,4 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { ObjectId } from "mongodb";
+import {
+  buildSettingsId,
+  type MathGeneratorSettings,
+} from "@croco-calc/schemas/math";
 import * as Migration from "../../../__migration__/testActivity";
 import * as UserTestData from "../../__testData__/users";
 import * as UserDal from "../../../src/dal/user";
@@ -57,19 +62,49 @@ describe("testActivity migration", () => {
   });
 });
 
+const SETTINGS: MathGeneratorSettings = {
+  addition: "1000",
+  multiplication: "100",
+  division: "threeByTwo",
+  fractionAddition: "99",
+  fractionMultiplication: true,
+  decimals: true,
+  negatives: true,
+};
+
+/**
+ * A minimal but *real* croco calc result.
+ *
+ * This fixture used to be a monkeytype one — `wpm`, `rawWpm`, `charStats`,
+ * `keyConsistency`, and a second-based `mode2: "60"` — smuggled past the type
+ * checker with `as unknown as DBResult`. None of those fields exist on
+ * `DBResult` any more, so the cast was the only thing keeping the last typing
+ * metrics in the backend alive. Dropping the cast is the point: the shape is now
+ * checked, so it cannot drift back.
+ *
+ * The migration only reads `timestamp`, so every other value is arbitrary — but
+ * it has to be arbitrary *and valid*.
+ */
 async function createResult(uid: string, timestamp: number): Promise<void> {
-  await ResultDal.addResult(uid, {
-    wpm: 0,
-    rawWpm: 0,
-    charStats: [1, 2, 3, 4],
-    acc: 0,
-    mode: "time",
-    mode2: "60",
-    timestamp: timestamp,
-    testDuration: 1,
-    consistency: 0,
-    keyConsistency: 0,
-    chartData: "toolong",
+  const result: DBResult = {
+    _id: new ObjectId(),
+    uid,
     name: "",
-  } as unknown as DBResult);
+    score: 0,
+    correct: 0,
+    wrong: 0,
+    acc: 0,
+    tpm: 0,
+    spm: 0,
+    consistency: 0,
+    mode: "time",
+    mode2: "8",
+    timestamp,
+    testDuration: 1,
+    chartData: "toolong",
+    settings: SETTINGS,
+    settingsId: buildSettingsId(SETTINGS),
+  };
+
+  await ResultDal.addResult(uid, result);
 }

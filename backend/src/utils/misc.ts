@@ -1,4 +1,3 @@
-import { MILLISECONDS_IN_DAY } from "@croco-calc/util/date-and-time";
 import { roundTo2 } from "@croco-calc/util/numbers";
 export { sanitizeString } from "@croco-calc/util/strings";
 import uaparser from "ua-parser-js";
@@ -73,25 +72,6 @@ export function matchesAPattern(text: string, pattern: string): boolean {
  */
 export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-export function kogascore(wpm: number, acc: number, timestamp: number): number {
-  // its safe to round after multiplying by 100 (99.99 * 100 rounded will be 9999 not 100)
-  // rounding is necessary to protect against floating point errors
-  const normalizedWpm = Math.round(wpm * 100);
-  const normalizedAcc = Math.round(acc * 100);
-
-  const padAmount = 100000;
-  const firstPart = (padAmount + normalizedWpm) * padAmount;
-  const secondPart = (firstPart + normalizedAcc) * padAmount;
-
-  const currentDayTimeMilliseconds =
-    timestamp - (timestamp % MILLISECONDS_IN_DAY);
-  const todayMilliseconds = timestamp - currentDayTimeMilliseconds;
-
-  return (
-    secondPart + Math.floor((MILLISECONDS_IN_DAY - todayMilliseconds) / 1000)
-  );
 }
 
 export function flattenObjectDeep(

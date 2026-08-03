@@ -26,8 +26,13 @@ import { clearTimeouts } from "../utils/misc";
 
 export const [getResultVisible, setResultVisible] = createSignal(false);
 /**
- * True from the first line of `TestLogic.finish()` until the result is built,
- * so it covers the stream fade-out that `getResultVisible()` is still false during.
+ * True from the first line of `TestLogic.finish()` until the result is built.
+ *
+ * It covers the window between the arena reaching `finished` and the results
+ * screen appearing, during which `getResultVisible()` is still false — the gap
+ * `route-controller` treats as "page busy, do not navigate". (Pre-doc-07 this
+ * gap was described as the task stream's fade-out; the stream is gone, the gap
+ * is not.)
  */
 export const [isResultCalculating, setResultCalculating] = createSignal(false);
 export const [getFocus, setFocus] = createSignal(false);

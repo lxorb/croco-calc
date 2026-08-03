@@ -390,7 +390,13 @@ export async function updateLastHashes(
   );
 }
 
-export async function updateTypingStats(
+/**
+ * AC-013 / AC-014 — the lifetime counters behind `SolveStatsSchema`. This was
+ * `updateTypingStats`; the schema and the `testStats` wire key shed the typing
+ * vocabulary but the DAL function kept it, which is the last live identifier in
+ * the backend that still called solving "typing".
+ */
+export async function updateSolveStats(
   uid: string,
   restartCount: number,
   timeSpent: number,
