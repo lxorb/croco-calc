@@ -43,7 +43,7 @@ export function Logo(): JSXElement {
       <div class="hidden h-6 place-content-center text-[2rem] leading-0 sm:grid">
         <div
           class={cn(
-            "-mt-[1.65em] hidden pl-[0.5em] text-[0.315em] leading-0 text-sub transition-colors duration-125 lg:block",
+            "-mt-[1.65em] hidden pl-[0.5em] text-[0.315em] leading-0 whitespace-nowrap text-sub transition-colors duration-125 lg:block",
             {
               "text-transparent": getFocus(),
             },
@@ -53,9 +53,12 @@ export function Logo(): JSXElement {
           {isDevEnvironment() ? "localhost" : "snap snap"}
         </div>
         <h1
-          class={cn("-mt-[0.11em] text-text transition-colors duration-250", {
-            "text-sub": getFocus(),
-          })}
+          class={cn(
+            "-mt-[0.11em] whitespace-nowrap text-text transition-colors duration-250",
+            {
+              "text-sub": getFocus(),
+            },
+          )}
           data-ui-element="logoText"
         >
           croco calc
