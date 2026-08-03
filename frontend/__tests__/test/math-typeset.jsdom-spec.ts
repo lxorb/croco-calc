@@ -319,35 +319,18 @@ describe("TR-303 / TR-326 — the spoken form", () => {
 });
 
 describe("TR-296 / TR-325 — layout stability across task kinds", () => {
-  it("reserves the stacked height on the prompt and on the reveal", async () => {
-    // jsdom has no layout engine, so `getBoundingClientRect()` is all zeros and
-    // asserting the rect directly would assert nothing at all. The reserved
-    // height *is* the mechanism, so the mechanism is what is asserted.
-    const { readFileSync } = await import("node:fs");
-    const path = await import("node:path");
-    const scss = readFileSync(
-      path.resolve(__dirname, "../../src/styles/test.scss"),
-      "utf8",
-    );
-
-    /** The whole top-level rule for `#<id>`, brace-matched. */
-    const block = (id: string): string => {
-      const start = scss.indexOf(`#${id} {`);
-      expect(start).toBeGreaterThan(-1);
-      let depth = 0;
-      for (let i = start; i < scss.length; i++) {
-        if (scss[i] === "{") depth++;
-        else if (scss[i] === "}" && --depth === 0) return scss.slice(start, i);
-      }
-      throw new Error(`unterminated #${id} block`);
-    };
-
-    // A stacked fraction is ≈1.28em tall against ≈1.1em for an integer row, so
-    // both containers reserve at least the taller form and centre what they get.
-    expect(block("taskPrompt")).toContain("min-height: 1.35em");
-    expect(block("taskReveal")).toContain("min-height: 1.35em");
-  });
-
+  // The height arithmetic that discharges TR-296 lives in
+  // `arena-stylesheet.jsdom-spec.ts`: it is a property of the stylesheet's
+  // declared `em` values, not of the DOM this module builds. What belongs here
+  // is the DOM half of the same guarantee — that the prompt's *structure* is
+  // identical whatever the task kind, so there is exactly one thing whose
+  // height the reservation has to dominate.
+  //
+  // The earlier version of this test asserted that the string
+  // `min-height: 1.35em` appears in `test.scss`. That was true throughout the
+  // period when `.mathParen--tall { font-size: 2em; line-height: 1 }` was
+  // moving `#taskRule` 20.85px down the page, which is exactly the amount a
+  // substring check is worth.
   it("puts exactly one row element in the prompt whatever the kind", () => {
     for (const kind of ALL_KINDS) {
       const host = render(displayPrompt(firstOfKind(kind).prompt));

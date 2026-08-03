@@ -105,7 +105,9 @@ reference. §10 states that explicitly and testably.
   on `#taskArena` for the duration of the feedback, and removed on advance. This **amends CP-187**, whose
   per-`.task` placement presupposed a stream.
 - **TR-016** The `.task`, `.prompt`, `.answer`, `.hints`, `hint` and `letter` class/element names MUST NOT
-  appear anywhere in `frontend/src` after this change.
+  appear **in the arena or anything that serves it** after this change. **Scoped by TR-344** — as written
+  ("anywhere in `frontend/src`") this requirement contradicted TR-176 / TR-238, which freeze the results
+  screen; see §17.
 - **TR-017** The timer's `data-seconds-remaining` hook (CP-189) MUST be kept. It MUST be written to
   `#taskArena` and to every `[data-timer]` element, exactly as `test-timer.ts` does today for `#tasks`.
 - **TR-018** `#taskPrompt`, `#taskRule`, `#taskReveal` and `#taskContinueHint` MUST be `user-select: none`.
@@ -198,6 +200,9 @@ reference. §10 states that explicitly and testably.
   | `liveSpeedStyle` | `off` / `mini` / `text` | tpm hidden / base size / large size |
   | `liveAccStyle` | `off` / `mini` / `text` | acc hidden / base size / large size |
 
+  The **shipped defaults** for the three keys are fixed by **TR-345**: `timerStyle: "mini"`,
+  `liveAccStyle: "mini"`, `liveSpeedStyle: "off"`.
+
 - **TR-033** The `flash_text` and `flash_mini` behaviour is unchanged: the time is revealed only when
   `(duration − elapsed) % 15 === 0`. `flash_text` blanks the text; `flash_mini` fades it. Both keep working
   in the new row.
@@ -280,6 +285,8 @@ reference. §10 states that explicitly and testably.
 
 - **TR-057** `data-state="finished"`, `data-feedback="none"`, `data-result` removed. `#taskArena` is hidden
   and the results screen takes the page, exactly as today. The results screen is unchanged (§10).
+  **"Hidden" means the arena element itself, not its children one at a time — see TR-343**, which records why
+  the descendant form of this rule does not work at all.
 - **TR-058** If the timer expires while the arena is in the correct-answer dwell or in `awaitingContinue`,
   the run MUST finish immediately: the dwell is cancelled, the reveal is discarded, and the partially
   answered task (if any) is discarded per ME-157.
@@ -1367,10 +1374,12 @@ two must never be confused at a glance.
   (if numerically equal) statement and looks wrong.
 - **TR-300** Parentheses around a stacked operand (ME-131's negative second operand, e.g. `1/2 + (−5/6)`) MUST
   visually enclose the **full height** of the stack. A half-height parenthesis beside a two-storey stack is a
-  defect. Reference implementation: the paren span carries `font-size: 2em; line-height: 1` when the operand it
-  wraps is stacked, and `1em` otherwise. The **requirement is the visual enclosure**; an implementation that
-  achieves it by another mechanism (a scaled SVG, `transform: scaleY`) is acceptable provided it does not
-  distort the stroke weight.
+  defect. ~~Reference implementation: the paren span carries `font-size: 2em; line-height: 1` when the operand
+  it wraps is stacked, and `1em` otherwise.~~ **The reference implementation is struck by TR-340** — it
+  violated TR-296 and painted through `#taskRule`. The **requirement is the visual enclosure** and it stands
+  unchanged; an implementation that achieves it by another mechanism (a scaled SVG, `transform: scaleY`) is
+  acceptable provided it does not distort the stroke weight. TR-340 / TR-341 give the implementation that is
+  actually shipped, with the font measurements it is derived from.
 
 ### 14.8 Decimals
 
@@ -1497,7 +1506,9 @@ The brief asks for this to be decided deliberately and documented. It is decided
 - **TR-324** A test MUST assert that no `/` character appears in `#taskPrompt`'s or `#taskReveal`'s
   `textContent` for any fraction task, and that no `*` or ASCII `-` (U+002D) appears in either at any time.
 - **TR-325** A test MUST assert TR-296: `#taskRule`'s bounding rect is identical for an integer task and a
-  fraction task.
+  fraction task — **and for a parenthesised fraction task, which is the case that regressed.** The suite has
+  no layout engine, so **TR-342 replaces the "bounding rect" wording with what must actually be asserted**;
+  a substring check against `test.scss` does not discharge this requirement and never did.
 - **TR-326** A test MUST assert TR-302's `aria-label` for a range of fractions, and TR-303's spoken forms for
   a bare negative, a parenthesised negative, each operator and a fraction.
 - **TR-327** A test MUST assert TR-304: for the same task, the task-log entry's `prompt` is the raw engine
@@ -1556,3 +1567,115 @@ The brief asks for this to be decided deliberately and documented. It is decided
   overhang and TR-294's sizing keep the scale difference obvious. *Flagged* because it is the one place where
   this section's marks interact with an earlier decision, and a reviewer may want to see it on screen before
   agreeing.
+
+---
+
+## 17. Remediation rulings (TR-340 … TR-346)
+
+Two independent verifiers audited the shipped redesign against §1 … §16. Everything below is a ruling on
+something they found: either a defect in the implementation, or — twice — a defect in the requirements
+themselves, where two MUSTs contradicted each other and the builder had no way to satisfy both.
+
+### 17.1 The tall parenthesis: TR-296 and TR-300 were in direct conflict
+
+TR-296 says `#taskPrompt` MUST reserve its tallest form so `#taskRule` never moves. TR-300's reference
+implementation says the parenthesis around a stacked operand carries `font-size: 2em; line-height: 1`. A 2 em
+line box does not fit inside a 1.35 em reservation, so the two could not both hold, and the implementation
+picked TR-300: measured live at the default `fontSize: 2`, an integer or a bare fraction put `#taskRule` at
+`381.9`, and `55/82 + (−1/2)` put it at `402.7`. The rule and the answer field jumped 20.85 px on every
+advance into or out of a parenthesised fraction — the exact defect TR-296 exists to prevent.
+
+- **TR-340** **TR-296 wins; TR-300's reference implementation is struck.** A scaled delimiter MUST contribute
+  **no height** to `.mathRow` — `line-height: 0` on the scaled span. The row's height is then driven only by
+  `.mathFrac` (1.28 em), the reservation dominates every form `typesetInto` can emit, and the invariant stops
+  depending on anyone remembering to keep the paren small. `align-items: center` still centres the (now
+  zero-height) box on the maths axis, so TR-293's alignment argument is untouched.
+  Its **ink** MUST additionally stay inside the reservation: `#taskPrompt` reserves `1.35em`, so the ink may
+  reach `0.675em` from the axis and no further. This is a separate obligation from the box arithmetic, because
+  a glyph's ink is not clipped to its line box — at `2em` the parenthesis painted about 9 px *below its own
+  box* and straight through `#taskRule`, which is why the verifier could see the defect as well as measure it.
+- **TR-341** **The scaled parenthesis MUST be re-centred on the maths axis.** A glyph is centred by its **em
+  box**, and a parenthesis is the one glyph in the arena whose ink is not centred in its em box. Measured with
+  canvas `TextMetrics` against the two shipped webfonts, its ink centre sits `0.105em` (Roboto Mono) /
+  `0.115em` (Lexend Deca) below its box centre. At `1em` that is invisible and correct — it is how parentheses
+  set in running text, and it MUST NOT be corrected there. Scaled up it is a visible drop. The correction is
+  `translateY(-0.11em)` in the paren's **own** em, so it scales with the glyph.
+
+  The measurements that fix the size, per 100 px:
+
+  | | Roboto Mono (default) | Lexend Deca |
+  |---|---|---|
+  | `(` ink ascent / descent | 81 / 24 | — |
+  | paren ink half-height, of its own font-size | `0.525em` | `0.450em` |
+  | fraction-stack ink half-height, in prompt em | `0.5475em` | `0.5450em` |
+
+  At `font-size: 1.25em` the paren's ink half-height is `0.656em` (Roboto Mono) / `0.563em` (Lexend Deca):
+  above the stack's ink in both, so TR-300's enclosure holds, and below `0.675em` in both, so TR-340's
+  containment holds. That window — wide enough to enclose, narrow enough not to escape — is what the shipped
+  `1.25em` is chosen from, and it is why `2em` could never have worked.
+
+- **TR-342** **TR-325 restated.** jsdom has no layout engine, so `#taskRule`'s bounding rect is all zeros and
+  the requirement as worded is untestable in this suite. Asserting instead that the string `min-height: 1.35em`
+  appears in `test.scss` is **not** an acceptable substitute: that assertion was green for the entire life of
+  the defect. What MUST be asserted is the **arithmetic**, computed from the stylesheet's own declared values:
+  every element `typesetInto` can emit is a flex item of `.mathRow`, so the row's height is the maximum of its
+  items' heights, and each of those is a declared `font-size × line-height` (or, for `.mathFrac`, two storeys
+  plus the bar plus its margins). The test MUST compute those numbers and assert each is `≤` the declared
+  reservation, on the prompt and on the reveal; it MUST additionally assert the two ink bounds of TR-340 /
+  TR-341 against the measured font constants above. Implemented in
+  `frontend/__tests__/test/arena-stylesheet.jsdom-spec.ts`, which was confirmed to **fail** on the
+  pre-remediation stylesheet before being accepted.
+
+### 17.2 The finished state
+
+- **TR-343** **TR-057 MUST be implemented by hiding `#taskArena` itself.** The descendant form —
+  `#taskArena[data-state="finished"] { #taskPrompt, #answerInput, #taskReadouts { display: none } }` — does not
+  work, for a reason that has nothing to do with the arena: `index.scss` wraps this stylesheet in
+  `@layer custom-styles` and `tailwind.css` declares `utilities` **after** it, and **cascade layers are
+  resolved before specificity is considered at all**. `#taskReadouts` carries Tailwind's `flex`, so a
+  single-class utility beat a two-ID-plus-attribute selector and the timer stayed on screen, painting a bare
+  `0` above the score. Hiding the ancestor removes the subtree from rendering, which no utility on a descendant
+  can undo. It also disposes of the second half of the defect: `#taskArena`'s own `min-height: 6em` (TR-024)
+  survived the descendant form and left 192 px of dead space above the results.
+  `#tasksTest` MUST NOT be hidden — `result.ts` reveals `#result` below it and scrolls to it — and
+  `#taskAnnouncer` is a sibling of the arena, not a child, so the only live region on the page (TR-013) stays
+  in the accessibility tree either way.
+
+### 17.3 Scope corrections
+
+- **TR-344** **TR-016 is scoped to the arena.** As written it banned `.task` "anywhere in `frontend/src`",
+  which is unsatisfiable alongside TR-176 and TR-238: the results screen's task history is `.task`, and those
+  two requirements forbid touching the results screen for this redesign. The three surviving occurrences —
+  `frontend/src/styles/result.scss` (`.task`, `.noErrorBorder .task.wrong`) and
+  `frontend/src/ts/controllers/chart-controller.ts` (`#resultTaskHistory .tasks .task`) — are **genuinely
+  about arithmetic tasks**, which is the test TR-016 was reaching for in the first place: it exists to delete
+  *typing* vocabulary, and a per-task row on a results screen is not typing vocabulary. The ban therefore
+  applies to the arena and everything that serves it, where the names were stream artefacts, and not to the
+  results screen. `.prompt`, `.answer`, `.hints`, `hint` and `letter` remain banned everywhere: none of them
+  has a surviving math analogue.
+- **TR-345** **Shipped defaults for the readouts row.** `timerStyle: "mini"`, `liveAccStyle: "mini"`,
+  `liveSpeedStyle: "off"`. The redesign shipped with `liveAccStyle: "off"` inherited from monkeytype, which is
+  permitted by TR-032 but means a first-time visitor sees only a timer — not the `(timer) 7:42   acc 96%` of
+  the user's approved sketch, and not the brief's "timer and live accuracy at the top". tpm stays `off`
+  because the sketch shows two readouts; TR-031 caps the row at three, it does not require three. All three
+  keep their full domains and remain user-configurable (TR-032); this ruling is about the default only.
+- **TR-346** **TR-128 is subject to the consent gate.** On a genuinely first visit `#CookiesModal` opens
+  modally, takes focus, and does not close on Escape, so "from a freshly loaded page, pressing any accepted
+  answer character starts the run" is false until it is dismissed. This is **correct behaviour for a consent
+  gate** and is deliberately not changed: suppressing or auto-accepting a consent dialog to make a keyboard
+  shortcut work is not a trade this project makes. TR-128 is to be read as applying to a page load with
+  consent already recorded, which is every load after the first. Recorded rather than fixed.
+
+### 17.4 The theme sweep missed `#caret`
+
+- **TR-347** **`#caret` MUST be in the C30 removed-selector guard.** TR-254 deleted the custom caret element;
+  `frontend/static/themes/` was never swept for it, and nine rule blocks survived across `aurora`, `fire`,
+  `grape`, `trance`, `phantom`, `rgb` and `chaos_theory` — one of them still loading
+  `images/themes/chaos_theory/caret.webp`, 808 bytes of asset whose only consumer was a selector that matches
+  nothing. The guard in `frontend/__tests__/constants/themes.spec.ts` did not list `#caret`, which was
+  *correct* when it was written (master C11 had restored the caret at that point) and stopped being correct
+  when C45 struck C11 again. Per INV-062 the four comma-form rules lose **only** the `#caret,` selector line,
+  the rest of each rule being live; the five standalone blocks are dropped whole; the asset is deleted; and
+  `#caret` joins the guard regex so it cannot come back. Note the distinction from TR-020, which **keeps**
+  `--caret-color` in all 52 themes: the custom property now themes the browser's own text caret inside
+  `#answerInput`. It is the `#caret` *element* that no longer exists.

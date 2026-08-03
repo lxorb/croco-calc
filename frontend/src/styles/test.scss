@@ -233,12 +233,44 @@
 // height** of the stack; a half-height paren beside a two-storey stack is a
 // defect. Font-size scaling rather than `transform: scaleY`, which would
 // distort the stroke weight (TR-333).
+
+// TR-340 / TR-341 — the corrections TR-300's `2em; line-height: 1` reference
+// implementation needed, all of them measured rather than guessed (the numbers
+// below are canvas `TextMetrics` readings for the two shipped webfonts, taken
+// in a real browser; see doc 07 §17):
+
+//  (a) `line-height: 0` — the scaled glyph MUST contribute **no height** to
+//      `.mathRow`. At `2em; line-height: 1` it contributed a 2em line box,
+//      which exceeded `#taskPrompt`'s 1.35em reservation and pushed `#taskRule`
+//      and `#answerInput` 20.85px down the page on every parenthesised
+//      fraction — a direct TR-296 violation. With `line-height: 0` the row's
+//      height is driven only by `.mathFrac` (1.28em), so the reserved height
+//      dominates *every* form the typesetter can emit and the rule cannot move.
+//      `align-items: center` still centres the (zero-height) box on the maths
+//      axis, so nothing about the alignment argument changes.
+
+//  (b) `translateY(-0.11em)` — a glyph is centred by its **em box**, not by its
+//      ink, and a parenthesis is the one glyph in the arena whose ink is not
+//      centred in its em box: it sits `0.105em` (Roboto Mono) / `0.115em`
+//      (Lexend Deca) low. At 1em nobody can see that — it is simply how
+//      parentheses set in running text. Scaled up it becomes a visible drop
+//      that crossed `#taskRule`. Correcting by the paren's own em makes the
+//      correction scale with it.
+
+//  (c) `1.25em` rather than `2em`. Measured ink half-height is `0.525em`
+//      (Roboto Mono) / `0.45em` (Lexend Deca) of the paren's font size, so
+//      1.25em yields `0.656em` / `0.563em` against the stack's `0.547em` of
+//      ink — enclosing it with visible overhang, while staying inside
+//      `#taskPrompt`'s `0.675em` half-reservation so the ink can never reach
+//      the rule. 2em put the ink 0.79-1.05em from the axis: past the
+//      reservation, past the 0.125em gap below it, and through the rule.
 .mathParen {
   line-height: 1;
 
   &--tall {
-    font-size: 2em;
-    line-height: 1;
+    font-size: 1.25em;
+    line-height: 0;
+    transform: translateY(-0.11em);
   }
 }
 
@@ -331,8 +363,7 @@
 // layout entirely, and `#taskPrompt` holds no text node at all. The pre-start
 // guarantee is structural: there is nothing to read because nothing is
 // rendered.
-#taskArena[data-state="preStart"],
-#taskArena[data-state="finished"] {
+#taskArena[data-state="preStart"] {
   #taskRule,
   #taskReveal,
   #taskContinueHint {
@@ -340,18 +371,27 @@
   }
 }
 
-// TR-057 — in `finished` the results screen owns the page, so the arena's task
-// content goes with it. Without this the run's last prompt and the user's last
-// answer sit above the results for as long as the results are open.
-// The arena element itself is deliberately kept in the layout: `result.ts`
-// reveals `#result` *below* `#tasksTest` and then scrolls to it, so removing
-// the container outright would break that hand-off.
+// TR-057 — in `finished` the results screen owns the page, so the arena goes
+// with it, **as a whole**. Hiding its children one by one, as this rule used to
+// do, was wrong twice over:
+
+//   1. `#taskReadouts` carries Tailwind's `flex` utility, and Tailwind's
+//      `utilities` layer is declared *after* `custom-styles` (see
+//      `index.scss`), so a layered `display: flex` beat
+//      `#taskArena[data-state="finished"] #taskReadouts { display: none }`
+//      however specific that selector was — cascade layers outrank specificity.
+//      A bare `0` timer therefore painted above the score. Hiding the ancestor
+//      sidesteps the cascade entirely: a `display: none` subtree has no boxes
+//      to style.
+//   2. `#taskArena`'s own `min-height: 6em` (TR-024) survived either way, so
+//      192px of dead space sat between the header and the results.
+
+// `#tasksTest` — the container `result.ts` reveals `#result` below and then
+// scrolls to — is deliberately NOT touched, so the hand-off is unaffected.
+// `#taskAnnouncer` is a sibling of the arena, not a child, so the only live
+// region on the page stays in the accessibility tree (TR-013).
 #taskArena[data-state="finished"] {
-  #taskPrompt,
-  #answerInput,
-  #taskReadouts {
-    display: none;
-  }
+  display: none;
 }
 
 // TR-024 — in `running` the reveal and the hint keep their space but show
