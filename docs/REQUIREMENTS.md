@@ -831,7 +831,7 @@ rule that cannot be satisfied is not a rule; a grep that does not implement the 
 | **C29** | **upheld**, with two new obligations | C46 → timing is unchanged, but the answer now has a second textual representation: the reveal must be cleared with `replaceChildren()` so no `aria-label` survives, and the C29 tests must also assert the spoken form is absent (TR-316) |
 | **C33** / ME-161 | **upheld and extended** | C46 → from the minus sign to **every** operator glyph. TR-097/TR-098's exemption for the ASCII buffer inside `#answerInput` still stands (TR-284) |
 | `07-…` TR-030 | **upheld and reinforced** | C46 → the display/log split it established is the mechanism §14 builds on: display is derived, the logged string is verbatim (TR-268) |
-| DoD / §7.3 greps | **extended** | C46 → two greps added: no code path writes a literal `/` into the arena's text, and `git diff --stat packages/math-engine` is empty for the typography commit (TR-330) |
+| DoD / §7.3 greps | **extended** | C46 → two greps added: no code path writes a literal `/` into the arena's text, and `git diff --stat packages/math-engine` is empty for the typography commit (TR-330). **Landed as DoD-15a in §7.3** |
 
 Everything not in this table is binding as written.
 
@@ -1807,6 +1807,16 @@ A validation stage MUST be able to verify every line below mechanically or by di
       (INF-135). Per **C44** the range is deliberate: unscoped, the grep matches monkeytype's inherited
       commits, which INF-136 preserves and `NOTICE` clause 3 forbids rewriting, so it could never pass.
 - [ ] **DoD-15** Every commit added by stage 2 is single-line, all lowercase, ≤ 5 words (INF-134).
+- [ ] **DoD-15a (added by C46)** The two mathematical-typography greps (`07-…` TR-330):
+      1. `grep -rn "textContent *= *[^;]*\"/\"" frontend/src/ts/test/` returns nothing — no code path writes a
+         literal `/` into the arena's text, which is what would silently defeat TR-263's stacked fractions.
+      2. `git diff --stat packages/math-engine` is **empty** for the typography commit (TR-266, TR-329):
+         §14 is a pure rendering change, no executable line of the engine may move, and therefore **no
+         `MATH_ENGINE_VERSION` bump is permitted** (TR-267) — a bump would reject every cached client
+         mid-run for a purely visual change.
+
+      Recorded here because revision 6's C46 row in §2.31 promised these two greps were "added to the
+      DoD / §7.3 greps" and no DoD item actually carried them.
 
 ### 7.4 Automated tests
 

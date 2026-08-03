@@ -3,12 +3,13 @@
 **Status:** authoritative for the in-run experience. Supersedes the rulings listed in §12 of this document
 and recorded as **C45** in `docs/REQUIREMENTS.md` §2.
 **Date:** 2026-08-03
-**Revision:** **2** — adds §14, **mathematical typography** (`TR-263 … TR-330`), recorded as **C46** in
+**Revision:** **2** — adds §14, **mathematical typography** (`TR-263 … TR-335`), recorded as **C46** in
 `docs/REQUIREMENTS.md` §2. Revision 2 amends **TR-029** and **TR-145** of this document in place; both are
 struck where they stand with a pointer to §14, and ME-130 is amended. Revision 1 (`TR-001 … TR-262`) is
 otherwise unchanged.
-**Requirement prefix:** `TR-` (**test redesign**). Range **TR-001 … TR-330**, contiguous, no gaps, no
-duplicates.
+**Requirement prefix:** `TR-` (**test redesign**). Range **TR-001 … TR-335**, contiguous, no gaps, no
+duplicates. (§14 runs `TR-263 … TR-335`: §§14.1–14.13 are `TR-263 … TR-330` and the ambiguity register
+§14.15 is `TR-331 … TR-335`. `docs/REQUIREMENTS.md` §1 records the same **335** total.)
 **Owner work package:** WP-06 (test page and test engine), with named carve-outs to WP-03 (schemas),
 WP-04 (themes, styles), WP-05 (config metadata, command palette) and WP-07 (results screen, read-only
 confirmation) in §9.
@@ -828,6 +829,16 @@ overshoots.
 Every path below was verified to exist in the working tree at the time of writing. Line counts are from
 `wc -l`. Items marked **AMBIGUOUS** carry a recommendation and are also listed in §13.
 
+> **Status note, added 2026-08-03 after revision 2.** This inventory has since been **executed** for
+> revision 1 (§§1–13). The four outright deletions (TR-178 … TR-181) and the two renames (TR-211
+> `PreStartHint.tsx` → `StartGate.tsx`, TR-222 `PreStartHint.spec.tsx` → `StartGate.spec.tsx`) are done, the
+> TR-214 collapse to `TaskReadouts.tsx` is done, TR-203's config keys are gone from
+> `packages/schemas/src/configs.ts`, and TR-230's `frontend/__tests__/test/task-arena.jsdom-spec.ts` exists.
+> All three surviving TR-254 greps return clean. **A path listed below that no longer exists is therefore
+> evidence the requirement was met, not a stale reference** — the table is retained as the audit trail of
+> what was removed and why, which is the same obligation C44 imposes on the struck-config comments (TR-218).
+> §14's typography requirements (`TR-263 … TR-335`) are the part of this document still being implemented.
+
 ### 9.1 Files deleted outright
 
 | # | path | lines | what it is | why it goes |
@@ -991,7 +1002,14 @@ Every path below was verified to exist in the working tree at the time of writin
   - `grep -rn "tasksInput\|#tasksWrapper\|paceCaret\|<letter\|letter>" frontend/src` returns nothing.
   - `grep -rn "letter-color\|letter-animation" frontend/src frontend/static` returns nothing.
   - `grep -rn "smoothCaret\|caretStyle" frontend/src packages/*/src` returns nothing.
-  - `grep -rn "caret" frontend/src` returns only `caret-color` occurrences.
+  - ~~`grep -rn "caret" frontend/src` returns only `caret-color` occurrences.~~ **AMENDED — as written this
+    fourth grep is unsatisfiable and asserts the wrong thing.** Three families of legitimate hits make it
+    impossible and none is typing machinery: Phosphor's `ph:caret-*` **chevron** icon names (sort arrows,
+    pagination, scroll-to-top, the palette bullet); the `caret` **theme colour key**, which TR-020
+    *requires* be kept in all 52 themes, in `CustomThemeColorsSchema` and in the theme modal's picker; and
+    `caret-color` in unrelated stylesheets that style ordinary form fields. The normative replacement — which
+    carries this grep's actual intent, that no executable statement references a *custom* caret — is stated
+    in full at **DoD-05a in `docs/REQUIREMENTS.md` §7.2**, and it is the version that MUST be run.
 - **TR-255** **DoD-05 MUST be amended.** It currently asserts that `frontend/src/ts/elements/caret.ts` and
   `frontend/src/styles/caret.scss` **do exist**. After this change they MUST NOT exist, and both paths move
   from DoD-05's "these do exist" list to DoD-04's "these do not exist" list.
@@ -1122,7 +1140,7 @@ individually reversible.
 **Added in revision 2 of this document (2026-08-03), recorded as C46 in `docs/REQUIREMENTS.md` §2.**
 This section is a **second user design decision**, taken after §§1–13 were merged. It extends the redesign
 rather than reversing it, and it **amends TR-029 and TR-145 of this document in place** (both are struck with
-a pointer here — see §14.13).
+a pointer here — see **§14.14**, the supersession table; §14.13 is the test list).
 
 The decision, verbatim:
 
