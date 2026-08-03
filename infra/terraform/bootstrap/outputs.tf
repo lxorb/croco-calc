@@ -13,6 +13,11 @@ output "prod_resource_group_name" {
   value       = azurerm_resource_group.prod.name
 }
 
+output "subscription_budget_id" {
+  description = "INF-143a's subscription-wide cost guard. Deliberately NOT croco calc's budget — see INF-143 for that one."
+  value       = azurerm_consumption_budget_subscription.total.id
+}
+
 output "cicd_client_id" {
   description = "Value for the GitHub secret AZURE_CLIENT_ID (INF-086)."
   value       = azurerm_user_assigned_identity.cicd.client_id
