@@ -2,7 +2,18 @@ import { cleanup, render } from "@solidjs/testing-library";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PreStartHint } from "../../../../src/ts/components/pages/test/PreStartHint";
+import { focusInputElement } from "../../../../src/ts/input/input-element";
 import { setPreStart } from "../../../../src/ts/states/test";
+import { startTest } from "../../../../src/ts/test/test-logic";
+
+// The button's job is to call these two; the engine and the real textarea are
+// not what this spec is about.
+vi.mock("../../../../src/ts/test/test-logic", () => ({
+  startTest: vi.fn(),
+}));
+vi.mock("../../../../src/ts/input/input-element", () => ({
+  focusInputElement: vi.fn(),
+}));
 
 /**
  * CP-048 / CP-051 — the hint over the hidden stream, and its fade.
@@ -36,7 +47,29 @@ describe("PreStartHint", () => {
   it("is shown, fully opaque, while the stream is hidden (CP-048)", () => {
     expect(hint()).not.toBeNull();
     expect(hint()?.classList.contains("hidden-hint")).toBe(false);
-    expect(hint()?.textContent).toContain("type a digit to start");
+    expect(hint()?.textContent).toContain("start test");
+  });
+
+  it("offers a real button, not a passive hint, as the way in", () => {
+    const button = container.querySelector<HTMLButtonElement>(
+      "[data-test-id='startTestButton']",
+    );
+    expect(button).not.toBeNull();
+    expect(button?.tagName).toBe("BUTTON");
+    // Keyboard-activatable: a native button in the tab order.
+    expect(button?.tabIndex).toBe(0);
+    // The wrapper is click-through so it never blocks the stream; the button
+    // itself has to opt back in or it could not be clicked at all.
+    expect(button?.classList.contains("pointer-events-auto")).toBe(true);
+  });
+
+  it("starts the test and hands the keyboard over when clicked", () => {
+    const button = container.querySelector<HTMLButtonElement>(
+      "[data-test-id='startTestButton']",
+    );
+    button?.click();
+    expect(startTest).toHaveBeenCalledTimes(1);
+    expect(focusInputElement).toHaveBeenCalledTimes(1);
   });
 
   it("fades for 0.25 s before it leaves the document (CP-051)", () => {
