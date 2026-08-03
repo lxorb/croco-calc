@@ -65,10 +65,6 @@
   animation: rgb-bg 5s linear infinite;
 }
 
-#caret {
-  animation: rgb-bg 5s linear infinite !important;
-}
-
 [data-ui-element="logoSubtext"],
 #result .stats .group .bottom,
 [data-nav-item]:hover,

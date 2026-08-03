@@ -333,8 +333,18 @@ describe("theme stylesheets (C30, CP-164, INV-062, INV-119)", () => {
   });
 
   it("references no UI that croco calc deleted", async () => {
+    // `#caret` was added to this list late, and the gap is instructive: when
+    // this guard was written master C11 had *restored* the custom caret, so
+    // excluding it was correct. C45 struck C11 again and deleted the element
+    // (TR-254; `test.scss` records that "the custom `#caret` element is gone"),
+    // but nothing pulled the theme sweep along behind it — so nine dead
+    // `#caret` blocks sat in seven theme files, one of them still loading an
+    // 808-byte image, with the suite green. Note the distinction from the test
+    // above: the `--caret-color` *custom property* is deliberately KEPT
+    // (TR-020) because it now themes the browser's own text caret inside
+    // `#answerInput`; it is the `#caret` *element* that no longer exists.
     const dead =
-      /\.word\b|\.highlight-|:not\(\.blind\)|\.pageSettings\b|\.customText\b|#keymap|\.funbox|#watchReplayButton|#watchVideoAdButton|#practiseWordsButton|#showWordHistoryButton/;
+      /#caret\b|\.word\b|\.highlight-|:not\(\.blind\)|\.pageSettings\b|\.customText\b|#keymap|\.funbox|#watchReplayButton|#watchVideoAdButton|#practiseWordsButton|#showWordHistoryButton/;
 
     const offenders: string[] = [];
     // `code` has comments stripped: chaos_theory.css keeps a dead block on record.

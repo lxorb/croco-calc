@@ -13,18 +13,6 @@
   transition: 0.5s;
 }
 
-#caret {
-  background-image: url("/images/themes/chaos_theory/caret.webp") !important;
-  background-color: transparent !important;
-  background-size: 1rem !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
-}
-
-#caret.default {
-  width: 4px !important;
-}
-
 /* this is not taking effect since 4 years ago because it is
 refering to the old .config which does not exist anymore
 did not try it on the new #testConfig yet
@@ -168,12 +156,6 @@ body.crtmode {
       3px 0 1px color-mix(in srgb, #ab92e1 20%, transparent),
       -3px 0 color-mix(in srgb, #ab92e1 30%, transparent),
       0 0 3px;
-  }
-
-  & #caret {
-    box-shadow: none !important;
-    filter: drop-shadow(3px 0px 1px var(--crt-main-color-glow))
-      drop-shadow(-3px 0px 0px var(--crt-main-color-glow));
   }
 
   & header[data-focused] [data-nav-item] {

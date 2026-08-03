@@ -118,10 +118,6 @@ button.text:hover,
   color: var(--bg-color);
 }
 
-#caret {
-  animation: phantom-bg 3s linear infinite;
-}
-
 [data-nav-item]:hover {
   background: none;
 }
