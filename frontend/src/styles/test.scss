@@ -233,6 +233,20 @@
   }
 }
 
+// TR-057 — in `finished` the results screen owns the page, so the arena's task
+// content goes with it. Without this the run's last prompt and the user's last
+// answer sit above the results for as long as the results are open.
+// The arena element itself is deliberately kept in the layout: `result.ts`
+// reveals `#result` *below* `#tasksTest` and then scrolls to it, so removing
+// the container outright would break that hand-off.
+#taskArena[data-state="finished"] {
+  #taskPrompt,
+  #answerInput,
+  #taskReadouts {
+    display: none;
+  }
+}
+
 // TR-024 — in `running` the reveal and the hint keep their space but show
 // nothing, so the prompt does not move when they appear.
 #taskArena[data-state="running"] {
