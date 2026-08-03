@@ -1,13 +1,17 @@
 # 07 — In-run test screen redesign (one task at a time)
 
-**Status:** authoritative for the in-run experience. Supersedes the rulings listed in §13 of this document
+**Status:** authoritative for the in-run experience. Supersedes the rulings listed in §12 of this document
 and recorded as **C45** in `docs/REQUIREMENTS.md` §2.
 **Date:** 2026-08-03
-**Requirement prefix:** `TR-` (**test redesign**). Range **TR-001 … TR-262**, contiguous, no gaps, no
+**Revision:** **2** — adds §14, **mathematical typography** (`TR-263 … TR-330`), recorded as **C46** in
+`docs/REQUIREMENTS.md` §2. Revision 2 amends **TR-029** and **TR-145** of this document in place; both are
+struck where they stand with a pointer to §14, and ME-130 is amended. Revision 1 (`TR-001 … TR-262`) is
+otherwise unchanged.
+**Requirement prefix:** `TR-` (**test redesign**). Range **TR-001 … TR-330**, contiguous, no gaps, no
 duplicates.
 **Owner work package:** WP-06 (test page and test engine), with named carve-outs to WP-03 (schemas),
 WP-04 (themes, styles), WP-05 (config metadata, command palette) and WP-07 (results screen, read-only
-confirmation) in §10.
+confirmation) in §9.
 
 ---
 
@@ -30,30 +34,30 @@ croco calc does not have.
 
 **The chrome stays monkeytype-like.** The header, the settings bar, the modes-notice strip, the footer, the
 results page, the account pages, the themes and the overall minimalism are unchanged and remain the
-reference. §11 states that explicitly and testably.
+reference. §10 states that explicitly and testably.
 
 - **TR-001** This document is binding. Where it conflicts with `01-math-engine.md` … `06-infra-and-ops.md` or
   with a §2 ruling in `docs/REQUIREMENTS.md`, **this document wins**, and only for the requirements
-  enumerated in §13. Every other requirement in those documents remains binding as written.
+  enumerated in §12 and §14.14. Every other requirement in those documents remains binding as written.
 - **TR-002** This is a **presentation-layer change**. `packages/math-engine` (343 passing tests) is correct
   and MUST NOT be reimplemented, re-tuned or re-derived. Task generation, judging, seeding, the
   decimals/negatives/fraction rules, the metric formulas and the plausibility thresholds are all unchanged.
   The one permitted engine-package edit is documentation (see TR-217).
 - **TR-003** The persisted result payload, the anti-cheat surface and the server-side revalidation contract
-  MUST NOT change. §9 is the proof obligation for this.
+  MUST NOT change. §8 is the proof obligation for this.
 - **TR-004** Implementation MUST NOT begin before this document is merged. No application code is written in
   the specification phase.
 - **TR-005** Every `MUST` below is unconditional unless the requirement itself names a config key. A
   behaviour MUST NOT be satisfied by a config default alone (restatement of CP-185 for this document).
 - **TR-006** Where this document deletes a feature, the tests that assert that feature MUST be **rewritten to
   assert the new behaviour**, not weakened and not silently dropped. A test may be deleted only when the
-  feature it covers is genuinely gone; §10 marks each such case explicitly.
+  feature it covers is genuinely gone; §9 marks each such case explicitly.
 - **TR-007** Two anti-cheat properties are **binding and preserved verbatim** through this redesign:
   1. judgement happens only on an explicit submit event, never per character (CP-036 / ME-152); and
   2. the correct answer of a task that has not been submitted is not present in the DOM or in readable
      client state (master C29 / ME-135).
   Every design decision below is subordinate to these two.
-- **TR-008** The change MUST be shippable in one deploy. §10's deletion inventory and §12's acceptance
+- **TR-008** The change MUST be shippable in one deploy. §9's deletion inventory and §11's acceptance
   criteria together define "done".
 
 ---
@@ -163,8 +167,12 @@ reference. §11 states that explicitly and testably.
   when focus arrives by keyboard from outside the arena.
 - **TR-028** `#answerInput` MUST use `font-variant-numeric: tabular-nums` so digit widths are constant and
   the caret does not jitter between digits. (This is CP-043, kept — it is about numerals, not about typing.)
-- **TR-029** The prompt MUST be rendered with the engine's glyphs verbatim: `×`, `÷`, `/` for fraction
-  values, and U+2212 for every minus and negative sign (ME-127, ME-128, ME-130, ME-131, master C33).
+- ~~**TR-029**~~ **STRUCK by revision 2 (C46) — superseded by TR-263, TR-277 and TR-281 in §14.** Original
+  text, preserved for the audit trail and **no longer binding**: *"The prompt MUST be rendered with the
+  engine's glyphs verbatim: `×`, `÷`, `/` for fraction values, and U+2212 for every minus and negative sign
+  (ME-127, ME-128, ME-130, ME-131, master C33)."* The `×`, `÷` and U+2212 clauses survive verbatim as TR-281.
+  The `/`-for-fraction-values clause is exactly what the user rejected: fractions are now **stacked**, with a
+  drawn vinculum and no `/` on screen (§14).
 - **TR-030** The **display** form of the prompt MUST strip a single trailing ` =` from `task.prompt`, because
   `#taskRule` now carries the equals relation. The stripping is display-only:
   `packages/math-engine/src/render.ts` `renderPrompt` MUST NOT change, `task.prompt` MUST keep its trailing
@@ -211,7 +219,7 @@ reference. §11 states that explicitly and testably.
   layout (`display: none`, not merely transparent). `#answerInput` MUST be empty.
 - **TR-039** The pre-start guarantee is therefore satisfied **structurally, not visually**: there is nothing
   to read because nothing is rendered. The blur, the `preStart` class, the `masked` task markup, the
-  fixed-width blanks and `MASK_WIDTHS` are all **struck** (§13). Deleting a CSS class in devtools,
+  fixed-width blanks and `MASK_WIDTHS` are all **struck** (§12). Deleting a CSS class in devtools,
   screenshotting the page, or reading `document.body.textContent` yields no prompt, because there is none.
 - **TR-040** The `startgate` mount MUST render a real, focusable `start test` button centred in the arena,
   with icon `ph:play-bold` and `data-test-id="startTestButton"`. This is the adaptation of the existing
@@ -242,7 +250,7 @@ reference. §11 states that explicitly and testably.
 
 - **TR-047** `data-feedback="correct"`, `data-result="correct"`, `data-state` stays `running`.
 - **TR-048** The submitted answer stays on screen, in `var(--main-color)`, and `#taskRule` takes
-  `var(--main-color)`, for the dwell defined in §6. Then the arena advances to the next task.
+  `var(--main-color)`, for the dwell defined in §5. Then the arena advances to the next task.
 - **TR-049** No correct answer is revealed on a correct submission — the user already produced it.
 
 ### 2.6 State: `awaitingContinue` (feedback `wrong`)
@@ -270,7 +278,7 @@ reference. §11 states that explicitly and testably.
 ### 2.7 State: `finished`
 
 - **TR-057** `data-state="finished"`, `data-feedback="none"`, `data-result` removed. `#taskArena` is hidden
-  and the results screen takes the page, exactly as today. The results screen is unchanged (§11).
+  and the results screen takes the page, exactly as today. The results screen is unchanged (§10).
 - **TR-058** If the timer expires while the arena is in the correct-answer dwell or in `awaitingContinue`,
   the run MUST finish immediately: the dwell is cancelled, the reveal is discarded, and the partially
   answered task (if any) is discarded per ME-157.
@@ -680,9 +688,13 @@ overshoots.
   restart button remains reachable by mouse and by the Escape-bound restart.
 - **TR-144** Every interactive element in the arena MUST be keyboard-reachable and MUST have an accessible
   name (CP-183, DoD-36). `tabindex="-1"` MUST NOT be used on any of them.
-- **TR-145** `#taskAnnouncer` MUST be written on exactly these occasions, and no others:
+- **TR-145** **AMENDED by revision 2 (C46) — see TR-303.** The *occasions* below remain binding exactly as
+  written; the *announced text* no longer uses the raw engine string. Every `task.prompt` and `answerDisplay`
+  in the table below MUST be passed through `spokenForm()` first, so `3/4 + 5/6 =` is announced
+  `"3 over 4 plus 5 over 6"` rather than read out with a slash. The task log and the event log are
+  **unaffected** and still carry `task.prompt` verbatim (TR-268, TR-304).
 
-  | occasion | announced text |
+  | occasion | announced text (before the TR-303 amendment) |
   |---|---|
   | run starts / a new prompt is rendered after a wrong answer | `task.prompt` verbatim |
   | a new prompt is rendered after a correct answer | `` `correct. ${task.prompt}` `` |
@@ -696,7 +708,7 @@ overshoots.
 - **TR-148** The out-of-focus warning (CP-083) MUST be kept: after 1 s of lost focus the arena is blurred and
   the warning overlays it, with the two existing messages unchanged. It MUST cover `#taskArena` via
   `position: absolute; inset: 0`, which removes the need for the JS-measured `outOfFocusMaxHeight` signal
-  (§10).
+  (§9).
 - **TR-149** Regaining focus MUST lift the out-of-focus blur and MUST NOT change `data-state`. In particular
   it MUST NOT start a `preStart` run and MUST NOT continue from `awaitingContinue` (CP-085, restated).
 - **TR-150** Keyboard acceptance test, which MUST exist as an integration test: load the page; press `4`;
@@ -814,7 +826,7 @@ overshoots.
 ## 9. Deletion inventory
 
 Every path below was verified to exist in the working tree at the time of writing. Line counts are from
-`wc -l`. Items marked **AMBIGUOUS** carry a recommendation and are also listed in §14.
+`wc -l`. Items marked **AMBIGUOUS** carry a recommendation and are also listed in §13.
 
 ### 9.1 Files deleted outright
 
@@ -877,7 +889,7 @@ Every path below was verified to exist in the working tree at the time of writin
 | **TR-207** | `frontend/src/ts/commandline/lists.ts` | `...buildCommands("smoothCaret", "caretStyle")` and the `//caret (restored by master C11)` comment |
 | **TR-208** | `frontend/src/ts/config/utils.ts` | the boolean-`smoothCaret` migration (`if (typeof configObj.smoothCaret === "boolean")`) and the mention in the doc comment. The other legacy migrations (`quickTab`, `swapEscAndTab`, `showAverage === "wpm"`, `showTimerProgress`, string `fontSize`, `accountChart` padding, `comfy` → `croco`) are **kept** — they repair stored configs for keys that still exist. |
 | **TR-209** | — | `--caret-color`, `CustomThemeColorsSchema`'s 10-tuple and `ThemeModal.tsx`'s `<Picker color="caret" />` are all **KEPT** (TR-020). |
-| **TR-210** | — | **Deploy hazard, MUST be handled.** `packages/contracts/src/configs.ts` declares `PATCH /configs` with `body: PartialConfigSchema.strict()`. A cached SPA that still sends `smoothCaret` / `caretStyle` will get a 422 from a newly deployed backend. Recommendation: relax that body to `PartialConfigSchema` (non-strict, which strips unknown keys) permanently — the frontend already sanitises with `.strip()` on read, so strictness on write buys nothing and breaks every removal. Flagged in §14. |
+| **TR-210** | — | **Deploy hazard, MUST be handled.** `packages/contracts/src/configs.ts` declares `PATCH /configs` with `body: PartialConfigSchema.strict()`. A cached SPA that still sends `smoothCaret` / `caretStyle` will get a 422 from a newly deployed backend. Recommendation: relax that body to `PartialConfigSchema` (non-strict, which strips unknown keys) permanently — the frontend already sanitises with `.strip()` on read, so strictness on write buys nothing and breaks every removal. Flagged in §13. |
 
 ### 9.7 Components
 
@@ -994,6 +1006,8 @@ Every path below was verified to exist in the working tree at the time of writin
   8. TR-140's `quickRestart: "enter"` guard has a passing test.
   9. The test page renders with no horizontal scrollbar at 320, 768, 1024 and 1920 px (DoD-34).
   10. All 52 themes render the arena with no invisible text (DoD-35).
+  11. **Revision 2:** §14.13's typography assertions pass — in particular TR-322's fidelity round-trip and
+      TR-329's "`packages/math-engine` is unedited". TR-330 adds two greps to the TR-254 set.
 
 ---
 
@@ -1001,6 +1015,10 @@ Every path below was verified to exist in the working tree at the time of writin
 
 Recorded in `docs/REQUIREMENTS.md` §2 as **C45**. The originals are marked struck **in place** there, with a
 pointer to this document; nothing is silently edited.
+
+> **Revision 2 extends this map.** §14.14 records what the mathematical-typography decision (**C46**)
+> supersedes — notably **ME-130** (amended) and **TR-029** (struck) and **TR-145** (amended). Read the two
+> tables together.
 
 ### 12.1 Struck outright
 
@@ -1062,6 +1080,9 @@ Each item below is a place where the user's instruction, the existing spec and t
 determine a single answer. A decision is recorded for each so implementation is not blocked; each is
 individually reversible.
 
+> **Revision 2 extends this register.** §14.15 (`TR-331 … TR-335`) records the five typography ambiguities,
+> including the input-versus-display recommendation the brief asked for explicitly (TR-331).
+
 - **TR-257** **`Space` as a second submit key.** *Ambiguity:* the user said "SUBMIT = Enter" but did not
   explicitly strike Space, and CP-037 / ME-140 mandate it. *Decision:* **struck** (TR-132). *Why:* CP-037's
   own justification is monkeytype muscle memory, which is exactly what this document removes; and in the new
@@ -1093,3 +1114,392 @@ individually reversible.
   stream; it is not typing vocabulary; and renaming it touches CP-019, `test-ui.ts`, `test.scss` and the
   init-failed panel for no benefit. Flagged only so the inconsistency with `#taskArena` is a recorded choice
   rather than an oversight.
+
+---
+
+## 14. Mathematical typography
+
+**Added in revision 2 of this document (2026-08-03), recorded as C46 in `docs/REQUIREMENTS.md` §2.**
+This section is a **second user design decision**, taken after §§1–13 were merged. It extends the redesign
+rather than reversing it, and it **amends TR-029 and TR-145 of this document in place** (both are struck with
+a pointer here — see §14.13).
+
+The decision, verbatim:
+
+> "bitte sorge dafuer, dass bspw. brueche auch als solche angezeigt werden und nicht mit /"
+> — *make sure that fractions are displayed as fractions, and not with a `/`.*
+
+### 14.1 Why, and what premise is withdrawn
+
+- **TR-263** Fractions MUST be typeset as **real fractions** — numerator above denominator, separated by a
+  horizontal rule (the **vinculum**) — everywhere the user reads a mathematical value in the arena. The inline
+  `n/d` form MUST NOT appear on screen.
+- **TR-264** This generalises beyond fractions and is binding as a principle: the single large task is
+  **mathematical notation**, not a line of source code. Every glyph the arena shows MUST be the glyph a
+  mathematician would write. §14.5 enumerates them.
+- **TR-265** **ME-130's premise is withdrawn.** ME-130 reads: *"Fractions MUST be rendered inline as `n/d`
+  with no spaces around the `/`. Stacked/vertical fractions MUST NOT be used: they would break the
+  single-line, wrapping word-row layout that the test page inherits from monkeytype."* Its **entire stated
+  reason** is the wrapping word-row layout — which TR-022 deleted. The premise is gone, so the prohibition
+  goes with it, exactly as C11's premise fell with CP-053. ME-130 is **amended, not struck**: it survives as
+  the rule governing the **string encoding** (§14.2), and loses its authority over the **visual form**.
+
+### 14.2 The string form is unchanged — this is a rendering change only
+
+This is the single most important constraint in this section, and every requirement below is subordinate to
+it.
+
+- **TR-266** **No executable line of `packages/math-engine` may change.** `FRACTION_SEPARATOR = "/"`,
+  `renderPrompt`, `renderAnswerDisplay`, `decimalString` and `MINUS` all keep their exact current behaviour.
+  `task.prompt` remains `"3/4 + 5/6 ="` and `task.answerDisplay` remains `"19/12"`.
+- **TR-267** Consequently **no `MATH_ENGINE_VERSION` bump is required or permitted** by this section. ME-177 /
+  ME-184 gate on *generation, mixing or judging* semantics and on the strings ME-174 regenerates; none of
+  those move. A bump would reject every cached client mid-run for a purely visual change.
+- **TR-268** The values written to the **task log** (`TaskLogEntry.prompt`, `.expected`, `.given`) and to the
+  **event log** (`taskShown.prompt`) remain the engine strings **verbatim**. ME-174's seeded regeneration
+  compares those strings server-side and MUST continue to match byte for byte.
+- **TR-269** The typeset form is therefore a **pure function of the engine's display string**, computed in the
+  frontend at render time and never persisted, never transmitted, and never compared.
+
+### 14.3 The layout primitive
+
+- **TR-270** The typesetting MUST be implemented as a small, pure, separately tested module at
+  `frontend/src/ts/test/math-typeset.ts`. It MUST NOT pull in KaTeX, MathJax or any other maths typesetting
+  library: the grammar is a two-operand expression over four glyph classes, the bundle budget is real
+  (INF/DoD build-size obligations), and a general TeX layout engine is three orders of magnitude more machinery
+  than this needs.
+- **TR-271** The module's entire public surface is:
+
+  ```ts
+  /** Typesets one engine display string into `target`, replacing its contents. */
+  export function typesetInto(target: Element, display: string): void;
+  /** The spoken form of an engine display string (TR-302). */
+  export function spokenForm(display: string): string;
+  ```
+
+- **TR-272** `typesetInto` MUST build the result with `document.createElement` and `textContent` only. It MUST
+  NOT use `innerHTML`, `insertAdjacentHTML` or any string-concatenated markup. The inputs are engine-produced
+  and contain only digits and four operator glyphs, so there is no injection vector today; constructing nodes
+  directly means there is no injection vector after a future engine change either.
+- **TR-273** `typesetInto` MUST clear the target completely before writing (`replaceChildren()`), so no
+  residue of a previous task can survive a re-render. This is a C29 obligation, not a tidiness one
+  (§14.10).
+- **TR-274** The module MUST be **total**: any string it cannot parse MUST fall back to rendering that string
+  as a single plain text node. It MUST NOT throw and MUST NOT render an empty element. A rendering bug must
+  degrade to "the old inline look", never to a blank prompt that makes the run unplayable.
+
+### 14.4 The grammar, and exactly what gets stacked
+
+- **TR-275** `typesetInto` parses the display string as a sequence of **atoms** separated by single spaces,
+  where an atom is either an **operator** (`+`, `×` U+00D7, `÷` U+00F7) or an **operand**.
+- **TR-276** An operand atom is, in order: an optional opening `(`, an optional `−` (U+2212) sign, a
+  **magnitude**, and an optional closing `)`. This is exactly what ME-131 emits — bare sign in first
+  position, parenthesised in second.
+- **TR-277** **The stacking predicate, normative.** A magnitude MUST be rendered as a stacked fraction **if and
+  only if** it matches `^\d+\/\d+$`. Every other magnitude — an integer (`^\d+$`) and a canonical decimal
+  (`^\d+\.\d+$`) — MUST be rendered as a single inline text run.
+- **TR-278** That predicate is **exact and unambiguous**, and the reason MUST be recorded in the module's
+  header comment: ME-128 reserves `/` for the fraction separator and mandates `÷` for the division operator,
+  and ME-132/ME-133 mandate `.` as the decimal separator with a required leading `0`. A `/` in a display
+  string therefore *always* means "fraction bar" and *never* means "divide". Doc 01's assumption A9 — taken
+  for a completely different reason, to keep `3/4 ÷ …` unambiguous in text — is what makes the visual
+  distinction in §14.6 mechanically decidable.
+- **TR-279** The parse MUST be driven by the **display string**, not re-derived from `task.operands`.
+  Rationale, and it is deliberate:
+  1. One primitive then serves both the prompt and the reveal. The reveal only ever *has* a string
+     (`answerDisplay`); a structured path would need a second, divergent implementation for it.
+  2. It makes the typeset output **provably faithful** to the string the server revalidates (TR-268), which
+     TR-322's round-trip test asserts mechanically.
+  3. It requires **no change to `TaskView`**, so the redesign adds no new field to the one type whose surface
+     C29 constrains (TR-155).
+- **TR-280** `spokenForm` and `typesetInto` MUST share the same parse, so the visual and spoken forms can never
+  disagree about what the expression is.
+
+### 14.5 Glyphs
+
+- **TR-281** The arena MUST render these glyphs and no ASCII substitutes:
+
+  | meaning | glyph | codepoint | never |
+  |---|---|---|---|
+  | multiplication | `×` | U+00D7 | `*`, `x`, `X` |
+  | division (operation) | `÷` | U+00F7 | `/` |
+  | minus / negative | `−` | U+2212 | `-` (U+002D) |
+  | addition | `+` | U+002B | — |
+  | fraction bar | *a drawn rule* | — | `/` |
+
+- **TR-282** The first four already arrive correct from the engine (`OPERATOR_MUL`, `OPERATOR_DIV`, `MINUS`);
+  the renderer's obligation is to **pass them through unaltered** and to never substitute an ASCII lookalike
+  in markup, CSS `content`, an `aria-label` or a test fixture.
+- **TR-283** The fraction bar MUST be a **drawn element**, not a glyph: no `/`, no `⁄` (U+2044), no `─`. §14.7
+  gives its geometry.
+- **TR-284** ME-161 / C33's existing rule — U+2212 for every displayed negative — is **extended** by this
+  section to every operator, and is unchanged for the minus itself. TR-097 and TR-098 stand: the ASCII buffer
+  inside `#answerInput` is exempt, because it is neither a rendered prompt nor a rendered answer.
+- **TR-285** Operators MUST be separated from their operands by horizontal space of `0.3em`, applied as flex
+  `gap`, **not** as literal space characters in a text node. The engine's single spaces are consumed by the
+  parse and MUST NOT survive into the DOM as whitespace text nodes, which would defeat the alignment in
+  §14.7.
+
+### 14.6 Division tasks and fractions MUST look different
+
+The user's requirement is explicit: a division task is an **operation**, a fraction is a **value**, and the
+two must never be confused at a glance.
+
+- **TR-286** A division task MUST render as a single horizontal line with the `÷` glyph between two inline
+  integers: `144 ÷ 12`. Its operands MUST NOT be stacked.
+- **TR-287** This is guaranteed structurally, not by convention: `assembleByKind` in
+  `packages/math-engine/src/generate.ts` builds `kind: "div"` from `intOperand(a), intOperand(b)`, so both
+  operands of a division task are integers and neither can ever match TR-277's predicate.
+- **TR-288** A fraction MUST render as a two-storey stack with a drawn vinculum and **no** `÷` and **no** `/`.
+- **TR-289** The two forms are therefore distinguished on **three** independent axes at once — the operator
+  glyph (`÷` vs none), the number of storeys (one vs two), and the presence of a drawn rule — so the
+  distinction survives a user who cannot tell `÷` from `/` at a glance, a low-contrast theme, and a small
+  screen.
+- **TR-290** A test MUST assert the distinction directly: for a `div` task, `#taskPrompt` contains a `÷` text
+  node and **zero** `.mathFrac` elements; for a `fracAdd` / `fracMul` task, `#taskPrompt` contains **two**
+  `.mathFrac` elements and no `÷` and no `/` anywhere in its text content.
+
+### 14.7 Fraction geometry and the maths axis
+
+- **TR-291** The DOM shape of a stacked fraction is normative:
+
+  ```html
+  <span class="mathFrac" role="math" aria-label="3 over 4">
+    <span class="mathFrac__num" aria-hidden="true">3</span>
+    <span class="mathFrac__bar" aria-hidden="true"></span>
+    <span class="mathFrac__den" aria-hidden="true">4</span>
+  </span>
+  ```
+
+- **TR-292** The expression row is a flex row centred on a single axis, which is what puts the vinculum on the
+  **maths axis** without any baseline arithmetic:
+
+  ```css
+  .mathRow  { display: inline-flex; align-items: center; gap: 0.3em; }
+  .mathFrac { display: inline-flex; flex-direction: column; align-items: center;
+              line-height: 1.05; padding: 0 0.08em; }
+  .mathFrac__num,
+  .mathFrac__den { font-size: 0.5em; line-height: 1.05; }
+  .mathFrac__bar { align-self: stretch; height: 0.09em; background: currentColor;
+                   margin: 0.07em 0; }
+  ```
+
+- **TR-293** The alignment argument MUST be recorded in a comment, because it is the reason this is only three
+  CSS declarations: a numerator and a denominator are single line boxes of equal height, so the bar sits at the
+  exact vertical centre of the `.mathFrac` box; `align-items: center` on the row then puts that centre on the
+  same axis as the visual centre of every inline operand and every operator. `1/2 + 3` therefore aligns
+  correctly by construction — the vinculum, the `+` and the `3` share one axis.
+- **TR-294** The numerator and denominator MUST render at `0.5em` of the surrounding font size. The resulting
+  stack is `2 × (0.5 × 1.05) + 0.09 + (2 × 0.07) ≈ 1.28em` tall, against `1.1em` for a single line of integers
+  at `#taskPrompt`'s `line-height: 1.1` — i.e. **a fraction is about 16 % taller than an integer row, not
+  twice as tall.** That ratio is the point of the `0.5em` choice: it keeps the arena's vertical rhythm nearly
+  unchanged between task kinds while leaving each digit at half the prompt size, which at the default
+  `fontSize` is `2rem` and amply legible. The residual difference is absorbed by TR-296, which is the
+  normative requirement; the arithmetic here is informative.
+- **TR-295** The vinculum MUST use `currentColor` so it inherits the feedback colour automatically: it is
+  `--task-active-color` in the prompt, and `--main-color` in `#taskReveal`, with no extra rule and no chance of
+  a stale colour after a state change.
+- **TR-296** **Layout stability across task kinds is mandatory.** `#taskPrompt` MUST reserve the height of its
+  tallest form at all times, so advancing from `847 + 1293` to `3/4 + 5/6` does not move `#taskRule` or
+  `#answerInput` by a single pixel. This is the cross-kind analogue of TR-024 and is testable the same way:
+  the bounding rect of `#taskRule` MUST be identical for an integer task and a fraction task.
+- **TR-297** The vinculum MUST span the wider of the numerator and the denominator, plus `0.08em` of overhang
+  on each side (the `padding` in TR-292 plus `align-self: stretch`). A bar exactly as wide as the digits reads
+  as cramped; the overhang is what makes it read as a rule.
+- **TR-298** Digits inside a fraction MUST inherit `font-variant-numeric: tabular-nums` (TR-028), so a
+  two-digit numerator over a two-digit denominator is optically centred.
+- **TR-299** A negative sign on a stacked fraction MUST sit **outside** the stack, vertically centred on the
+  vinculum — `−` then the stack — and MUST NOT be attached to the numerator. `−5/6` reads as
+  "negative five sixths"; a minus glued to the numerator reads as a numerator of `−5`, which is a different
+  (if numerically equal) statement and looks wrong.
+- **TR-300** Parentheses around a stacked operand (ME-131's negative second operand, e.g. `1/2 + (−5/6)`) MUST
+  visually enclose the **full height** of the stack. A half-height parenthesis beside a two-storey stack is a
+  defect. Reference implementation: the paren span carries `font-size: 2em; line-height: 1` when the operand it
+  wraps is stacked, and `1em` otherwise. The **requirement is the visual enclosure**; an implementation that
+  achieves it by another mechanism (a scaled SVG, `transform: scaleY`) is acceptable provided it does not
+  distort the stroke weight.
+
+### 14.8 Decimals
+
+- **TR-301** A decimal MUST render as a single inline run with the point unambiguous at the large display
+  size. The point MUST NOT be confusable with the fraction bar, which is the only other horizontal mark in
+  the arena — they differ in size, position and shape, and the decimal is never accompanied by a second
+  storey. Themes MUST NOT restyle the decimal point; `#taskPrompt`'s `font-variant: no-common-ligatures`
+  (already present) MUST be kept so no font can fuse `.` with an adjacent digit.
+
+### 14.9 Accessibility
+
+- **TR-302** A stacked fraction MUST read sensibly to a screen reader. `.mathFrac` MUST carry `role="math"`
+  and `aria-label="<numerator> over <denominator>"` (e.g. `"3 over 4"`), and its three children MUST be
+  `aria-hidden="true"` so the reader announces the label once instead of reading "3", "4" as two loose
+  numbers with an unexplained gap.
+- **TR-303** **TR-145 is amended.** `#taskAnnouncer` MUST be written with the **spoken form** of the prompt,
+  not the raw engine string. Announcing `"3/4 + 5/6 ="` verbatim is the audio version of exactly the defect
+  the user reported. `spokenForm` maps:
+
+  | in the display string | spoken |
+  |---|---|
+  | `n/d` | `n over d` |
+  | `×` | `times` |
+  | `÷` | `divided by` |
+  | `+` | `plus` |
+  | leading `−` (first operand) | `minus` |
+  | `(−x)` (second operand) | `negative x` |
+  | trailing `=` | dropped |
+
+  So `3/4 + 5/6 =` is announced `"3 over 4 plus 5 over 6"`, and `12 + (−5) =` is announced
+  `"12 plus negative 5"`.
+- **TR-304** This amendment touches **only** the announcer. TR-077's event log and ME-159's task log keep
+  `task.prompt` verbatim (TR-268), and a test MUST assert that the logged prompt is still the raw engine
+  string while the announced prompt is the spoken form — the two MUST NOT be allowed to converge by a
+  well-meaning refactor.
+- **TR-305** The wrong-answer announcement (TR-145 row three) MUST likewise use the spoken form of the
+  correct answer: `"incorrect. correct answer 19 over 12. press enter to continue."`
+- **TR-306** `#taskAnnouncer` remains the **only** live region (TR-013). The typeset elements MUST NOT carry
+  `aria-live`, so adding `role="math"` MUST NOT introduce a second announcement channel.
+- **TR-307** **Text selection and copy.** TR-018 already sets `user-select: none` on `#taskPrompt` and
+  `#taskReveal`, and it MUST be kept. This is what discharges the "must not break selection or copy in a
+  confusing way" obligation: a stacked fraction that *could* be selected would copy as `3⏎4` or `34`, which is
+  wrong in a way that is silent and hard to notice. Making it unselectable means there is no confusing copy
+  behaviour to get wrong. `#answerInput` remains selectable (TR-018) — the user's own answer is theirs, is
+  plain text, and copies correctly.
+- **TR-308** `role="math"` MUST NOT be placed on `#taskPrompt` as a whole. Applying it per fraction keeps the
+  operators and integers as ordinary text for assistive technology that does not implement MathML semantics,
+  and keeps the accessible name short and specific.
+
+### 14.10 Input versus display — the recommendation, with reasoning
+
+The brief asks for this to be decided deliberately and documented. It is decided as follows.
+
+- **TR-309** **The user's in-progress answer stays plain text as typed. It MUST NOT be live-restacked.**
+  `#answerInput` shows `5/6` with an ASCII `/` while the user is typing it.
+- **TR-310** The decisive reason is structural, not aesthetic: **an `<input type="text">` cannot contain
+  markup at all.** Its value is a flat string. Live-stacking would require replacing the input with a
+  `contenteditable`, or overlaying typeset glyphs on a hidden field — which is *precisely* the hidden-capture-
+  field-plus-rendered-glyphs architecture that CP-053 / C12 imposed and that this document deleted (TR-079).
+  Re-introducing it to prettify an in-progress buffer would undo the redesign's central simplification.
+- **TR-311** The secondary reasons, each independently sufficient:
+  1. TR-089 makes `#answerInput.value` a strict mirror of the engine buffer. A stacked echo would have to
+     diverge from the buffer, and the divergence would have to be reconciled on every keystroke.
+  2. It would be visually jumpy in a way that hurts: `5` is one storey, `5/` is an indeterminate state, `5/6`
+     is two storeys. The answer would change height mid-entry, directly under the user's eye, on a screen
+     whose whole point is that nothing moves.
+  3. CP-036 / ME-152 is a live constraint here. A live restack is a *judgement about the shape of the answer*
+     rendered before submit. It leaks nothing about correctness today, but it establishes a rendering path
+     that reacts to buffer content, which is the exact class of machinery those requirements forbid.
+- **TR-312** **The wrong-answer reveal MUST use the full stacked typography.** `#taskReveal` renders
+  `answerDisplay` through `typesetInto` (TR-271), so a fractional correct answer appears as a real fraction.
+  This is the requirement's primary target and is non-negotiable.
+- **TR-313** The user's own submitted answer MUST remain in `#answerInput` as plain text during
+  `awaitingContinue` (it is already `readonly` per TR-056). The screen therefore shows the user's plain `5/6`
+  above the typeset correct answer. That contrast is acceptable and arguably useful — "what you typed" versus
+  "the value" — and it avoids a layout shift at submit time. Flagged as reversible in §14.14.
+- **TR-314** **The accepted answer format MUST NOT change.** `/` remains the character the user types for a
+  fraction, `.` and `,` for a decimal, `-` for a negative. §4.2's filter, ME-143's grammar and ME-147's exact
+  rational judging are all untouched. The user types `5/6`; the engine judges `5/6`; only the *reveal* is
+  typeset.
+
+### 14.11 C29 — when the answer enters the DOM
+
+- **TR-315** The typesetting changes **nothing** about C29's timing. TR-153's table stands unaltered: the
+  correct answer enters the DOM at the first paint of `#taskReveal`, which is after `engine.commit()` has
+  already judged, scored and logged the task.
+- **TR-316** The typeset reveal is built from `answerDisplay` and therefore enters the DOM as **several text
+  nodes plus one `aria-label`** rather than one text node. Two consequences MUST be handled:
+  1. `clearReveal()` MUST use `replaceChildren()` (TR-273), not `setText("")`. Emptying only the text of a
+     wrapper would leave `aria-label="19 over 12"` in an attribute — a C29 violation that `textContent`-based
+     tests would not catch.
+  2. TR-161's stronger test — no un-submitted task's `answerDisplay` in `document.body.innerHTML` — MUST be
+     extended to also assert the **spoken form** (`"19 over 12"`) is absent, since the answer now has a second
+     textual representation that a naive check would miss.
+- **TR-317** The prompt's typeset form discloses nothing new. It is a pure function of `task.prompt`, which
+  was already fully in the DOM; TR-279's decision not to read `task.operands` means the redesign adds no new
+  field to `TaskView` and therefore no new C29 surface.
+
+### 14.12 Scaling and mobile
+
+- **TR-318** The typeset expression MUST scale with `#taskPrompt`'s font size, which is `2 × fontSize`
+  (TR-023). Every dimension in §14.7 is expressed in `em`, so the whole construction scales with a single
+  declaration and nothing needs a breakpoint of its own.
+- **TR-319** At the `sm` breakpoint and below, a stacked fraction MUST remain legible: the effective
+  numerator/denominator size MUST NOT fall below `1rem`. Where the default `fontSize` would breach that, the
+  prompt MUST scale down as a whole rather than the fraction scaling independently — the row must never
+  become two different type sizes.
+- **TR-320** CP-180's four widths (320, 768, 1024, 1920 px) MUST render a two-fraction prompt
+  (`13/14 + (−15/16)`, the widest realistic case) with no horizontal scrollbar and no clipping.
+  `#taskPrompt`'s `white-space: nowrap` MUST be kept, so a fraction can never be broken across lines.
+- **TR-321** The answer symbol row (TR-101 … TR-106) is **unchanged**. It offers the `/` character because
+  that is what the user *types* (TR-314); it MUST NOT be relabelled with a fraction-bar glyph, which would
+  suggest a key that does not exist.
+
+### 14.13 Tests
+
+- **TR-322** **The fidelity round-trip, the most important test in this section.** For a large seeded sample
+  of tasks across all six kinds, walking the typeset DOM and re-serialising it — joining atom text in order and
+  emitting `<num>/<den>` for each `.mathFrac` — MUST reproduce `displayPrompt(task.prompt)` **exactly**. This
+  is what mechanically guarantees the renderer can never quietly show different mathematics from what the
+  engine generated and the server revalidates.
+- **TR-323** A test MUST assert TR-290's division-versus-fraction distinction on real generated tasks of each
+  kind.
+- **TR-324** A test MUST assert that no `/` character appears in `#taskPrompt`'s or `#taskReveal`'s
+  `textContent` for any fraction task, and that no `*` or ASCII `-` (U+002D) appears in either at any time.
+- **TR-325** A test MUST assert TR-296: `#taskRule`'s bounding rect is identical for an integer task and a
+  fraction task.
+- **TR-326** A test MUST assert TR-302's `aria-label` for a range of fractions, and TR-303's spoken forms for
+  a bare negative, a parenthesised negative, each operator and a fraction.
+- **TR-327** A test MUST assert TR-304: for the same task, the task-log entry's `prompt` is the raw engine
+  string **and** the announcer's text is the spoken form.
+- **TR-328** A test MUST assert TR-274's totality: `typesetInto` given a malformed or unexpected string
+  renders it as plain text, does not throw, and leaves a non-empty element.
+- **TR-329** `packages/math-engine`'s 343 tests MUST pass **unedited**. A diff touching that package's `src`
+  or `__tests__` is by itself a failure of this section.
+- **TR-330** Two grep assertions extend the TR-254 set and MUST be added to `docs/REQUIREMENTS.md` §7.3:
+  - `grep -rn "textContent *= *[^;]*\"/\"" frontend/src/ts/test/` returns nothing — no code path writes a
+    literal `/` into the arena's text.
+  - `git diff --stat packages/math-engine` is **empty** for the typography commit (TR-266, TR-329).
+
+### 14.14 What §14 supersedes — extends §12
+
+| ID | disposition |
+|---|---|
+| **ME-130** | **amended, not struck.** Survives as the rule for the **string encoding** (`n/d`, no spaces), which the engine, the task log, the event log and ME-174's revalidation all still use. Its prohibition on stacked/vertical rendering is **withdrawn**: its sole stated reason was the wrapping word-row layout, which TR-022 deleted (TR-265) |
+| ~~**TR-029**~~ | **struck by TR-263 / TR-277.** It required the prompt to be rendered "with the engine's glyphs verbatim: `×`, `÷`, `/` for fraction values". The first two stand and are re-stated by TR-281; the `/` clause is exactly what the user rejected. Superseded in place — see the strike note at TR-029 |
+| **TR-145** | **amended by TR-303.** The announcer receives the **spoken form**, not `task.prompt` verbatim. The task log and event log are unaffected (TR-268, TR-304) |
+| **TR-030** | **upheld and reinforced.** The display/log split it established is the mechanism this section builds on: display is derived, the logged string is verbatim |
+| ME-127, ME-128 | **upheld, and load-bearing.** ME-128's reservation of `/` for fractions and `÷` for division is what makes TR-277's stacking predicate exact (TR-278) |
+| ME-131, ME-132, ME-133, ME-134 | **upheld, unchanged.** They define the strings this section parses |
+| ME-177 / ME-184 | **not triggered.** No engine version bump (TR-267) |
+| master **C29** | **upheld**, with two new obligations from the second textual representation (TR-316) |
+| master **C33** / ME-161 | **upheld and extended** from the minus sign to every operator (TR-284) |
+
+### 14.15 Ambiguity register — extends §13
+
+- **TR-331** **Live-restacking the in-progress answer.** *Ambiguity:* the user's requirement is about display,
+  and "the answer is entered directly below the task" could be read as the answer echoing back typeset.
+  *Decision:* **plain text while typing; typeset only in the reveal** (TR-309 … TR-313). *Why:* an `<input>`
+  structurally cannot hold markup, so the alternative rebuilds the deleted hidden-field architecture (TR-310).
+  *Reversal cost:* high — it is an architecture change, not a styling one. This is the recommendation the brief
+  asked for, and the reasoning is the structural argument, not the aesthetic one.
+- **TR-332** **The user's own wrong answer stays plain while the correct one is typeset.** *Ambiguity:* the
+  two values sit adjacent in different notations. *Decision:* keep it (TR-313). *Why:* typesetting the
+  submitted answer means swapping the `readonly` input for a rendered element at submit time — a layout shift
+  and a focus problem (Enter must still reach the input to continue, TR-056). *Reversal cost:* low if the
+  reveal grows a second typeset row; flagged so a reviewer can ask for it.
+- **TR-333** **Parenthesis scaling mechanism.** *Ambiguity:* CSS has no clean "stretchy delimiter". *Decision:*
+  font-size scaling, with the **visual enclosure** as the normative requirement and the mechanism left open
+  (TR-300). *Why:* `transform: scaleY` distorts stroke weight; an SVG delimiter is more machinery than a
+  parenthesis is worth. *Reversal cost:* one CSS rule.
+- **TR-334** **Mixed fraction-and-integer operands.** *Status:* the primitive supports it and TR-293's
+  alignment makes `1/2 + 3` correct. *But it does not currently occur in a generated prompt:* verified in
+  `assembleByKind`, every kind builds two operands of the **same** type (`int+int` for add/mul/div,
+  `fraction+fraction` for fracAdd/fracMul, `decimal+decimal` for decimal). The mixed case **does** occur across
+  the prompt/reveal boundary — `1/2 + 1/2` reveals the integer `1` — which is why the reveal shares the same
+  primitive. Recorded so a future kind that mixes operand types needs no typography work.
+- **TR-335** **Whether the `=` should return.** *Ambiguity:* TR-030 strips the trailing `=` because `#taskRule`
+  carries the equals relation, and the user's sketch shows no `=`. With fractions now stacked, the rule and a
+  vinculum are two horizontal lines on screen at once, which could in principle be read as related.
+  *Decision:* **keep TR-030 as is.** *Why:* they are unmistakably different — the rule spans the arena's full
+  content width and sits below the answer, the vinculum is ~1 em wide and sits inside the expression. TR-297's
+  overhang and TR-294's sizing keep the scale difference obvious. *Flagged* because it is the one place where
+  this section's marks interact with an earlier decision, and a reviewer may want to see it on screen before
+  agreeing.

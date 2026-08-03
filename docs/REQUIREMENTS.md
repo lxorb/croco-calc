@@ -2,7 +2,15 @@
 
 **Status:** authoritative. Supersedes the seven source documents wherever this file rules on a conflict.
 **Date:** 2026-08-03
-**Revision:** **5** — records **C45**, the user's in-run test screen redesign (decision **D3**), and adds
+**Revision:** **6** — records **C46**, the user's **mathematical typography** decision (**D4**): fractions
+MUST be displayed as real stacked fractions rather than with a `/`, and the in-run screen MUST be typeset as
+mathematics throughout. `docs/requirements/07-test-screen-redesign.md` grows a §14 and extends to
+`TR-001 … TR-335`. C46 **amends ME-130** (its prohibition on stacked rendering had exactly one stated
+reason — the wrapping word-row layout — which C45 had already deleted) and **strikes TR-029** and **amends
+TR-145** inside doc 07, each struck in place with a pointer. No engine version bump: `packages/math-engine`
+is not modified, and the string form `n/d` remains the encoding used by the task log, the event log and
+ME-174's server-side regeneration. C29, CP-036 / ME-152 and ME-153 remain upheld.
+**Revision 5** — records **C45**, the user's in-run test screen redesign (decision **D3**), and adds
 `docs/requirements/07-test-screen-redesign.md` (`TR-001 … TR-262`) as a seventh source document, authoritative
 for the in-run experience. Every requirement C45 withdraws is struck **in §2.31 with a pointer**, never edited
 away; the earlier rulings C11 and C12 keep their original text in §2 and are marked struck there too. The
@@ -16,7 +24,7 @@ new contradiction rulings (C36…C42), two new open questions (OQ-15, OQ-16), a 
 DoD-49…DoD-53). All original IDs are unchanged; four existing DoD items (02, 04, 07, 19) and the exit criteria
 of WP-03, WP-08, WP-11 and WP-12 were corrected in place.
 **Sources:** `docs/requirements/01-math-engine.md` … `docs/requirements/07-test-screen-redesign.md`
-**Total requirements consolidated:** **1375** (1113 after revision 3's correction, plus doc 07's 262)
+**Total requirements consolidated:** **1448** (1113 after revision 3's correction, plus doc 07's 335)
 
 This document does three things and nothing else:
 
@@ -40,8 +48,8 @@ MUST be read by implementers. Where this document rules against a source require
 | `04-pages-account.md` | `AC-` | AC-001 … AC-187 | **187** | User stats, leaderboard, friends, public profile, account settings, profile menu, XP/level system, persisted result/user schema |
 | `05-monkeytype-inventory.md` | `ME-` → **`INV-`** | INV-000 … INV-208 (+ 11 lettered) | **220** | Keep/adapt/delete disposition for every file inherited from monkeytype |
 | `06-infra-and-ops.md` | `INF-` | INF-001 … INF-156 (+ INF-058a, INF-086a) | **158** | Hosting, Terraform, database, secrets, job locking, Firebase auth, reCAPTCHA, app icon, repo, CI/CD, observability, cost |
-| `07-test-screen-redesign.md` | `TR-` | TR-001 … TR-262 | **262** | The in-run test screen: layout per state, the state machine and the timer, the answer input, the feedback animations, keyboard-only operation, the C29 proof, the results payload confirmation, the typing-machinery deletion inventory (added in revision 5 by **C45**) |
-| | | | **1375** | |
+| `07-test-screen-redesign.md` | `TR-` | TR-001 … TR-335 | **335** | The in-run test screen: layout per state, the state machine and the timer, the answer input, the feedback animations, keyboard-only operation, the C29 proof, the results payload confirmation, the typing-machinery deletion inventory (added in revision 5 by **C45**); **mathematical typography** — stacked fractions, operator glyphs, division-vs-fraction, accessibility, input-vs-display (`TR-263 … TR-335`, added in revision 6 by **C46**) |
+| | | | **1448** | |
 
 **Revision-2 additions, by document** (all appended; no existing ID was renumbered):
 `ME-179`…`ME-183` (plausibility thresholds, review gap 8), `ME-184` (engine-version/compatibility bump,
@@ -811,7 +819,19 @@ rule that cannot be satisfied is not a rule; a grep that does not implement the 
 | §6.1 (`smoothCaret`, `caretStyle`) | **struck** | C45 → both keys removed from the schema, the defaults, the metadata, the palette and the migration path (TR-203 … TR-208) |
 | §6.1 (`maxLineWidth`) | retained, retargeted | C45 → the key name is kept for stored-config compatibility; it now bounds the task arena's width (TR-025, TR-258) |
 | §6.1 (`flipTestColors`, `colorfulMode`) | retained, rebound | C45 → they bind to the renamed math properties (TR-247) |
-| §1 index total | **extended** | C45 → `07-test-screen-redesign.md` adds `TR-001 … TR-262` (**262**), taking the consolidated total to **1375** |
+| §1 index total | **extended** | C45 → `07-test-screen-redesign.md` adds `TR-001 … TR-262` (**262**), taking the consolidated total to **1375**. C46 (revision 6) extends doc 07 to `TR-001 … TR-335` (**335**), taking the total to **1448** |
+| **Rows below added in revision 6 — mathematical typography (C46, user decision D4, 2026-08-03)** | | |
+| **ME-130** | **amended, not struck** | C46 → survives as the rule for the **string encoding** (`n/d`, no spaces), which the engine, the task log, the event log and ME-174's regeneration all still use. Its prohibition on **stacked/vertical rendering** is withdrawn: its sole stated reason was the wrapping word-row layout, which C45 deleted. Fractions are now displayed stacked (`07-…` TR-263, TR-265, TR-277) |
+| ~~`07-…` **TR-029**~~ | **struck** | C46 → it required the prompt to use "`×`, `÷`, `/` for fraction values". The `×` / `÷` / U+2212 clauses survive as TR-281; the `/`-for-fractions clause is exactly what the user rejected. Struck **in place** in doc 07 with its original text preserved |
+| `07-…` **TR-145** | amended | C46 → `#taskAnnouncer` receives the **spoken form** ("3 over 4 plus 5 over 6"), not the raw engine string. The occasions are unchanged. The task log and event log still carry `task.prompt` verbatim (TR-303, TR-304) |
+| ME-127, ME-128 | **upheld, and load-bearing** | C46 → ME-128's reservation of `/` for fractions and `÷` for division is what makes the stacking predicate exact and the division-vs-fraction distinction mechanically decidable (TR-277, TR-278). Assumption **A9** is reinforced, not disturbed |
+| ME-129, ME-131, ME-132, ME-133, ME-134 | **upheld, unchanged** | C46 → they define the display strings §14 parses. `renderPrompt` and `renderAnswerDisplay` are not modified |
+| ME-137 … ME-143, ME-147, ME-151 | **upheld, unchanged** | C46 → the **accepted answer format does not change**. The user still types `5/6`; only the reveal is typeset (TR-314) |
+| ME-177 / ME-184 | **not triggered** | C46 → no `MATH_ENGINE_VERSION` bump. Generation, mixing and judging are untouched and no engine-produced string moves (TR-266, TR-267) |
+| **C29** | **upheld**, with two new obligations | C46 → timing is unchanged, but the answer now has a second textual representation: the reveal must be cleared with `replaceChildren()` so no `aria-label` survives, and the C29 tests must also assert the spoken form is absent (TR-316) |
+| **C33** / ME-161 | **upheld and extended** | C46 → from the minus sign to **every** operator glyph. TR-097/TR-098's exemption for the ASCII buffer inside `#answerInput` still stands (TR-284) |
+| `07-…` TR-030 | **upheld and reinforced** | C46 → the display/log split it established is the mechanism §14 builds on: display is derived, the logged string is verbatim (TR-268) |
+| DoD / §7.3 greps | **extended** | C46 → two greps added: no code path writes a literal `/` into the arena's text, and `git diff --stat packages/math-engine` is empty for the typography commit (TR-330) |
 
 Everything not in this table is binding as written.
 
@@ -839,6 +859,13 @@ documents, and they are recorded here so the citation resolves.
   the first-task blur are deleted; the requirement the blur served is preserved by not rendering a task
   before the run starts. Ruled in **C45**; specified in full in
   `docs/requirements/07-test-screen-redesign.md` (`TR-001 … TR-262`). Code cites this as **D3**.
+- **D4 — the in-run screen is typeset as mathematics.** Fractions are displayed as **real stacked
+  fractions**, not with a `/`; operators use `×`, `÷` and U+2212 throughout; a division task (an operation)
+  and a fraction (a value) are visually distinct by construction. Done with a small CSS/markup primitive,
+  not KaTeX/MathJax. The **input format is unchanged** — the user still types `5/6` — and the in-progress
+  answer is not live-restacked; the stacked form appears in the wrong-answer reveal. The math engine is not
+  modified and no engine version bump is issued. Ruled in **C46**; specified in
+  `docs/requirements/07-test-screen-redesign.md` §14 (`TR-263 … TR-335`). Code cites this as **D4**.
 
 ### C43 — ME-088's "one config-change event" vs SB-090's mandated mechanism
 
@@ -929,6 +956,48 @@ its §13, and over none other. Its §13 is the normative supersession map; the s
   do not change and a bump would reject every cached client mid-flight (ME-177 / ME-184).
 - The result payload, the seeded regeneration (ME-174), the task log (ME-159) and the plausibility
   thresholds (ME-179 … ME-182) are unchanged. `07-…` §8 carries the proof.
+
+### C46 — the in-run screen is typeset as mathematics (user decision D4, 2026-08-03)
+
+**This is not a contradiction between the source documents.** Like C45 it is a **user design decision that
+overrides them**, recorded so every ruling it withdraws keeps its audit trail. It is **additive to C45**, not
+a reversal of it: C45's one-task-at-a-time arena is the surface C46 typesets.
+
+**The decision, verbatim.** "bitte sorge dafuer, dass bspw. brueche auch als solche angezeigt werden und nicht
+mit /" — *make sure that fractions are displayed as fractions, and not with a `/`.*
+
+**The premise that is withdrawn.** **ME-130** reads: *"Fractions MUST be rendered inline as `n/d` with no
+spaces around the `/`. Stacked/vertical fractions MUST NOT be used: they would break the single-line, wrapping
+word-row layout that the test page inherits from monkeytype."* Its **entire stated reason** is the wrapping
+word-row layout — which C45 deleted (TR-022). This is the same pattern as C11: the ruling's own reason clause
+names a premise that a later decision withdrew, so the ruling falls with it. ME-130 is **amended, not struck**
+— it survives as the rule for the **string encoding**, and loses its authority over the **visual form**.
+
+**Ruling.** `docs/requirements/07-test-screen-redesign.md` gains a **§14** numbering **TR-263 … TR-335**, and
+it is authoritative for mathematical typography on the in-run screen.
+
+- Fractions are **stacked** — numerator over denominator, separated by a drawn vinculum. No `/` on screen.
+- Operators use proper glyphs throughout: `×` (U+00D7), `÷` (U+00F7), `−` (U+2212). C33 / ME-161's rule for
+  the minus sign is **extended to every operator**.
+- **A division task and a fraction MUST look different.** `144 ÷ 12` is an operation, on one line, with the
+  division sign; `1/2` is a value, stacked. This is decidable mechanically because ME-128 already reserves
+  `/` for the fraction separator and mandates `÷` for division — doc 01's assumption **A9**, taken for an
+  unrelated reason, is what makes the visual rule exact (TR-277, TR-278).
+- Implemented as a **small CSS/markup primitive** (`frontend/src/ts/test/math-typeset.ts`), **not** KaTeX or
+  MathJax — the grammar is a two-operand expression and the bundle budget is real (TR-270).
+- **Accessible:** a stacked fraction carries `role="math"` and an `aria-label` of "1 over 2", and the live
+  announcer is amended to speak "3 over 4 plus 5 over 6" instead of reading the slash aloud (TR-302, TR-303).
+- **Input is unchanged.** The user still types `5/6`; the accepted answer grammar (ME-137 … ME-143, ME-147)
+  is untouched. The in-progress answer stays **plain text** and is not live-restacked — an `<input>` cannot
+  hold markup, so live-stacking would rebuild the very hidden-field-plus-rendered-glyphs architecture C45
+  deleted (TR-309 … TR-311). The **wrong-answer reveal** uses the full stacked typography (TR-312).
+- **The math engine is untouched and no version bump is issued.** `FRACTION_SEPARATOR = "/"` stays; the task
+  log, the event log and ME-174's seeded regeneration keep comparing the engine's verbatim strings. The
+  typeset form is a pure function of the display string, computed at render time and never persisted
+  (TR-266 … TR-269).
+- **C29 is unchanged in timing** but gains two obligations, because the answer now has a second textual
+  representation: the reveal must be cleared with `replaceChildren()` so no `aria-label` survives, and the
+  C29 tests must also assert the spoken form is absent (TR-316).
 
 ---
 
@@ -1289,6 +1358,11 @@ anonymous users (SB-207).
 
 ### WP-06 — Test page and test engine
 
+> **Revision 6 (C46).** Doc 07 now runs to **`TR-335`**; its **§14** (`TR-263 … TR-335`) is WP-06-owned and
+> adds `frontend/src/ts/test/math-typeset.ts`, the stacked-fraction styles in `frontend/src/styles/test.scss`
+> and `frontend/__tests__/test/math-typeset.spec.ts`. **`packages/math-engine` MUST NOT be edited** for it
+> (TR-266, TR-329).
+>
 > **Revision 5 (C45).** WP-06 additionally covers **all of `docs/requirements/07-test-screen-redesign.md`**
 > (`TR-001 … TR-262`), which supersedes the stream-side half of the coverage below. Read doc 07 **first**;
 > its §13 is the map of what in CP-030 … CP-089, C11 and C12 still applies. Carve-outs to other work
@@ -1301,7 +1375,7 @@ anonymous users (SB-207).
 **Covers:** CP-018 … CP-089 (excluding CP-023 … CP-029, owned by WP-05); ME-129 … ME-159 (UI obligations),
 ME-135 as scoped by C29; INV-050, INV-051, INV-056, INV-057, INV-058, INV-059, INV-067, INV-083 … INV-100,
 INV-153 … INV-184 (test-side deletions), INV-197; ~~C11~~, ~~C12~~ (both struck by C45), C13, C19 (test
-side), C29, C30, C32, C33; **and TR-001 … TR-262**.
+side), C29, C30, C32, C33; **and TR-001 … TR-335**.
 
 **Owns:** `frontend/src/html/pages/test.html`; `frontend/src/ts/components/pages/test/**` **except**
 `TestConfig.tsx` and `modes-notice/**`; `frontend/src/ts/test/**` **except** `result.ts`, `pb-crown.ts`,
