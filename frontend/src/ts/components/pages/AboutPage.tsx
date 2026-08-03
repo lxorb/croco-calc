@@ -3,8 +3,10 @@ import { For, JSXElement, Show } from "solid-js";
 
 import {
   COMING_SOON_TOOLTIP,
+  DEFERRED_FEATURES,
   GITHUB_CONTRIBUTORS_URL,
   GITHUB_REPO_URL,
+  MONKEYTYPE_REPO_URL,
   SOCIAL_LINKS,
 } from "../../constants/links";
 import {
@@ -38,14 +40,18 @@ import { QuickRestartHotkey } from "../hotkeys/QuickRestartHotkey";
 export function AboutPage(): JSXElement {
   const isOpen = () => getActivePage() === "about";
 
+  // Both lists are hidden (`DEFERRED_FEATURES`), so their fetches are switched
+  // off with them — there is nothing to render the result into. The query
+  // options themselves are untouched, so turning a flag back on restores the
+  // fetch along with the section.
   const contributors = useQuery(() => ({
     ...getContributorsQueryOptions(),
-    enabled: isOpen(),
+    enabled: isOpen() && DEFERRED_FEATURES.contributors,
   }));
 
   const supporters = useQuery(() => ({
     ...getSupportersQueryOptions(),
-    enabled: isOpen(),
+    enabled: isOpen() && DEFERRED_FEATURES.supporters,
   }));
 
   // CP-149 — every query is gated on the page actually being open and keeps the
@@ -74,13 +80,23 @@ export function AboutPage(): JSXElement {
   return (
     <Page id="about">
       <div class="content-grid grid gap-8">
-        {/* CP-133 — three centred lines. The two anchors below are what
-            `#supporters_title` and `#contributors_title` point at. */}
+        {/* CP-133 — three centred lines. The middle line used to link at the
+            `#supporters_title` / `#contributors_title` anchors; those sections
+            are hidden (`DEFERRED_FEATURES`), so it credits the upstream project
+            instead. A bare `<a>` is `--sub-color` like the text around it and
+            only brightens on hover, so the link does not stand out. */}
         <section class="text-center text-sub">
-          Created with love by Emil.
+          Created by lxorb.
           <br />
-          <a href="#supporters_title">Supported</a> and{" "}
-          <a href="#contributors_title">expanded</a> by many awesome people.
+          Based on{" "}
+          <a
+            href={MONKEYTYPE_REPO_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            monkeytype
+          </a>
+          . Many thanks to miodec &lt;3
           <br />
           Launched in 2026.
         </section>
@@ -404,63 +420,72 @@ export function AboutPage(): JSXElement {
         </section>
         <div></div>
 
-        {/* CP-145 */}
-        <section>
-          <H2 icon={{ icon: "ph:lifebuoy-bold" }} text="support" />
-          <p>
-            Thanks to everyone who has supported this project. It would not be
-            possible without you and your continued support.
-          </p>
-          <div class="mt-4 text-xl">
-            <Button
-              icon={{ icon: "ph:hand-heart-bold" }}
-              onClick={() => showModal("Support")}
-              text="support"
-              class="w-full p-8"
-            />
-          </div>
-        </section>
-        <div></div>
+        {/* CP-145 — hidden while support is deferred, together with its
+            trailing spacer so the page does not keep a gap where it was. */}
+        <Show when={DEFERRED_FEATURES.support}>
+          <section>
+            <H2 icon={{ icon: "ph:lifebuoy-bold" }} text="support" />
+            <p>
+              Thanks to everyone who has supported this project. It would not be
+              possible without you and your continued support.
+            </p>
+            <div class="mt-4 text-xl">
+              <Button
+                icon={{ icon: "ph:hand-heart-bold" }}
+                onClick={() => showModal("Support")}
+                text="support"
+                class="w-full p-8"
+              />
+            </div>
+          </section>
+          <div></div>
+        </Show>
 
-        {/* CP-146 — twitter is gone, so the grid is three wide, not four.
-            The discord button honours CP-017: no invite yet, so it renders
-            disabled behind a `coming soon` tooltip rather than linking nowhere.
-            The tooltip sits on a wrapper because a disabled button sets
-            `pointer-events: none` and would never see the hover itself. */}
+        {/* CP-146 — twitter is gone and discord is hidden
+            (`DEFERRED_FEATURES.discord`), so the grid holds mail and github
+            and is two wide at `sm` and up; three across would leave a third of
+            the row empty. Put `lg:grid-cols-3` back when discord returns.
+            The discord button still honours CP-017 behind the flag: with no
+            invite it renders disabled behind a `coming soon` tooltip rather
+            than linking nowhere, and the tooltip sits on a wrapper because a
+            disabled button sets `pointer-events: none` and would never see the
+            hover itself. */}
         <section>
           <H2 icon={{ icon: "ph:envelope-simple-bold" }} text="contact" />
           <p>
             If you encounter a bug, have a feature request or just want to say
             hi - here are the different ways you can contact me directly.
           </p>
-          <div class="mt-4 grid w-full grid-cols-1 gap-4 text-xl sm:grid-cols-2 lg:grid-cols-3">
+          <div class="mt-4 grid w-full grid-cols-1 gap-4 text-xl sm:grid-cols-2">
             <Button
               text="mail"
               icon={{ icon: "ph:envelope-simple-bold" }}
               onClick={() => showModal("Contact")}
               class="w-full p-8"
             />
-            <Show
-              when={discordUrl()}
-              fallback={
-                <Balloon text={COMING_SOON_TOOLTIP} position="up">
+            <Show when={DEFERRED_FEATURES.discord}>
+              <Show
+                when={discordUrl()}
+                fallback={
+                  <Balloon text={COMING_SOON_TOOLTIP} position="up">
+                    <Button
+                      text="discord"
+                      icon={{ icon: "ph:discord-logo-bold" }}
+                      disabled
+                      class="w-full p-8"
+                    />
+                  </Balloon>
+                }
+              >
+                {(url) => (
                   <Button
                     text="discord"
                     icon={{ icon: "ph:discord-logo-bold" }}
-                    disabled
+                    href={url()}
                     class="w-full p-8"
                   />
-                </Balloon>
-              }
-            >
-              {(url) => (
-                <Button
-                  text="discord"
-                  icon={{ icon: "ph:discord-logo-bold" }}
-                  href={url()}
-                  class="w-full p-8"
-                />
-              )}
+                )}
+              </Show>
             </Show>
             <Button
               text="github"
@@ -474,29 +499,43 @@ export function AboutPage(): JSXElement {
 
         {/* CP-147 — the upstream credit is mandatory and may not be removed:
             croco calc is a direct adaptation of a GPL-licensed codebase. This
-            is the one place in `frontend/src` the DoD-07 vocabulary grep is
-            allowed to match. */}
+            section, the about-page hero and the footer credit are the places in
+            `frontend/src` the DoD-07 vocabulary grep is allowed to match; the
+            longer form of the credit belongs here.
+
+            The `Supporters` entry anchors at `#supporters_title`, so it is tied
+            to the same flag as the section it points at — otherwise it would be
+            a link to nothing. `Contributors` points at GitHub, not at an
+            in-page anchor, so it stands on its own. */}
         <section>
           <H2 icon={{ icon: "ph:users-bold" }} text="credits" />
           <p>
             <Button
               variant="text"
               text="Monkeytype"
-              href="https://github.com/monkeytypegame/monkeytype"
+              href={MONKEYTYPE_REPO_URL}
               class="p-0 pt-2 pr-2 pb-2"
             />
             and its authors, for the design and the codebase croco calc is
             adapted from
           </p>
-          <p>
-            <Button
-              variant="text"
-              text="Supporters"
-              href="#supporters_title"
-              class="p-0 pt-2 pr-2 pb-2"
-            />
-            who helped financially by donating
+          <p class="py-2">
+            Special thanks to Miodec, monkeytype&apos;s creator and maintainer —
+            croco calc would not exist without that work. croco calc is
+            distributed under the GPL-3.0, like the code it is adapted from (see
+            LICENSE and NOTICE in the repository).
           </p>
+          <Show when={DEFERRED_FEATURES.supporters}>
+            <p>
+              <Button
+                variant="text"
+                text="Supporters"
+                href="#supporters_title"
+                class="p-0 pt-2 pr-2 pb-2"
+              />
+              who helped financially by donating
+            </p>
+          </Show>
           <p>
             <Button
               variant="text"
@@ -508,60 +547,72 @@ export function AboutPage(): JSXElement {
             adding themes and more
           </p>
         </section>
-        <div></div>
 
         {/* CP-148 — both lists ship empty (`[]`) and render as empty grids
-            rather than erroring. */}
-        <section>
-          <H2
-            id="supporters_title"
-            icon={{ icon: "ph:hand-coins-bold" }}
-            text="top supporters"
-          />
-          <AsyncContent
-            queries={{ supporters }}
-            errorMessage="Failed to get supporters"
-          >
-            {({ supportersData }) => (
-              <div
-                class="grid"
-                style={{
-                  "grid-template-columns":
-                    "repeat(auto-fill, minmax(13em, 1fr))",
-                }}
-              >
-                <For each={supportersData()}>{(name) => <div>{name}</div>}</For>
-              </div>
-            )}
-          </AsyncContent>
-        </section>
-        <div></div>
+            rather than erroring, which is exactly why they are hidden: two
+            headings over two blank grids is not worth a screenful. Each keeps
+            its own leading spacer inside the `<Show>`, so with both off the
+            page ends on the credits section with no trailing gap, and with
+            either back on the original section/spacer rhythm returns. The
+            `supporters` / `contributors` queries above stay gated on the page
+            being open and are simply not consumed while this is off. */}
+        <Show when={DEFERRED_FEATURES.supporters}>
+          <div></div>
+          <section>
+            <H2
+              id="supporters_title"
+              icon={{ icon: "ph:hand-coins-bold" }}
+              text="top supporters"
+            />
+            <AsyncContent
+              queries={{ supporters }}
+              errorMessage="Failed to get supporters"
+            >
+              {({ supportersData }) => (
+                <div
+                  class="grid"
+                  style={{
+                    "grid-template-columns":
+                      "repeat(auto-fill, minmax(13em, 1fr))",
+                  }}
+                >
+                  <For each={supportersData()}>
+                    {(name) => <div>{name}</div>}
+                  </For>
+                </div>
+              )}
+            </AsyncContent>
+          </section>
+        </Show>
 
-        <section>
-          <H2
-            id="contributors_title"
-            icon={{ icon: "ph:git-branch-bold" }}
-            text="contributors"
-          />
-          <AsyncContent
-            queries={{ contributors }}
-            errorMessage="Failed to get contributors"
-          >
-            {({ contributorsData }) => (
-              <div
-                class="grid"
-                style={{
-                  "grid-template-columns":
-                    "repeat(auto-fill, minmax(13em, 1fr))",
-                }}
-              >
-                <For each={contributorsData()}>
-                  {(name) => <div>{name}</div>}
-                </For>
-              </div>
-            )}
-          </AsyncContent>
-        </section>
+        <Show when={DEFERRED_FEATURES.contributors}>
+          <div></div>
+          <section>
+            <H2
+              id="contributors_title"
+              icon={{ icon: "ph:git-branch-bold" }}
+              text="contributors"
+            />
+            <AsyncContent
+              queries={{ contributors }}
+              errorMessage="Failed to get contributors"
+            >
+              {({ contributorsData }) => (
+                <div
+                  class="grid"
+                  style={{
+                    "grid-template-columns":
+                      "repeat(auto-fill, minmax(13em, 1fr))",
+                  }}
+                >
+                  <For each={contributorsData()}>
+                    {(name) => <div>{name}</div>}
+                  </For>
+                </div>
+              )}
+            </AsyncContent>
+          </section>
+        </Show>
       </div>
     </Page>
   );
