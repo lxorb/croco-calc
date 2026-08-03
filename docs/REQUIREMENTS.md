@@ -724,8 +724,10 @@ rule that cannot be satisfied is not a rule; a grep that does not implement the 
 | INF-059 / INF-060 / INF-061 | amended | firewall rule replaces the Atlas IP access list; admin user replaces the Atlas DB user; `mongodump` becomes defence in depth on M10 |
 | INF-005 (single region) | amended | one documented exception: the free-tier lever moves the DB to `northeurope` |
 | INF-074 / INF-086 (providers, secrets) | amended | `mongodbatlas` provider and `MONGODB_ATLAS_*` secrets struck |
-| INF-037 (cost table) | **VERIFIED; CORRECTED 2026-08-03** | every row cited from the Azure Retail Prices API for `westeurope`, re-queried 2026-08-03. The single figure ≈ $39.42/mo is **withdrawn** — it assumed ACA free grants croco calc does not get (they are per-subscription and already spent by the user's other apps) and a 0 %-active replica. Corrected total **≈ $38.4 – 48.6/mo** |
-| INF-038 (60 % headroom) | **breached, deliberately** | ≈ $38.4 – 48.6 leaves only **3 – 23 %** headroom; still under the hard $50 ceiling and user-accepted; recoverable to ≈ $30.5 – 35.6 via INF-144's sizing lever, ≈ $15.8 – 26.1 via INF-062's free-tier lever, ≈ $7.9 – 13.1 via both |
+| INF-035 (container sizing) | **AMENDED AND APPLIED 2026-08-03** | `cpu = 0.25`, `memory = "0.5Gi"`, down from `0.5` / `"1Gi"`. The original figure was never grounded in measurement; the replica actually draws **0.0050 vCPU** and **~99 MiB**, so ~50× CPU and ~5× memory headroom remain. Applied via Terraform; revision `ca-croco-calc-api--0000003` started **healthy, `restartCount = 0`**, no OOM |
+| INF-036 (scale rule) | **re-examined 2026-08-03, unchanged** | `concurrentRequests = 50`, min 1 / max 3 all kept. Scaling out is cost-neutral per unit of load (two 0.25 vCPU replicas bill what one 0.5 vCPU replica did), measured traffic is 0 requests so there is nothing to tune against, and `maxReplicas = 3` bounds the tail against a hard ceiling |
+| INF-037 (cost table) | **VERIFIED; CORRECTED 2026-08-03; RE-BASED 2026-08-03** | every row cited from the Azure Retail Prices API for `westeurope`, re-queried 2026-08-03. The single figure ≈ $39.42/mo is **withdrawn** — it assumed ACA free grants croco calc does not get (they are per-subscription and already spent by the user's other apps) and a 0 %-active replica. The corrected ≈ $38.4 – 48.6/mo is **also superseded** by INF-144's applied sizing lever. Current total **≈ $30.5 – 35.6/mo ≡ CHF 24.6 – 28.8** at CHF/USD 0.808 |
+| INF-038 (60 % headroom) | **still breached, deliberately, but far less** | ≈ $30.5 – 35.6 leaves **29 – 39 %** headroom (was 3 – 23 % before the sizing lever). Still under the hard $50 ceiling and user-accepted. The database is **74 % of the bill**, so the 60 % rule is unreachable while it stays; ≈ $7.9 – 13.0 remains available via INF-062's free-tier lever, now the only lever left |
 | INF-156 (cost-table gate) | **cleared** | no row carries the italic marker; `infra.yml`'s grep made precise so INF-156's own prose cannot trip it |
 | **BL-4** (Atlas org + API keys) | **RETIRED** | user decision → no Atlas account needed at all |
 | **B6** (ACA rates from memory) | **RESOLVED** | rates now cited; residual risk is the idle-vs-active assumption, policed by INF-144 |
@@ -742,7 +744,8 @@ rule that cannot be satisfied is not a rule; a grep that does not implement the 
 | DoD-04a, DoD-07, DoD-12, DoD-13a, DoD-14 (grep wording) | **corrected** | C44 |
 | INF-043 (`:latest`) | **restated as testable** | `container_image` has no default and two `validation` blocks; `infra.yml` supplies the SHA |
 | §1 index total (**1111**) | **corrected** | revision 3 added `INF-053a` and `INF-062a`; the true total is **1113**, INF 158 → 160. Evidence: `docs/coverage/requirement-coverage.md` |
-| INF-037 total vs doc 06 range | **corrected, then re-opened 2026-08-03** | the single figure ≈ $39.42/mo is withdrawn; doc 06 now carries a measured range ≈ $38.4 – 48.6/mo, because the ACA vCPU row genuinely is a range |
+| INF-037 total vs doc 06 range | **corrected, then re-opened 2026-08-03, then re-based** | the single figure ≈ $39.42/mo is withdrawn; doc 06 carries a measured range, which is a range because the ACA vCPU row genuinely is one. After INF-144's sizing lever that range is **≈ $30.5 – 35.6/mo**; the intermediate ≈ $38.4 – 48.6 figure is superseded |
+| INF-143a (subscription budget) | **new, created 2026-08-03** | `budget-azure-subscription-total`, **CHF 500**, subscription scope, **Actual 80 % / 100 % only — no Forecasted** (a forecast alert is what produced the 2026-08-03 false alarm). Declared in `infra/terraform/bootstrap/`, **not** `prod/`, so a `terraform destroy` of croco calc cannot delete the user's subscription-wide guard; carries `prevent_destroy`. It is **not** croco calc's budget |
 
 Everything not in this table is binding as written.
 
@@ -1645,10 +1648,20 @@ A validation stage MUST be able to verify every line below mechanically or by di
 - [ ] **DoD-40** Response headers on `/` and on a hashed asset match INF-020 / INF-021.
 - [ ] **DoD-41** The SPA calls the backend with no CORS error (INF-012, INF-054).
 - [ ] **DoD-42** All three sign-in providers work end to end (INF-104) — **blocked on BL-1/BL-2/BL-3**.
-- [ ] **DoD-43** `az consumption budget list --resource-group rg-croco-calc-prod` shows
+- [x] **DoD-43** `az consumption budget list --resource-group rg-croco-calc-prod` shows
       `budget-croco-calc-monthly` at **CHF 40** with a `resourceGroups/rg-croco-calc-prod` id (INF-143). The
-      subscription bills in CHF; USD 50 ≡ CHF 40.4. A budget at *subscription* scope is wrong — it measures
-      ~11 unrelated projects, not croco calc.
+      subscription bills in CHF; USD 50 ≡ CHF 40.4. **croco calc's** budget at *subscription* scope would be
+      wrong — it would measure ~11 unrelated projects, not croco calc. **Verified 2026-08-03.**
+- [x] **DoD-43a ✚** `az consumption budget list` shows a **second, separate** budget
+      `budget-azure-subscription-total` at **CHF 500** with a bare `/subscriptions/<id>/…` id and **exactly
+      two notifications, both `Actual` (80 % and 100 %) — no `Forecasted` one** (INF-143a). It must not be
+      named as if it were croco calc's, and it must not be declared in `infra/terraform/prod`, so that a
+      `terraform destroy` of croco calc cannot remove it. **Verified 2026-08-03.**
+- [x] **DoD-43b ✚** `az containerapp show -n ca-croco-calc-api -g rg-croco-calc-prod` reports
+      `cpu = 0.25` / `memory = 0.5Gi`, and the revision carrying that sizing is **active, at 100 % traffic,
+      `runningState = Running`, `healthState = Healthy`, `restartCount = 0`** (INF-035, INF-144). A Node
+      backend can OOM at 0.5 GiB, so a healthy *and non-restarting* revision is the check, not a successful
+      `terraform apply`. **Verified 2026-08-03 on revision `ca-croco-calc-api--0000003`.**
 - [ ] **DoD-44** `gh api repos/lxorb/croco-calc --jq '.fork,.private,.default_branch'` → `false,false,main`;
       `git branch -r` shows exactly one remote branch.
 - [ ] **DoD-45** Actual spend checked seven days after go-live and recorded next to the INF-037 estimate.
