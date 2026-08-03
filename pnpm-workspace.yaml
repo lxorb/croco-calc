@@ -3,16 +3,28 @@ packages:
   - backend
   - packages/*
 
+# pnpm 10 blocks dependency build scripts unless they are allowlisted here, so
+# this list is the complete set of packages permitted to compile on install.
+# Keep it minimal: every entry is a native toolchain requirement on every runner
+# and in the backend image build.
 onlyBuiltDependencies:
   - "@firebase/util"
   # INV-012 — pruned once the dependencies themselves went:
   #   @fortawesome/fontawesome-free (INV-063, WP-04) and @sentry/cli
   #   (INV-118d, WP-12) are no longer installed anywhere in the workspace.
-  - bcrypt
+  #   bcrypt, msgpackr-extract and re2 likewise resolve to nothing today
+  #   (`pnpm why` finds no dependent), so allowlisting them was dead weight.
+  #
+  # ssh2 and cpu-features are deliberately NOT listed. They arrive only via
+  # testcontainers -> dockerode -> docker-modem, which talks to the local Docker
+  # socket and never over SSH. Both of ssh2's native pieces (cpu-features, nan)
+  # are declared `optionalDependencies` and ssh2 falls back to its pure-JS
+  # implementation when they are absent, so skipping their build costs nothing.
+  # Building them, by contrast, breaks every clean install: cpu-features shells
+  # out to node-gyp (needs Python + a C++ toolchain the runners and the Alpine
+  # image do not have) and nan@2.20 does not compile against Node 24's V8 —
+  # `v8::Isolate` has no `IdleNotificationDeadline`, `v8::ObjectTemplate` has no
+  # `SetAccessor`. Adding a toolchain would not help; the code itself is stale.
   - core-js
-  - cpu-features
   - esbuild
-  - msgpackr-extract
   - protobufjs
-  - re2
-  - ssh2
