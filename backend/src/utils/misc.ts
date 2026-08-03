@@ -66,6 +66,15 @@ export function matchesAPattern(text: string, pattern: string): boolean {
   return regex.test(text);
 }
 
+/**
+ * Escape every regular-expression metacharacter so `value` can be embedded in a
+ * pattern as a literal. Needed by the Mongo `$regex` queries that stand in for
+ * `collation`, which Cosmos DB vCore does not support on `find` (INF-057).
+ */
+export function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function kogascore(wpm: number, acc: number, timestamp: number): number {
   // its safe to round after multiplying by 100 (99.99 * 100 rounded will be 9999 not 100)
   // rounding is necessary to protect against floating point errors

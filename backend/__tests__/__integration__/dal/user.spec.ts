@@ -148,6 +148,26 @@ describe("UserDal", () => {
     }
   });
 
+  it("isNameAvailable should treat regex metacharacters in the name literally", async () => {
+    // given
+    // dots are legal in usernames (`slug()`), and the lookup is a `$regex`
+    // because Cosmos vCore rejects `collation` on `find` (INF-057). An
+    // unescaped dot would make `a.c` match the taken name `abc`.
+    const suffix = new ObjectId().toHexString();
+    const taken = `abc${suffix}`;
+    await UserTestData.createUser({ name: taken });
+    const { uid: other } = await UserTestData.createUser({
+      name: `other${suffix}`,
+    });
+
+    // when, then
+    expect(await UserDAL.isNameAvailable(`a.c${suffix}`, other)).toBe(true);
+    expect(await UserDAL.isNameAvailable(taken, other)).toBe(false);
+    expect(await UserDAL.isNameAvailable(taken.toUpperCase(), other)).toBe(
+      false,
+    );
+  });
+
   it("updatename should not allow unavailable usernames", async () => {
     // given
     const name1 = `user${new ObjectId().toHexString()}`;

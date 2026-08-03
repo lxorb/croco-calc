@@ -8,7 +8,12 @@ import {
   type UpdateFilter,
   type Filter,
 } from "mongodb";
-import { flattenObjectDeep, isPlainObject, WithObjectId } from "../utils/misc";
+import {
+  escapeRegExp,
+  flattenObjectDeep,
+  isPlainObject,
+  WithObjectId,
+} from "../utils/misc";
 import { getDayOfYear } from "date-fns";
 import { UTCDate } from "@date-fns/utc";
 import {
@@ -226,11 +231,24 @@ export async function getPartialUser<K extends keyof DBUser>(
   return partialUser;
 }
 
+/**
+ * Case-insensitive exact match on `name`.
+ *
+ * This was `findOne({ name }, { collation: { locale: "en", strength: 1 } })`.
+ * INF-057 puts production on Azure Cosmos DB for MongoDB vCore, whose `find`
+ * rejects `collation` outright ("collation is not supported in the find command
+ * yet"), so every username lookup — `GET /users/checkName/:name`, `POST
+ * /users/signup`, `/profile/{name}`, the name-change flow — returned a 500.
+ *
+ * Usernames are ASCII `[0-9a-zA-Z_.-]` (`slug()` in `packages/schemas/src/util.ts`),
+ * so an anchored case-insensitive regex is exactly equivalent to strength-1
+ * collation over the reachable character set. The name is still escaped: it
+ * arrives unvalidated on the profile route.
+ */
 export async function findByName(name: string): Promise<DBUser | undefined> {
-  const found = await getUsersCollection().findOne(
-    { name },
-    { collation: { locale: "en", strength: 1 } },
-  );
+  const found = await getUsersCollection().findOne({
+    name: { $regex: `^${escapeRegExp(name)}$`, $options: "i" },
+  });
 
   return found ?? undefined;
 }
