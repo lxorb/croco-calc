@@ -1679,3 +1679,109 @@ advance into or out of a parenthesised fraction — the exact defect TR-296 exis
   `#caret` joins the guard regex so it cannot come back. Note the distinction from TR-020, which **keeps**
   `--caret-color` in all 52 themes: the custom property now themes the browser's own text caret inside
   `#answerInput`. It is the `#caret` *element* that no longer exists.
+
+## 18. User-reported rulings (TR-348 … TR-350)
+
+Three defects reported by the user against the shipped screen. Unlike §17 these are not audit findings: two
+of them are behaviours inherited wholesale from monkeytype that are simply wrong for this product, and the
+third is a form field nobody had questioned.
+
+### 18.1 Passive mouse movement during a run
+
+Upstream, `frontend/src/ts/test/focus.ts` drops focus mode on the first mouse movement over `unfocusPx`,
+repainting the header, the settings bar, the modes notice and the footer around a test in progress. That is
+right for a typing test — the screen streams words and the user may legitimately want to reach for a setting
+mid-flow — and wrong here. Reported as *"while in a test and hovering with the mouse cursor, nothing should
+really happen (the settings shouldn't come back)"*: the user is concentrating on one arithmetic problem, and
+a desk bump repainting the whole page around it is pure distraction.
+
+- **TR-348** **While `isTestActive()`, passive mouse movement MUST NOT release focus mode.** The `mousemove`
+  handler keeps its `PageTransition` guard and its `unfocusPx` jitter threshold; the change is that during an
+  active run it returns instead of calling `set(false)`. `dwell` and `awaitingContinue` are inside the run, so
+  the wrong-answer pause is covered too and the reveal is never framed by returning chrome.
+
+  What this deliberately does **not** touch:
+
+  - **Every keyboard escape hatch.** Nothing here listens for keys. `tab > enter` (TR-137) still reaches
+    `#restartTestButton`, which TR-138's `:focus-visible` override makes visible for exactly as long as it is
+    focused; Escape still opens the command palette (TR-141), which calls `Focus.set(false)` itself; the
+    quick-restart hotkey (TR-139) is untouched; and `event-handlers/global.ts` still re-focuses `#answerInput`
+    on any accepted character from anywhere on the page, so a run can never become un-typeable.
+  - **Deliberate clicks.** Only *movement* is inert. `#taskArena` still focuses the input on click, the
+    restart button still restarts on click, and the settings bar — which carries `pointer-events-none` and
+    disables each control under `getFocus()` — was already inert by its own rules, not by this one.
+  - **The end of the run.** `finish()` and `restart()` both clear `isTestActive()`, so the very next movement
+    releases the chrome exactly as before. That is what uncovers the results screen's surroundings, and it is
+    why this ruling needs no new "and now put it back" path.
+
+- **TR-348a** **The cursor is the one thing movement still restores.** It is hidden when the run starts — it
+  has no job while you are answering, and a pointer parked over the prompt is the clutter this screen exists
+  to remove — but the first real movement brings it back while the chrome stays hidden. Leaving it hidden
+  would make the deliberate clicks above unaimable, which is the same reasoning that put `withCursor` on the
+  initial page load. `focus.ts` therefore tracks cursor visibility separately from `getFocus()`, and
+  `Focus.set` no longer short-circuits on `value === getFocus()`: the two can legitimately be out of step, and
+  entering focus mode for the *next* run must be able to re-hide a cursor that a previous run's movement
+  restored.
+
+- **TR-348b** **`OutOfFocusWarning` is assessed and KEPT, unchanged.** It is a different mechanic from this
+  one — `testFocusState`, not `getFocus()` — and it answers a question the one-task-at-a-time design makes
+  *more* pressing rather than less: with no stream of characters appearing, "my keystrokes are going nowhere"
+  has no other visible symptom. Recorded, however, as **near-dead in its current wiring**: the only producer
+  of a non-`focused` state is the command palette's background toggle in `commandline.ts`, and nothing
+  anywhere sets `"unfocusedWindow"`, so that branch of the message is unreachable. Wiring a real producer (an
+  `#answerInput` blur, a `window` blur) or retiring the state is a separate change and is **not** made here.
+
+### 18.2 The restart control before a run
+
+- **TR-349** **`#restartTestButton` MUST NOT be rendered in `preStart`.** Reported as *"the restart test
+  button should only be there during a test, not before"*. In `preStart` the arena already offers the
+  `start test` button (TR-040) and there is, literally, nothing to restart; a second button offering to
+  discard a run that has not begun is noise, and — because `display: none` also removes it from the tab order
+  — it was stealing a Tab stop from the control that does something. It is present for `running`, `dwell`,
+  `awaitingContinue` and `finished`.
+
+  - **The results screen keeps it.** `finished` is explicitly in scope: with the run over, "again" is the
+    obvious next action and the button is the only mouse affordance for it. The complaint was about
+    *pre*-start only.
+  - **TR-063 still holds.** Restart remains reachable from every state: from `preStart` by the quick-restart
+    hotkey and the command palette, where it is a no-op in substance anyway (it re-seeds a run that has not
+    started). What TR-063 requires is reachability, not a button.
+  - **Owned by `test-ui.ts`, not the stylesheet.** `setTestState` toggles `.hidden` alongside the `data-state`
+    write, so the two can never disagree, and `test.html` ships the class so the button cannot flash into the
+    first paint before the first state write lands.
+  - **TR-138 is unchanged and its consequence is accepted.** Under `main.focus` the button stays at
+    `opacity: 0` with the `:focus-visible` override. Combined with TR-348 that means during a run it is a
+    *keyboard* affordance rather than a mouse one. This is deliberate: TR-138 exists so that nothing but the
+    task is on screen while you are answering, and re-exposing the button to the mouse would undo it.
+
+- **TR-349a** **No stylesheet may force `display` on `#restartTestButton` with `!important` unless it excuses
+  `.hidden`.** `.hidden`'s `display: none` lives in the `hidden` cascade layer, which `head.html` orders after
+  `custom-styles`, so it beats any *normal* declaration in the app's own stylesheets without specificity
+  entering into it (the mirror image of TR-343's problem). An `!important` does not play by those rules —
+  important declarations outrank normal ones whatever their layer — and `media-queries-blue.scss` carried a
+  bare `#restartTestButton { display: block !important }` under `(pointer: coarse) and (max-width: 778px)`.
+  It re-showed the button in `preStart` on every phone and tablet, i.e. on precisely the devices a desktop
+  check never covers. The rule is now `#restartTestButton:not(.hidden)`, and
+  `frontend/__tests__/test/arena-stylesheet.jsdom-spec.ts` scans the styles tree for the pattern so it cannot
+  come back.
+
+### 18.3 The duplicate email field on sign-up
+
+- **TR-350** **The registration form MUST ask for the email address exactly once.** Reported as *"remove the
+  verify email field for registration"*. The `emailVerify` field, its `onChangeListenTo: ["email"]` matcher
+  and its "verify email not matching email" message are removed from `Register.tsx`, along with the key in
+  `defaultValues` — which is also what stops an always-empty field from failing `allFieldsMandatory()` and
+  disabling submit. The single remaining field keeps `fromSchema(UserEmailSchema)` and its typo / disposable /
+  education warnings, and the tab order is username → email → password → verify password → sign up.
+
+  - **This is the form field, and nothing else.** Firebase still sends its verification mail on sign-up
+    (`auth.tsx` → `sendEmailVerification`), `email-handler.html` still handles the `verifyEmail` action code
+    and the "please verify your email" state is untouched. Re-entry catches a typo the user could see;
+    the verification mail catches the ones they could not, which is the stronger of the two guards and the one
+    that was always doing the real work.
+  - **`passwordVerify` STAYS.** A password is masked, so re-entry is the only way to catch a typo before the
+    account exists. The two fields looked alike and are not.
+  - **SIGN-UP ONLY.** The account-settings "update email" flow is a different component,
+    `modals/account-settings/UpdateEmailModal.tsx`, with its own `emailConfirm` input, and it **keeps** its
+    confirmation box: there a mistyped address moves an account that already exists to an inbox the user does
+    not control, which is a lockout rather than a failed sign-up.
