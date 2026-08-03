@@ -433,7 +433,7 @@ export function updateTitle(title?: string): void {
   const local = isDevEnvironment() ? "localhost - " : "";
 
   if (title === undefined || title === "") {
-    document.title = `${local}croco calc | A minimalistic, customizable mental-arithmetic trainer`;
+    document.title = `${local}croco calc`;
   } else {
     document.title = local + title;
   }
