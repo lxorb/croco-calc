@@ -51,15 +51,31 @@ variable "container_image" {
 }
 
 variable "container_cpu" {
-  description = "vCPU per replica (INF-035). INF-144's tuning lever drops this to 0.25."
+  description = <<-EOT
+    vCPU per replica (INF-035, amended by INF-144 on 2026-08-03).
+
+    0.25 is the applied value. The 0.5 the stack launched on was never justified
+    by measurement: the settled replica drew **0.0050 vCPU** (INF-037a), i.e. 1 %
+    of a 0.25 vCPU allocation, so halving it still leaves ~50x headroom while
+    halving the vCPU meter.
+  EOT
   type        = number
-  default     = 0.5
+  default     = 0.25
 }
 
 variable "container_memory" {
-  description = "Memory per replica (INF-035). Must pair with container_cpu as a valid ACA combination."
+  description = <<-EOT
+    Memory per replica (INF-035, amended by INF-144). Must pair with
+    container_cpu as a valid ACA Consumption combination — the ratio is fixed at
+    2 GiB per vCPU, so 0.25 vCPU admits exactly "0.5Gi".
+
+    Measured working set is ~102 MiB (INF-037a), 20 % of 0.5 GiB. If the Node
+    process ever OOMs at startup on this allocation the correct response is
+    0.5 vCPU / "1Gi" (the next valid pair up), NOT 0.25 vCPU / "0.75Gi", which
+    ACA rejects.
+  EOT
   type        = string
-  default     = "1Gi"
+  default     = "0.5Gi"
 }
 
 variable "min_replicas" {

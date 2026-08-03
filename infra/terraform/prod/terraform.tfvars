@@ -23,8 +23,16 @@ mongodb_tier       = "M10"
 mongodb_location   = "westeurope"
 mongodb_storage_gb = 32
 
-container_cpu       = 0.5
-container_memory    = "1Gi"
+# INF-144 sizing lever, applied 2026-08-03. Measured usage on the 0.5 vCPU /
+# 1 GiB revision was 0.0050 vCPU and ~102 MiB, so this still leaves ~50x CPU and
+# ~5x memory headroom while halving both ACA meters (-$7.9-13.0/mo).
+#
+# min/max replicas and the scale threshold are deliberately UNCHANGED — see
+# INF-036: at the active rate two 0.25 vCPU replicas cost exactly what one
+# 0.5 vCPU replica did, so scaling out is cost-neutral per unit of load, and
+# max_replicas = 3 keeps the worst-case tail bounded under the ceiling.
+container_cpu       = 0.25
+container_memory    = "0.5Gi"
 min_replicas        = 1
 max_replicas        = 3
 concurrent_requests = 50
