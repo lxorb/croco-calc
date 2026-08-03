@@ -300,8 +300,10 @@ export function startTest(): void {
   TestUI.setTestState("running");
   TestUI.setFeedback("none");
   showTask(0, now);
-  // TR-145 — a fresh prompt is announced verbatim.
-  TestUI.announce(engine.viewAt(0)?.prompt ?? "");
+  // TR-145 / TR-303 — announced in its spoken form ("3 over 4 plus 5 over 6"),
+  // never the raw engine string. TR-304: what `showTask` logged above is still
+  // `task.prompt` verbatim, and the two must stay apart.
+  TestUI.announcePrompt(engine.viewAt(0)?.prompt ?? "");
   TestTimer.start(engine, () => {
     void finish();
   });
@@ -382,7 +384,7 @@ function continueAfterWrong(): void {
 
   const next = engine.snapshot().activeIndex;
   showTask(next, now);
-  TestUI.announce(engine.viewAt(next)?.prompt ?? "");
+  TestUI.announcePrompt(engine.viewAt(next)?.prompt ?? "");
   TestUI.playAdvanceIn();
 }
 
@@ -403,7 +405,7 @@ function finishDwell(): void {
   const view = engine.viewAt(next);
   showTask(next, now);
   // TR-145 — after a correct answer the confirmation is spoken with the prompt.
-  TestUI.announce(`correct. ${view?.prompt ?? ""}`);
+  TestUI.announceCorrect(view?.prompt ?? "");
   TestUI.playAdvanceIn();
 }
 
@@ -458,10 +460,10 @@ export function commitAnswer(): void {
   // C29 — `committed.expected` is populated by the engine only for a task that
   // has already been committed, so this cannot reveal an answer still in play.
   const expected = committed?.expected ?? "";
+  // TR-312 — typeset, so a fractional answer reveals as a real fraction.
   TestUI.showReveal(expected);
-  TestUI.announce(
-    `incorrect. correct answer ${expected}. press enter to continue.`,
-  );
+  // TR-305 — and spoken as "19 over 12", not read out with a slash.
+  TestUI.announceWrong(expected);
 }
 
 /** Builds the complete, seed-carrying payload (ME-169, ME-173, ME-177). */

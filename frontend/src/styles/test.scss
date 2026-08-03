@@ -73,7 +73,13 @@
   gap: 0;
   width: 100%;
   margin: 0 auto;
-  font-size: 2rem; // overwritten from `fontSize` by test-ui.ts
+  // `--arena-font-size` is written from the `fontSize` config key by
+  // `test-ui.ts`; `--arena-font-scale` is this stylesheet's per-breakpoint
+  // multiplier (TR-023, TR-319). Keeping the two separate is what lets the
+  // breakpoints win — an inline `font-size` would outrank them.
+  --arena-font-size: 2rem;
+  --arena-font-scale: 1;
+  font-size: calc(var(--arena-font-size) * var(--arena-font-scale));
   line-height: 1;
 
   // TR-024 — a fixed minimum height equal to the tallest of the four states,
@@ -138,9 +144,102 @@
   color: var(--task-active-color);
   animation: var(--task-active-animation);
   text-align: center;
+  // TR-320 — a fraction may never be broken across lines.
   white-space: nowrap;
+  // TR-018 / TR-307 — unselectable, which is what discharges the "must not
+  // break selection or copy in a confusing way" obligation: a stacked fraction
+  // that *could* be selected would copy as `3⏎4` or `34`, wrong in a way that
+  // is silent and hard to notice. `#answerInput` stays selectable — the user's
+  // own answer is theirs, is plain text, and copies correctly.
   user-select: none;
+  // TR-301 — no font may fuse `.` with an adjacent digit at this size.
   font-variant: no-common-ligatures;
+
+  // TR-296 — **layout stability across task kinds is mandatory.** A stacked
+  // fraction is ~1.28em tall (§14.7's arithmetic) against ~1.1em for a row of
+  // integers, so the prompt reserves the taller form at all times and centres
+  // whichever it gets. Advancing from `847 + 1293` to `3/4 + 5/6` therefore
+  // moves `#taskRule` and `#answerInput` by exactly zero pixels. This is the
+  // cross-kind analogue of TR-024.
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.35em;
+}
+
+// ---------------------------------------------------------------------------
+// TR-291 … TR-300 — mathematical typography.
+//
+// The alignment argument, recorded because it is the reason this is nine
+// declarations rather than baseline arithmetic (TR-293): a numerator and a
+// denominator are single line boxes of equal height, so the vinculum sits at
+// the exact vertical centre of the `.mathFrac` box. `align-items: center` on
+// the row then puts that centre on the same axis as the visual centre of every
+// inline operand and every operator — the **maths axis**. `1/2 + 3` aligns
+// correctly by construction: the vinculum, the `+` and the `3` share one axis.
+// ---------------------------------------------------------------------------
+
+// TR-285 — the operator spacing is flex `gap`, never literal space characters:
+// the engine's single spaces are consumed by the parse and never reach the DOM.
+.mathRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+// The sign and the parentheses hug their magnitude, so no gap here.
+.mathOperand {
+  display: inline-flex;
+  align-items: center;
+}
+
+.mathFrac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+  // TR-297 — the vinculum spans the wider of the two storeys plus this much
+  // overhang on each side. A bar exactly as wide as the digits reads as
+  // cramped; the overhang is what makes it read as a rule.
+  padding: 0 0.08em;
+  // TR-298 — inherited by both storeys, so a two-digit numerator over a
+  // two-digit denominator is optically centred (TR-028 kept: it is about
+  // numerals, not about typing).
+  font-variant-numeric: tabular-nums;
+}
+
+// TR-294 — half the surrounding size. That ratio is the point: the stack lands
+// ~16% taller than a single integer row rather than twice as tall, so the
+// arena's vertical rhythm barely moves between task kinds, while each digit
+// stays at `2rem` at the default `fontSize` and is amply legible (TR-319).
+.mathFrac__num,
+.mathFrac__den {
+  font-size: 0.5em;
+  line-height: 1.05;
+}
+
+// TR-283 — a **drawn** rule, never a glyph: no `/`, no U+2044, no U+2500.
+// TR-295 — `currentColor`, so it inherits the feedback colour automatically:
+// `--task-active-color` in the prompt, `--main-color` in `#taskReveal`, with no
+// extra rule and no chance of a stale colour after a state change.
+.mathFrac__bar {
+  align-self: stretch;
+  height: 0.09em;
+  background: currentColor;
+  margin: 0.07em 0;
+}
+
+// TR-300 — a parenthesis around a stacked operand must enclose the **full
+// height** of the stack; a half-height paren beside a two-storey stack is a
+// defect. Font-size scaling rather than `transform: scaleY`, which would
+// distort the stroke weight (TR-333).
+.mathParen {
+  line-height: 1;
+
+  &--tall {
+    font-size: 2em;
+    line-height: 1;
+  }
 }
 
 // TR-026 — 2px solid, `0.25em` of margin above and below, no shadow, no
@@ -199,11 +298,19 @@
 #taskReveal {
   font-size: 0.75em;
   line-height: 1.2;
-  min-height: 1.2em;
   margin-top: 0.5em;
   color: var(--main-color);
   text-align: center;
+  // TR-307 — unselectable for the same reason as the prompt.
   user-select: none;
+
+  // TR-296, applied here too: the reveal is typeset (TR-312), so it must
+  // reserve the stacked height or the continue hint below it would jump
+  // between an integer answer and a fractional one.
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.35em;
 }
 
 // TR-053 — `press enter to continue`, unconditional (not gated on
@@ -439,15 +546,20 @@
 
 // TR-023 / TR-100 — the arena scales down at `sm` and below so CP-180's 320 px
 // requirement holds with no horizontal scrollbar.
+// TR-319 / TR-320 — the whole row scales as one, never the fraction on its own,
+// so the prompt never becomes two different type sizes. At the default
+// `fontSize: 2` the 0.55 floor leaves numerator and denominator at
+// `2 × 2rem × 0.55 × 0.5 = 1.1rem`, above TR-319's 1rem minimum, and the widest
+// realistic prompt (`13/14 + (−15/16)`) inside 320 px with no scrollbar.
 @media (max-width: 768px) {
   #taskArena {
-    font-size: 1.5rem;
+    --arena-font-scale: 0.75;
   }
 }
 
 @media (max-width: 480px) {
   #taskArena {
-    font-size: 1.1rem;
+    --arena-font-scale: 0.55;
     min-height: 7em;
   }
 }

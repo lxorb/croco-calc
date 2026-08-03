@@ -46,6 +46,7 @@ import { focusInputElement, setInputValue } from "../input/input-element";
 import type { ArenaState } from "../states/test";
 import { getArenaState, setArenaState } from "../states/test";
 import { qs, qsr } from "../utils/dom";
+import { spokenForm, typesetInto } from "./math-typeset";
 
 /** TR-120 — the feedback timings, named so tests import rather than hard-code. */
 export const CORRECT_DWELL_MS = 180;
@@ -108,9 +109,10 @@ export function setTaskIndex(index: number): void {
 /**
  * TR-145 — the announcer is written on exactly four occasions and no others.
  *
- * `prompt` is always `task.prompt` **verbatim**, never the display form: a
- * screen reader should hear the equals sign that the sighted user reads off
- * `#taskRule`.
+ * Raw: the three occasions that carry mathematics go through
+ * {@link announcePrompt}, {@link announceCorrect} and {@link announceWrong},
+ * which apply TR-303's spoken form. This one is the clear (TR-146) and the
+ * escape hatch.
  */
 export function announce(text: string): void {
   const announcer = qs("#taskAnnouncer");
@@ -119,20 +121,52 @@ export function announce(text: string): void {
 }
 
 /**
+ * TR-145 row one / TR-303 — a fresh prompt, spoken.
+ *
+ * The raw engine string is deliberately NOT announced: reading `"3/4 + 5/6 ="`
+ * out is the audio version of exactly the defect the user reported. TR-304 —
+ * the task log and the event log still carry `task.prompt` verbatim, and the
+ * two MUST NOT be allowed to converge by a well-meaning refactor.
+ */
+export function announcePrompt(prompt: string): void {
+  announce(spokenForm(prompt));
+}
+
+/** TR-145 row two — the confirmation rides along with the next prompt. */
+export function announceCorrect(prompt: string): void {
+  announce(`correct. ${spokenForm(prompt)}`);
+}
+
+/** TR-145 row three / TR-305 — the reveal, spoken. */
+export function announceWrong(answerDisplay: string): void {
+  announce(
+    `incorrect. correct answer ${spokenForm(answerDisplay)}. press enter to continue.`,
+  );
+}
+
+/**
  * TR-044 — render one task's prompt. The only place a prompt reaches the DOM.
  *
- * `textContent` rather than `innerHTML`: the engine's glyphs (`×`, `÷`, `/`,
- * U+2212) are plain text and never markup, so there is nothing to escape and no
- * injection surface to get wrong.
+ * TR-263 / TR-279 — typeset, not `textContent`: a fraction operand is stacked
+ * over a drawn vinculum rather than written `n/d`. The parse is driven by the
+ * engine's display string, so what is on screen is provably the expression the
+ * server revalidates (TR-322).
  */
 export function renderPrompt(prompt: string, index: number): void {
-  qs("#taskPrompt")?.setText(displayPrompt(prompt));
+  const el = qs("#taskPrompt");
+  if (el !== null) typesetInto(el.native, displayPrompt(prompt));
   setTaskIndex(index);
 }
 
-/** TR-038 — remove the prompt from the document entirely. */
+/**
+ * TR-038 — remove the prompt from the document entirely.
+ *
+ * `replaceChildren()` rather than `setText("")`: the typeset form is a tree of
+ * elements carrying `aria-label`s, and blanking only the text would leave those
+ * attributes behind (TR-316).
+ */
 export function clearPrompt(): void {
-  qs("#taskPrompt")?.setText("");
+  qs("#taskPrompt")?.native.replaceChildren();
 }
 
 /**
@@ -154,15 +188,23 @@ export function syncAnswer(buffer: string): void {
  * impossible to get wrong by accident (TR-155).
  */
 export function showReveal(answerDisplay: string): void {
-  qs("#taskReveal")?.setText(answerDisplay);
+  // TR-312 — the reveal is the requirement's primary target: a fractional
+  // correct answer appears as a real fraction, not as `19/12`.
+  const el = qs("#taskReveal");
+  if (el !== null) typesetInto(el.native, answerDisplay);
 }
 
 /**
  * TR-157 — **emptied**, not merely hidden. A `display: none` element still
  * holding the answer in its text content is a C29 violation.
+ *
+ * TR-316 — and it MUST be `replaceChildren()`, not `setText("")`: the typeset
+ * answer carries a second textual representation in `aria-label="19 over 12"`,
+ * which blanking the text would leave sitting in an attribute where a
+ * `textContent`-based check would never see it.
  */
 export function clearReveal(): void {
-  qs("#taskReveal")?.setText("");
+  qs("#taskReveal")?.native.replaceChildren();
 }
 
 /**
@@ -186,8 +228,15 @@ export function setAnswerReadonly(readonly: boolean): void {
  */
 export function applyArenaStyles(): void {
   const el = arena();
+  // TR-023 / TR-319 / TR-320 — written as a custom property, not as
+  // `style.fontSize`. An inline `font-size` outranks a media query, which would
+  // silently defeat the `sm`-and-below scaling and let the widest realistic
+  // prompt (`13/14 + (−15/16)`, two stacked fractions and a scaled paren)
+  // overflow 320 px. The stylesheet multiplies this by a per-breakpoint scale,
+  // so the whole row scales as one and the fraction never becomes a second type
+  // size.
+  el.native.style.setProperty("--arena-font-size", `${getConfig.fontSize}rem`);
   el.setStyle({
-    fontSize: `${getConfig.fontSize}rem`,
     maxWidth:
       getConfig.maxLineWidth === 0 ? "" : `${getConfig.maxLineWidth}rem`,
   });

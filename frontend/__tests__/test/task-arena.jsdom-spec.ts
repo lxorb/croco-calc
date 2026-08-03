@@ -43,6 +43,39 @@ const answerEl = (): HTMLInputElement =>
   document.querySelector("#answerInput") as HTMLInputElement;
 
 /**
+ * TR-322's round-trip, applied to the reveal: walk the typeset DOM and rebuild
+ * the engine's `answerDisplay`, emitting `<num>/<den>` for each stacked
+ * fraction.
+ *
+ * `#taskReveal.textContent` is **not** the answer any more. §14 splits a
+ * fraction into separate numerator and denominator nodes with a *drawn*
+ * vinculum, so `19/12` reads back as `"1912"` — a string that is not a valid
+ * answer to anything. Reading the answer out of `textContent` therefore submits
+ * a wrong answer and silently stops exercising the correct path, and because
+ * the seed is fresh on every run it does so only for the seeds whose task 0 is
+ * a fraction. Hence this helper, and hence `reveal()` is kept only for the
+ * emptiness and stability assertions it is still sound for.
+ */
+function revealAnswer(): string {
+  const row = document.querySelector("#taskReveal .mathRow");
+  // TR-274's fallback renders one plain text node and no row.
+  if (row === null) return reveal();
+
+  return [...row.children]
+    .map((atom) => {
+      const sign = atom.querySelector(".mathSign")?.textContent ?? "";
+      const frac = atom.querySelector(".mathFrac");
+      if (frac === null) {
+        return `${sign}${atom.querySelector(".mathNum")?.textContent ?? ""}`;
+      }
+      const num = frac.querySelector(".mathFrac__num")?.textContent ?? "";
+      const den = frac.querySelector(".mathFrac__den")?.textContent ?? "";
+      return `${sign}${num}/${den}`;
+    })
+    .join(" ");
+}
+
+/**
  * A controllable clock. `test-logic` timestamps everything with
  * `performance.now()`, so the fake timers have to agree with it or the TR-118
  * arming window cannot be tested deterministically.
@@ -217,17 +250,26 @@ describe("the task arena state machine", () => {
       const first = await load();
       for (const ch of "999999") first.logic.pressCharacter(ch);
       first.logic.submitOrContinue();
-      const answer = reveal();
+      // Read back through the typeset DOM, not through `textContent` — a
+      // fractional answer is stacked and has no `/` on screen at all.
+      const answer = revealAnswer();
       expect(answer).not.toBe("");
 
       // Rebuild everything from scratch with the same seed via `repeat`.
       first.logic.restart({ repeat: true });
       expect(state()).toBe("preStart");
 
+      // TR-097 / TR-098 — the displayed minus is U+2212, but the buffer and the
+      // keystrokes are ASCII, so the sign has to be converted back on the way
+      // in. `replace` without `/g` is deliberate: ME-137 accepts a minus only in
+      // first position, so there is never a second one to convert.
       for (const ch of answer.replace("−", "-")) {
         first.logic.pressCharacter(ch);
       }
       first.logic.submitOrContinue();
+      // Guard the guard: if the round-trip above ever silently degrades again,
+      // fail here with the reason rather than in each caller's assertion.
+      expect(state()).toBe("running");
       return first;
     }
 
