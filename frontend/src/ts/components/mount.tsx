@@ -23,13 +23,11 @@ import { ProfilePage } from "./pages/profile/ProfilePage";
 import { ProfileSearchPage } from "./pages/profile/ProfileSearchPage";
 import { AnswerSymbols } from "./pages/test/AnswerSymbols";
 import { BarTimerProgress } from "./pages/test/live-stats/BarTimerProgress";
-import { LiveStatsMini } from "./pages/test/live-stats/LiveStatsMini";
-import { LiveStatsTextBottom } from "./pages/test/live-stats/LiveStatsTextBottom";
-import { LiveStatsTextTop } from "./pages/test/live-stats/LiveStatsTextTop";
+import { TaskReadouts } from "./pages/test/live-stats/TaskReadouts";
 import { LoadingSpinner } from "./pages/test/LoadingSpinner";
 import { TestModesNotice } from "./pages/test/modes-notice/TestModesNotice";
 import { OutOfFocusWarning } from "./pages/test/OutOfFocusWarning";
-import { PreStartHint } from "./pages/test/PreStartHint";
+import { StartGate } from "./pages/test/StartGate";
 import { TestConfig } from "./pages/test/TestConfig";
 import { RestartIcon } from "./pages/test/TestIcons";
 import { Popups } from "./popups/Popups";
@@ -56,13 +54,11 @@ const components: Record<string, () => JSXElement> = {
   notfoundpage: () => <NotFoundPage />,
   accountsettingspage: () => <AccountSettingsPage />,
   outoffocuswarning: () => <OutOfFocusWarning />,
-  prestarthint: () => <PreStartHint />,
+  startgate: () => <StartGate />,
   answersymbols: () => <AnswerSymbols />,
   restarticon: () => <RestartIcon />,
   loadingspinner: () => <LoadingSpinner />,
-  livestatsmini: () => <LiveStatsMini />,
-  livestatstexttop: () => <LiveStatsTextTop />,
-  livestatstextbottom: () => <LiveStatsTextBottom />,
+  taskreadouts: () => <TaskReadouts />,
   bartimerprogress: () => <BarTimerProgress />,
 };
 

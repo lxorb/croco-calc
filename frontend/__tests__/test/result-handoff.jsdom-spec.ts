@@ -77,16 +77,20 @@ vi.mock("../../src/ts/states/core", () => ({
   setIsScreenshotting: vi.fn(),
 }));
 
-/** The real `#tasks*` markup the engine renders into, plus the results screen. */
+/** The real arena markup the engine renders into, plus the results screen. */
 function setupDom(): void {
   document.body.innerHTML = `<div class="page pageTest">
     <div id="testInitFailed" class="hidden"><div class="error"></div></div>
     <div id="tasksTest">
-      <div id="tasksWrapper">
-        <textarea id="tasksInput"></textarea>
-        <div id="caret" class="default"></div>
-        <div id="tasks" class="preStart" data-state="preStart"></div>
+      <div id="taskArena" data-state="preStart" data-feedback="none">
+        <div id="taskReadouts"></div>
+        <div id="taskPrompt"></div>
+        <div id="taskRule"></div>
+        <input id="answerInput" type="text" inputmode="decimal" />
+        <div id="taskReveal"></div>
+        <div id="taskContinueHint"></div>
       </div>
+      <div id="taskAnnouncer" aria-live="polite" aria-atomic="true" role="status"></div>
     </div>
     ${resultHtml}
     <div class="loading"></div>

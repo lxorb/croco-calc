@@ -1,6 +1,15 @@
 import { getConfig } from "../../../../config/store";
-import { cn } from "../../../../utils/cn";
 
+/**
+ * TR-034 — `timerColor` and `timerOpacity` keep applying to all three readouts
+ * and to the progress bar, unchanged (CP-077).
+ *
+ * TR-037 — the `TEXT_DISPLAY_CLASS` / `TEXT_WRAPPER_CLASS` pair that used to
+ * live here is struck. It implemented monkeytype's oversized-number-behind-the-
+ * stream treatment (`text-[4rem] … xl:text-[10rem]`, `z-[-1]`, `h-0`, `w-0` and
+ * a negative-margin overlay), which only made sense behind a wrapping word
+ * stream. `TaskReadouts` renders a normal in-flow row instead.
+ */
 export const liveStatsTextColor = (): Record<string, boolean> => ({
   "text-main": getConfig.timerColor === "main",
   "text-sub": getConfig.timerColor === "sub",
@@ -14,11 +23,3 @@ export const liveStatsBgColor = (): Record<string, boolean> => ({
   "bg-text": getConfig.timerColor === "text",
   "bg-[#000000]": getConfig.timerColor === "black",
 });
-
-export const TEXT_DISPLAY_CLASS = cn(
-  "text-[4rem] sm:text-[6rem] md:text-[7rem] lg:text-[8rem] xl:text-[10rem]",
-  "pointer-events-none relative z-[-1] grid h-0 text-center",
-);
-
-export const TEXT_WRAPPER_CLASS =
-  "absolute flex justify-self-center gap-[0.5ch] leading-none";

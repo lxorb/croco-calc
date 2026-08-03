@@ -35,7 +35,22 @@ export const configsContract = c.router(
         "Update the config of the current user. Only provided values will be updated while the missing values will be unchanged.",
       method: "PATCH",
       path: "",
-      body: PartialConfigSchema.strict(),
+      /**
+       * TR-210 / TR-260 — deliberately NOT `.strict()`.
+       *
+       * Deploy-ordering hazard, and a permanent one: a browser holding a
+       * cached SPA build still sends the config keys that build knew about. The
+       * moment a key is removed server-side, `.strict()` answers that client's
+       * next config save with a 422 — so the user silently stops being able to
+       * save *any* setting until they hard-refresh. Removing the two struck
+       * caret keys (TR-203) would have done exactly that.
+       *
+       * A non-strict object schema strips unknown keys instead, which is the
+       * behaviour that makes key removal survivable. The frontend already
+       * `.strip()`s on read, so strictness on write protected nothing; it only
+       * turned every future removal into a coordinated-deploy problem.
+       */
+      body: PartialConfigSchema,
       responses: {
         200: MonkeyResponseSchema,
       },

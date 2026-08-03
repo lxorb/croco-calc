@@ -62,12 +62,12 @@ a:not(.button):not([data-ui-variant="button"]):hover {
   animation: fire 5s linear infinite;
 }
 
-#tasks {
-  --correct-letter-animation: fire 5s linear infinite;
+#taskArena {
+  --task-active-animation: fire 5s linear infinite;
 }
 
-#tasks.flipped {
-  --untyped-letter-color: var(--sub-color);
-  --correct-letter-animation: none;
-  --untyped-letter-animation: fire 5s linear infinite;
+#taskArena.flipped {
+  --task-dim-color: var(--sub-color);
+  --task-active-animation: none;
+  --task-dim-animation: fire 5s linear infinite;
 }

@@ -1,7 +1,6 @@
 import { Config } from "./config/store";
-import * as Caret from "./test/caret";
 import { configEvent } from "./events/config";
-import { debounce, throttle } from "throttle-debounce";
+import { debounce } from "throttle-debounce";
 import * as TestUI from "./test/test-ui";
 import { getActivePage, getGlobalOffsetTop } from "./states/core";
 import { isDevEnvironment } from "./utils/env";
@@ -20,9 +19,9 @@ export function previewFontFamily(font: FontName): void {
     "--font",
     `"${font.replaceAll(/_/g, " ")}", "Roboto Mono", "Vazirharf", "monospace"`,
   );
-  // A different family means different glyph widths, so the task stream has to
-  // re-measure before the preview is judged.
-  TestUI.applyStreamStyles();
+  // A different family means different glyph widths, so the arena re-applies
+  // its sizing before the preview is judged.
+  TestUI.applyArenaStyles();
   isPreviewingFont = true;
 }
 
@@ -96,26 +95,19 @@ window.addEventListener("beforeunload", (event) => {
   }
 });
 
-// `test-ui.ts` re-measures the task stream on resize; what is left here is the
-// shell's half of the job — park the caret while the window is in motion, then
-// put the keyboard and the caret back once it settles. The tape-mode, line
-// centring and hint-position branches went with the features they served
-// (CP-060 … CP-066).
+// The arena is a centred flow layout, so a resize needs no re-measurement any
+// more — the stream geometry that did is gone. What is left is putting the
+// keyboard back on `#answerInput` once the window settles, so a resize does not
+// strand focus and silently swallow the next keystroke.
 const debouncedEvent = debounce(250, () => {
   if (getActivePage() === "test" && !getResultVisible()) {
     setTimeout(() => {
       TestUI.focusTasks();
-      Caret.show();
     }, 250);
   }
 });
 
-const throttledEvent = throttle(250, () => {
-  Caret.hide();
-});
-
 window.addEventListener("resize", () => {
-  throttledEvent();
   debouncedEvent();
 });
 

@@ -17,17 +17,56 @@
   <div id="tasksTest" class="content-grid full-width-padding">
     <mount data-component="testmodesnotice"></mount>
 
-    <mount data-component="livestatstexttop"></mount>
-    <mount data-component="livestatsmini" class="full-width"></mount>
-    <div id="tasksWrapper" class="content-grid full-width" translate="no">
-      <textarea
-        id="tasksInput"
-        class="full-width"
-        aria-label="Answer input"
+    <!--
+      TR-009 / TR-012 — the task arena. One task at a time, big and centred.
+      It replaces the former stream wrapper, stream, custom caret and hidden
+      capture field entirely: there is no stream to read ahead in, so there is
+      no stream, no caret over a per-character element, and nothing hidden.
+
+      TR-010 — `data-state` is always one of preStart | running |
+      awaitingContinue | finished. TR-011 — `data-feedback` is the animation
+      hook only and is never a source of truth.
+    -->
+    <div
+      id="taskArena"
+      class="full-width"
+      data-state="preStart"
+      data-feedback="none"
+      translate="no"
+    >
+      <mount data-component="taskreadouts" class="contents"></mount>
+
+      <!--
+        TR-038 — in `preStart` this element holds no text node at all and no
+        `data-*` attribute carrying a prompt. The pre-start guarantee is
+        structural, not visual: there is nothing to read because nothing is
+        rendered. Deleting a CSS class in devtools yields nothing.
+      -->
+      <div id="taskPrompt"></div>
+      <div id="taskRule" aria-hidden="true"></div>
+
+      <!--
+        TR-079 — the single answer input. `type` is `text`, never `number`
+        (TR-080): a `number` input rejects `/`, parses by locale and reports an
+        empty value for intermediate states, all three of which are wrong for an
+        answer that may be `7/12`.
+
+        The `data-*` attributes are anti-interference, not typing machinery
+        (TR-083): they stop password managers, Grammarly, Bitwarden and
+        1Password writing into or reading out of the field.
+      -->
+      <input
+        id="answerInput"
+        type="text"
+        inputmode="decimal"
+        enterkeyhint="done"
+        maxlength="16"
         autocomplete="off"
         autocapitalize="none"
         autocorrect="off"
-        inputmode="decimal"
+        spellcheck="false"
+        translate="no"
+        aria-label="Answer"
         data-gramm="false"
         data-gramm_editor="false"
         data-enable-grammarly="false"
@@ -35,28 +74,48 @@
         data-1p-ignore
         data-lpignore="true"
         data-form-type="other"
-        list="autocompleteOff"
-        spellcheck="false"
-      ></textarea>
-      <mount data-component="outoffocuswarning" class="contents"></mount>
-      <mount data-component="prestarthint" class="contents"></mount>
-      <div id="caret" class="full-width default"></div>
-      <div id="tasks" class="full-width preStart" data-state="preStart"></div>
+      />
+
       <!--
-        CP-183 — the stream itself is `user-select: none` and, while pre-start,
-        carries no prompt text at all, so a screen reader has nothing to read
-        off it. This region is how the active task's prompt is exposed instead:
-        `polite` so it never interrupts, `atomic` so the whole prompt is spoken
-        rather than a diff. It is written only once the stream is revealed, so
-        it cannot leak a prompt ahead of the start (CP-047).
+        TR-052 / TR-153 — the correct answer. Written ONLY after the task has
+        been committed, scored and logged, and emptied again on continue
+        (TR-157: a `display:none` element still holding the answer would be a
+        C29 violation). It is empty at every other moment of the run.
       -->
-      <div
-        id="taskAnnouncer"
-        aria-live="polite"
-        aria-atomic="true"
-        role="status"
-      ></div>
+      <div id="taskReveal"></div>
+      <!--
+        TR-053 — the continue affordance. Static markup rather than a rendered
+        component because the text never changes, and `<kbd>` picks up exactly
+        the same styling as the footer keytips (`core.scss`).
+
+        It is present **unconditionally** — deliberately not gated on
+        `showKeyTips` — because without it a user who gets an answer wrong sees
+        a screen that has simply stopped, with no indication that it is waiting
+        for them.
+      -->
+      <div id="taskContinueHint">
+        press
+        <kbd>enter</kbd>
+        to continue
+      </div>
+
+      <mount data-component="outoffocuswarning" class="contents"></mount>
+      <mount data-component="startgate" class="contents"></mount>
     </div>
+
+    <!--
+      TR-013 / CP-183 — the only live region on the test page. The visible
+      arena elements deliberately carry no `aria-live`, so two regions can
+      never compete. Clipped to a 1px box rather than hidden with
+      `display: none` / `visibility: hidden` / `hidden`, all three of which
+      would silence it. TR-147 — never written in `preStart` except to clear.
+    -->
+    <div
+      id="taskAnnouncer"
+      aria-live="polite"
+      aria-atomic="true"
+      role="status"
+    ></div>
 
     <mount data-component="answersymbols"></mount>
 
@@ -68,7 +127,6 @@
     >
       <mount data-component="restarticon" class="contents"></mount>
     </button>
-    <mount data-component="livestatstextbottom"></mount>
   </div>
   <div class="loading hidden">
     <mount data-component="loadingspinner" class="contents"></mount>

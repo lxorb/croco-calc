@@ -352,8 +352,6 @@ describe("SB-160 - commands that must survive", () => {
     "changeResultSaving",
     "changeQuickRestart",
     "changeSingleListCommandLine",
-    "changeSmoothCaret",
-    "changeCaretStyle",
     "changeTimerStyle",
     "changeTimerColor",
     "changeTimerOpacity",

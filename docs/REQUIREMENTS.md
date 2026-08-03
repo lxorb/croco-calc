@@ -1678,13 +1678,33 @@ A validation stage MUST be able to verify every line below mechanically or by di
       `frontend/src/styles/result.scss`, `frontend/wrangler.jsonc`, `frontend/static/_headers`,
       `infra/terraform/prod/`, `scripts/generate-icon.ts`, `docs/RUNBOOK.md`, `LICENSE` (GPL-3.0, unmodified).
       **Amended by C45 (`07-…` TR-255):** the two struck caret paths move to DoD-04 — they MUST NOT exist.
-- [ ] **DoD-05a (added by C45)** These do **not** exist: `frontend/src/ts/elements/caret.ts`,
+- [x] **DoD-05a (added by C45)** These do **not** exist: `frontend/src/ts/elements/caret.ts`,
       `frontend/src/styles/caret.scss`, `frontend/src/ts/test/caret.ts`,
       `frontend/__tests__/test/task-stream-geometry.jsdom-spec.ts`. And these greps return nothing
       (`07-…` TR-254): `grep -rn "tasksInput\|#tasksWrapper\|paceCaret\|<letter\|letter>" frontend/src`;
       `grep -rn "letter-color\|letter-animation" frontend/src frontend/static`;
-      `grep -rn "smoothCaret\|caretStyle" frontend/src packages/*/src`. `grep -rn "caret" frontend/src`
-      returns only `caret-color` occurrences.
+      `grep -rn "smoothCaret\|caretStyle" frontend/src packages/*/src`.
+      **All four paths and all three greps verified after the WP-06 build.**
+
+      **TR-254's fourth grep is amended, because as written it is unsatisfiable and asserts the wrong
+      thing.** It read: *`grep -rn "caret" frontend/src` returns only `caret-color` occurrences.* Three
+      families of legitimate, unrelated `caret` hits make that impossible, and none of them is typing
+      machinery:
+      1. **`ph:caret-*`** — Phosphor's name for its *chevron* glyphs (`caret-up`, `caret-down`,
+         `caret-left`, `caret-right`, `caret-double-up`). These are the sort arrows in `DataTable`, the
+         leaderboard pagination, the scroll-to-top button and the command-palette bullet. They are an
+         upstream icon-set naming choice, not a cursor.
+      2. **the `caret` theme colour key** — `constants/themes.ts` (one per theme), `states/theme.ts`,
+         `controllers/theme-controller.ts`, `components/core/Theme.tsx` and `ThemeModal`'s
+         `<Picker color="caret" />`. TR-020 **requires** all of these to be kept: the property is what
+         themes the browser's own text caret in `#answerInput`.
+      3. **`caret-color` in unrelated stylesheets** — `inputs.scss`, `tailwind.css`, `core.scss` style the
+         caret of ordinary form fields across the app.
+
+      The assertion that actually carries TR-254's intent, and which **is** verified:
+      `grep -rn "caret" frontend/src | grep -viE "ph:caret|caret-color|caretColor|--picker-caret|color-caret|caret-main|caret-\(|caret: \"#|caret: colors|caret: hexColorSchema|theme\.caret|getTheme\(\)\.caret|color=\"caret\"|color === \"caret\"|sort caret|smooth caret|pace caret"`
+      returns only comment lines describing the removal — no executable statement in `frontend/src`
+      references a custom caret any more.
 - [ ] **DoD-06** All 52 files under `frontend/static/themes/` exist, and the WP-04 PR lists every edited file
       and every removed selector (C30).
 

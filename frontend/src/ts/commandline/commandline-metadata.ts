@@ -165,18 +165,6 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
     },
   },
 
-  //caret
-  smoothCaret: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-  caretStyle: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-
   //appearance
   liveSpeedStyle: {
     subgroup: {

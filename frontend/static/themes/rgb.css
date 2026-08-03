@@ -103,11 +103,11 @@ header [data-nav-item="account"]:hover [data-ui-element="navAvatar"] svg path {
   animation: rgb-fill 5s linear infinite;
 }
 
-#tasks {
-  --correct-letter-animation: rgb 5s linear infinite;
+#taskArena {
+  --task-active-animation: rgb 5s linear infinite;
 }
 
-#tasks.flipped {
-  --correct-letter-animation: none;
-  --untyped-letter-animation: rgb 5s linear infinite;
+#taskArena.flipped {
+  --task-active-animation: none;
+  --task-dim-animation: rgb 5s linear infinite;
 }

@@ -241,10 +241,11 @@ export function AboutPage(): JSXElement {
             multiplication, division, fraction addition, fraction
             multiplication, decimals and negative numbers — plus a test length
             of 1, 2, 4 or 8 minutes, an account system to save your score
-            history, and user-configurable features such as themes, sounds, a
-            smooth caret, and more. croco calc keeps the task prompts
-            unobtrusive and shows your answer in place, so the only thing
-            between you and the next result is the arithmetic.
+            history, and user-configurable features such as themes, fonts, live
+            readouts, and more. croco calc shows you one task at a time, large
+            and centred, so the only thing between you and the next result is
+            the arithmetic. Get one wrong and it shows you the right answer and
+            waits until you are ready to carry on.
             <br />
             <br />
             Test yourself in various modes, track your progress and get faster.

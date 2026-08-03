@@ -32,10 +32,6 @@ const obj: Config = {
   resultSaving: true,
   singleListCommandLine: "on",
 
-  // caret (restored by master C11)
-  smoothCaret: "medium",
-  caretStyle: "default",
-
   // appearance
   timerStyle: "mini",
   liveSpeedStyle: "off",

@@ -11,7 +11,21 @@
  * records what the *user* entered and whether it was right, never what was right.
  */
 
-export const EVENT_LOG_VERSION = 2;
+/**
+ * TR-076 — bumped 2 -> 3 for the one-task-at-a-time redesign.
+ *
+ * No event type was added or removed. `taskShown` changed *meaning* slightly:
+ * it now fires when the prompt actually appears on screen, which lags the
+ * preceding `answerSubmitted` by the correct-answer dwell or the wrong-answer
+ * pause. The version bump is what records that, so a replay of an older log is
+ * not misread as having instant advances.
+ *
+ * TR-167 — this is a debug and replay stream, NOT the anti-cheat artefact.
+ * `buildCompletedEvent` reads `engine.taskLog()` and never the event log, and
+ * nothing the server validates depends on this constant, which is why the bump
+ * is free.
+ */
+export const EVENT_LOG_VERSION = 3;
 
 export type TestEventType = "taskShown" | "answerSubmitted" | "timer";
 
@@ -24,7 +38,10 @@ type EventProps<T extends TestEventType, TData> = {
   data: TData;
 };
 
-/** The active pointer moved onto a task (CP-040). */
+/**
+ * TR-077 — a task's prompt was rendered. Logged at the moment the prompt
+ * actually appears, which is also the moment ME-159's `tStart` is stamped.
+ */
 export type TaskShownEventData = {
   taskIndex: number;
   /** Public information — the prompt is on screen anyway. */

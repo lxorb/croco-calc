@@ -269,11 +269,11 @@ export async function applyCustomBackground(): Promise<void> {
   }
 
   if (backgroundUrl === "") {
-    qs("#tasks")?.removeClass("noErrorBorder");
+    qs("#taskArena")?.removeClass("noErrorBorder");
     qs("#resultTaskHistory")?.removeClass("noErrorBorder");
     qs(".customBackground img")?.remove();
   } else {
-    qs("#tasks")?.addClass("noErrorBorder");
+    qs("#taskArena")?.addClass("noErrorBorder");
     qs("#resultTaskHistory")?.addClass("noErrorBorder");
 
     //use setAttribute for possible unsafe customBackground value

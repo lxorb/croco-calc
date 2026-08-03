@@ -48,7 +48,9 @@ function publish(engine: TestEngine): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-timer]")) {
     el.dataset["secondsRemaining"] = String(remainingSeconds);
   }
-  qs("#tasks")?.native.setAttribute(
+  // TR-017 / TR-252 — the CP-189 hook moved to the arena with the rest of the
+  // in-run surface. The drift-corrected scheduler below is unchanged.
+  qs("#taskArena")?.native.setAttribute(
     "data-seconds-remaining",
     String(remainingSeconds),
   );

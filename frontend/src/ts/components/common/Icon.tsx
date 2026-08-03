@@ -171,6 +171,13 @@ const ICON_BODIES: Record<string, string> = {
     '<path fill="currentColor" d="M228 128a100 100 0 0 1-98.66 100H128a99.4 99.4 0 0 1-68.62-27.29a12 12 0 0 1 16.48-17.45a76 76 0 1 0-1.57-109c-.13.13-.25.25-.39.37L54.89 92H72a12 12 0 0 1 0 24H24a12 12 0 0 1-12-12V56a12 12 0 0 1 24 0v20.72l21.48-19.66A100 100 0 0 1 228 128"/>',
   "ph:arrow-down-bold":
     '<path fill="currentColor" d="m208.49 152.49l-72 72a12 12 0 0 1-17 0l-72-72a12 12 0 0 1 17-17L116 187V40a12 12 0 0 1 24 0v147l51.51-51.52a12 12 0 0 1 17 17Z"/>',
+  // TR-105 — the symbol row's submit / continue button. Generated as an exact
+  // horizontal mirror of the bundled `-right-` body about the centre of the
+  // 256×256 view box, because the workspace has no `@iconify-json/*` package
+  // and no network for the generator to fetch the left variant from. The
+  // geometry is therefore the audited upstream path, reflected, not hand-drawn.
+  "ph:arrow-elbow-down-left-bold":
+    '<g transform="translate(256 0) scale(-1 1)"><path fill="currentColor" d="m224.49 184.49l-48 48a12 12 0 0 1-17-17L187 188H72a12 12 0 0 1-12-12V32a12 12 0 0 1 24 0v132h103l-27.52-27.51a12 12 0 1 1 17-17l48 48a12 12 0 0 1 .01 17"/></g>',
   "ph:arrow-elbow-down-right-bold":
     '<path fill="currentColor" d="m224.49 184.49l-48 48a12 12 0 0 1-17-17L187 188H72a12 12 0 0 1-12-12V32a12 12 0 0 1 24 0v132h103l-27.52-27.51a12 12 0 1 1 17-17l48 48a12 12 0 0 1 .01 17"/>',
   "ph:arrow-left-bold":

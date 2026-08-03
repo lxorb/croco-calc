@@ -1,413 +1,203 @@
 /**
- * The task stream (CP-030 … CP-052).
+ * The task arena (doc 07, TR-009 … TR-058).
  *
- * The upstream project renders its prompt stream as a wrapping flex row with the
- * caret over the active glyph and a line-jump scroll. croco calc keeps exactly
- * that metaphor with `prompt → task` — three visible lines of upcoming content
- * that flow past you (CP-030, CP-044). The Zetamac single-centred-task
- * alternative was considered and rejected in doc 03 §2.3.
+ * One task at a time, large and centred. This replaces the wrapping task
+ * stream, its three-line scroll geometry, the custom caret and the hidden
+ * capture textarea that the CP-030 … CP-052 design inherited from monkeytype.
  *
- * ## Geometry and the line jump (CP-044)
+ * The rationale, recorded because it is the whole point of the redesign:
+ * monkeytype streams words because you type continuously *through* them — the
+ * stream is the input surface. A math trainer has no stream to read ahead in.
+ * You see one problem, you solve it, you get the next one.
  *
- * Two elements, two jobs, and they must not be the same element:
+ * ## The DOM contract (TR-010 … TR-012)
  *
- * - `#tasksWrapper` is the **viewport**: a fixed height of exactly
- *   {@link VISIBLE_LINES} line boxes, clipped vertically by `test.scss`.
- * - `#tasks` is the **content**: `height: fit-content`, unclipped, scrolled by
- *   animating its `margin-top`. Clipping the same element you scroll would move
- *   the window along with its contents and scroll nothing.
+ * `#taskArena` carries `data-state` (`preStart` | `running` |
+ * `awaitingContinue` | `finished`), `data-feedback` (`none` | `correct` |
+ * `wrong`), `data-taskindex` and, while feedback is showing, `data-result`.
+ * `data-state` is a **projection** of engine phase plus the two
+ * presentation-only sub-states (TR-059) — it is never authoritative for
+ * anything the result payload is derived from.
  *
- * The offset is **derived, never accumulated**: on every move of the active task
- * the target margin is recomputed from that task's line index inside the
- * currently rendered document. So a full re-render (which happens every 20
- * commits to keep the runway stocked) lands on a correct offset instead of
- * inheriting a stale one, and a dropped or interrupted animation self-corrects
- * on the next commit instead of desynchronising the stream forever.
+ * ## The pre-start guarantee (TR-038, TR-039)
  *
- * The active task sits on the first line until it reaches the second, and stays
- * pinned there for the rest of the run — one committed line above it, one
- * upcoming line below. That is the upstream steady state, reproduced without
- * upstream's "animate one line, then delete the top line and reset the margin"
- * bookkeeping.
+ * The requirement that a user must not read the first task before starting is
+ * now satisfied **structurally, not visually**: in `preStart` nothing is
+ * rendered at all. There is no blur to defeat, no `masked` markup and no
+ * fixed-width blank, because there is no prompt in the document. Deleting a CSS
+ * class in devtools, screenshotting the page or reading
+ * `document.body.textContent` yields nothing, because there is nothing to
+ * yield.
  *
- * ## The pre-start hide (CP-046 … CP-052)
+ * ## C29 (TR-151 … TR-157)
  *
- * The brief requires that the first task cannot be read before the test starts,
- * "so you don't get an advantage by pre-reading it". CP-047 widens that to the
- * whole stream, because blurring only task 0 leaves 1..n readable and the stated
- * advantage fully intact.
- *
- * Two mechanisms, deliberately layered:
- *
- * 1. **The prompts are not in the DOM at all.** While pre-start every `.task`
- *    renders as `.masked` with a blank fixed-width `.prompt` and
- *    `data-masked="true"`; no prompt string reaches the document. Deleting the
- *    CSS class in devtools, screenshotting, or reading `document.body.textContent`
- *    yields nothing, because there is nothing to yield. This is the real defence.
- * 2. **The `preStart` class**, carrying the same `opacity: 0.25; filter: blur(4px)`
- *    upstream uses for its own blur, kept separate from `blurred` so the two
- *    compose independently and each can be asserted in isolation (CP-046, CP-084).
- *
- * The reveal is one atomic step driven by the same event that starts the clock
- * (CP-049): the real prompts are written and `preStart` is dropped together, so
- * the 0.25 s transition (CP-051) plays over freshly rendered text. Nothing else
- * — not Tab, Escape, Enter, Space, a click, a modal or a refocus — can reach
- * `revealStream()` (CP-050, CP-085).
+ * The redesign makes master C29 **strictly easier** to satisfy, and the
+ * argument is preserved here deliberately: exactly one task exists on screen at
+ * a time, so only one task's answer is ever in play. The correct answer enters
+ * the DOM at exactly one moment — {@link showReveal}, which is only ever called
+ * *after* `engine.commit()` has already scored and logged that task — and is
+ * **emptied** again (never merely hidden) on continue, on restart and on
+ * finish.
  */
-
-import type { JSAnimation } from "animejs";
 
 import { getConfig } from "../config/store";
 import { configEvent } from "../events/config";
-import { focusInputElement } from "../input/input-element";
-import {
-  getActiveTaskIndex,
-  isPreStart,
-  setOutOfFocusMaxHeight,
-  setPreStart,
-} from "../states/test";
-import { qs, qsa, qsr } from "../utils/dom";
-import * as Caret from "./caret";
-import type { TaskView } from "./test-engine";
+import { focusInputElement, setInputValue } from "../input/input-element";
+import type { ArenaState } from "../states/test";
+import { getArenaState, setArenaState } from "../states/test";
+import { qs, qsr } from "../utils/dom";
 
-/** CP-044 — the upstream default: three visible lines. */
-export const VISIBLE_LINES = 3;
-/**
- * Which of those lines the active task settles on, zero-based. It starts on
- * line 0 and stops climbing once it reaches line 1, so there is always one
- * finished line above and one upcoming line below.
- */
-const ACTIVE_LINE = 1;
-/** How many tasks past the active one are kept in the document (CP-045). */
-const RENDER_AHEAD = 60;
-/** How many committed tasks stay behind the active one, so hints remain visible. */
-const RENDER_BEHIND = 24;
-/** CP-044 — duration of one line jump, in ms. */
-const LINE_JUMP_MS = 125;
-/** Widths, in `ch`, a masked task occupies. Task-shaped, but empty. */
-const MASK_WIDTHS = [9, 11, 13, 10, 12];
+/** TR-120 — the feedback timings, named so tests import rather than hard-code. */
+export const CORRECT_DWELL_MS = 180;
+export const FEEDBACK_PHASE_MS = 90;
+export const REVEAL_FADE_MS = 120;
+export const CONTINUE_ARM_MS = 210;
 
-/** One line box of the stream in px, margins included. 0 until measurable. */
-let lineHeight = 0;
-/** The `margin-top` currently applied to `#tasks`, in px. Always ≤ 0. */
-let streamOffset = 0;
-let lineJumpAnimation: JSAnimation | undefined;
+/** TR-010 — the four values `#taskArena[data-state]` may hold. */
+export type TestDomState = ArenaState;
 
-function tasksElement(): ReturnType<typeof qsr> {
-  return qsr("#tasks");
+/** TR-011 — the animation hook. Never a source of truth. */
+export type FeedbackKind = "none" | "correct" | "wrong";
+
+function arena(): ReturnType<typeof qsr> {
+  return qsr("#taskArena");
 }
 
 /**
- * CP-183 — announce the active task's prompt.
+ * TR-030 — the **display** form of a prompt drops a single trailing ` =`,
+ * because `#taskRule` now carries the equals relation.
  *
- * `#tasks` is `user-select: none` and, before the reveal, holds no prompt text
- * at all, so a screen-reader user would otherwise get an unannounced blank
- * region. The prompt is read back out of the DOM rather than threaded through
- * every call site, which keeps this correct for all three paths that move the
- * active marker (reveal, commit, re-render) without widening their signatures.
- *
- * Reading the DOM is also what makes this safe for C29/CP-047: while pre-start
- * the rendered prompts are empty, and the `isPreStart()` guard means we do not
- * even look. A prompt can only be announced once it is already on screen.
+ * Display-only, and that matters: `task.prompt` keeps its trailing ` =`, the
+ * value written to the task log and to `#taskAnnouncer` is `task.prompt`
+ * verbatim, and `packages/math-engine`'s `renderPrompt` is untouched. ME-174
+ * regenerates and compares the logged prompt string server-side, so changing
+ * what the engine produces would break revalidation and force an
+ * ME-177/ME-184 engine-version bump for a purely cosmetic reason.
  */
-function announceTask(activeIndex: number): void {
-  const announcer = qs("#taskAnnouncer");
-  if (announcer === null) return;
-  if (isPreStart()) {
-    announcer.native.textContent = "";
-    return;
-  }
-  const prompt = qs(
-    `#tasks .task[data-taskindex="${activeIndex}"] .prompt`,
-  )?.native.textContent?.trim();
-  if (prompt === undefined || prompt === "") return;
-  announcer.native.textContent = prompt;
+export function displayPrompt(prompt: string): string {
+  return prompt.replace(/\s*=\s*$/, "");
 }
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-function lettersHtml(buffer: string): string {
-  return [...buffer].map((ch) => `<letter>${escapeHtml(ch)}</letter>`).join("");
-}
-
-/**
- * The markup for one task (CP-031, CP-032): exactly two children, a `.prompt`
- * and an `.answer`, plus the CP-041 hint once it is committed and wrong.
- */
-function taskHtml(view: TaskView): string {
-  const classes = ["task"];
-  if (view.state === "active") classes.push("active");
-  if (view.state === "committed") {
-    classes.push("typed", view.result === "correct" ? "correct" : "incorrect");
-  }
-
-  // C29: `expected` is populated by the engine only for a committed task, so
-  // this hint can never reveal an answer that is still in play.
-  const hint =
-    view.state === "committed" && view.result === "incorrect"
-      ? `<div class="hints"><hint>${escapeHtml(view.expected ?? "")}</hint></div>`
-      : "";
-
-  const attr = resultAttr(view);
-  const result = attr === undefined ? "" : ` data-result="${attr}"`;
-
-  return (
-    `<div class="${classes.join(" ")}" data-taskindex="${view.index}"${result}>` +
-    `<span class="prompt">${escapeHtml(view.prompt)} </span>` +
-    `<span class="answer">${lettersHtml(view.given)}</span>${hint}</div>`
-  );
-}
-
-/** A task-shaped blank. Carries no prompt text at all — see the file header. */
-function maskedTaskHtml(index: number): string {
-  const width = MASK_WIDTHS[index % MASK_WIDTHS.length] ?? 10;
-  return (
-    `<div class="task masked" data-taskindex="${index}" data-masked="true">` +
-    `<span class="prompt" style="display:inline-block;width:${width}ch"></span>` +
-    `<span class="answer"></span></div>`
-  );
-}
-
-/** CP-186 — `#tasks` always carries `data-state`, with exactly these values. */
-export type TestDomState = "preStart" | "running" | "finished";
 
 export function setTestState(state: TestDomState): void {
-  tasksElement().native.dataset["state"] = state;
+  setArenaState(state);
+  arena().native.dataset["state"] = state;
 }
 
-/** CP-187 — `data-result` is `correct` | `wrong`, never `incorrect`. */
-function resultAttr(view: TaskView): "correct" | "wrong" | undefined {
-  if (view.result === undefined) return undefined;
-  return view.result === "correct" ? "correct" : "wrong";
+export function getTestState(): TestDomState {
+  return getArenaState();
 }
 
-/** The slice of task indices that should currently be in the document. */
-export function getRenderWindow(activeIndex: number): {
-  from: number;
-  to: number;
-} {
-  return {
-    from: Math.max(0, activeIndex - RENDER_BEHIND),
-    to: activeIndex + RENDER_AHEAD,
-  };
+export function setFeedback(kind: FeedbackKind): void {
+  arena().native.dataset["feedback"] = kind;
 }
 
 /**
- * CP-046 / CP-052 — (re-)hide the stream. Called on page load and on every
- * restart path; a test is never resumed half-revealed.
+ * TR-015 — `data-result` lives on the arena (there is exactly one task), and is
+ * **removed**, not blanked, once the feedback is over.
  */
-export function applyPreStart(): void {
-  const tasks = tasksElement();
-  setPreStart(true);
-  tasks.addClass("preStart");
-  setTestState("preStart");
-  tasks.setHtml(
-    Array.from({ length: RENDER_AHEAD }, (_, i) => maskedTaskHtml(i)).join(""),
-  );
-  // CP-183 — a restart must not leave the previous run's last prompt sitting in
-  // the live region, where a screen reader would re-read it as if it were live.
-  announceTask(0);
-  resetStreamOffset();
-  // Not just `applyGeometry`: every restart path funnels through here,
-  // including the initial build, so this is the one place guaranteed to run
-  // after the config has loaded — and the line box can only be measured once
-  // the configured font size is on the element.
-  applyStreamStyles();
+export function setResult(result: "correct" | "wrong" | undefined): void {
+  const el = arena().native;
+  if (result === undefined) delete el.dataset["result"];
+  else el.dataset["result"] = result;
+}
+
+export function setTaskIndex(index: number): void {
+  arena().native.dataset["taskindex"] = `${index}`;
 }
 
 /**
- * CP-049 / CP-051 — the reveal. Only the input pipeline's "first accepted
- * symbol" path reaches this, and it does so in the same turn as the clock start.
- */
-export function revealStream(views: readonly TaskView[]): void {
-  setPreStart(false);
-  renderStream(views);
-  tasksElement().removeClass("preStart");
-  setTestState("running");
-}
-
-/** Writes the whole visible window. */
-export function renderStream(views: readonly TaskView[]): void {
-  const tasks = tasksElement();
-  tasks.setHtml(views.map(taskHtml).join(""));
-  resetStreamOffset();
-  applyGeometry();
-  // The window normally starts RENDER_BEHIND tasks *before* the active one, so
-  // the correct offset after a re-render is several lines — snap to it rather
-  // than animating a jump the user never triggered.
-  updateActiveElement(getActiveTaskIndex(), true);
-}
-
-/**
- * CP-032 — re-render only the active task's `<letter>` run. Deliberately no
- * per-keystroke feedback of any kind (CP-036 / ME-152): the letters carry no
- * correct/incorrect class while the answer is being entered.
- */
-export function updateActiveAnswer(buffer: string): void {
-  const answer = qs(
-    `#tasks .task[data-taskindex="${getActiveTaskIndex()}"] .answer`,
-  );
-  if (answer === null) return;
-  answer.setHtml(lettersHtml(buffer));
-  Caret.updatePosition();
-}
-
-/** CP-040 — mark the just-committed task and move `.active` on by one. */
-export function commitTask(view: TaskView, nextActive: number): void {
-  const el = qs(`#tasks .task[data-taskindex="${view.index}"]`);
-  if (el !== null) {
-    el.removeClass("active");
-    el.addClass(["typed", view.result === "correct" ? "correct" : "incorrect"]);
-    el.native.dataset["result"] = resultAttr(view) ?? "";
-    if (view.result === "incorrect") {
-      const hints = document.createElement("div");
-      hints.className = "hints";
-      const hint = document.createElement("hint");
-      // CP-041 — safe, and only safe, because this task is already committed.
-      hint.textContent = view.expected ?? "";
-      hints.appendChild(hint);
-      el.native.appendChild(hints);
-    }
-  }
-  updateActiveElement(nextActive);
-}
-
-/**
- * CP-044 — move the `.active` marker and, when the active task has dropped onto
- * a new line, scroll the stream so that task is back on {@link ACTIVE_LINE}.
+ * TR-145 — the announcer is written on exactly four occasions and no others.
  *
- * `instant` skips the animation; it is used after a re-render, where the offset
- * can legitimately change by many lines at once.
+ * `prompt` is always `task.prompt` **verbatim**, never the display form: a
+ * screen reader should hear the equals sign that the sighted user reads off
+ * `#taskRule`.
  */
-export function updateActiveElement(
-  activeIndex: number,
-  instant = false,
-): void {
-  const tasks = tasksElement().native;
-  const next = tasks.querySelector<HTMLElement>(
-    `.task[data-taskindex="${activeIndex}"]`,
-  );
-  if (next === null) return;
-  for (const stale of tasks.querySelectorAll(".task.active")) {
-    if (stale !== next) stale.classList.remove("active");
-  }
-  next.classList.add("active");
-
-  // CP-183. Every path that moves the active marker funnels through here, so
-  // this is the single place the live region needs updating.
-  announceTask(activeIndex);
-
-  scrollActiveIntoView(next, instant);
-  Caret.updatePosition(instant);
-}
-
-/** The zero-based line the given task occupies inside `#tasks`. */
-function lineIndexOf(task: HTMLElement): number {
-  if (lineHeight <= 0) return 0;
-  const first = tasksElement().native.querySelector<HTMLElement>(".task");
-  if (first === null) return 0;
-  // A difference of two `offsetTop`s is immune to the stream's own margin, so
-  // this is safe to read while a line jump is mid-animation.
-  return Math.max(
-    0,
-    Math.round((task.offsetTop - first.offsetTop) / lineHeight),
-  );
+export function announce(text: string): void {
+  const announcer = qs("#taskAnnouncer");
+  if (announcer === null) return;
+  announcer.native.textContent = text;
 }
 
 /**
- * CP-044 — the line jump. Recomputed from scratch each time, so it cannot drift.
+ * TR-044 — render one task's prompt. The only place a prompt reaches the DOM.
+ *
+ * `textContent` rather than `innerHTML`: the engine's glyphs (`×`, `÷`, `/`,
+ * U+2212) are plain text and never markup, so there is nothing to escape and no
+ * injection surface to get wrong.
  */
-function scrollActiveIntoView(active: HTMLElement, instant: boolean): void {
-  if (lineHeight <= 0) return;
-  const target = -Math.max(0, lineIndexOf(active) - ACTIVE_LINE) * lineHeight;
-  if (target === streamOffset) return;
-
-  const delta = target - streamOffset;
-  const duration = instant ? 0 : LINE_JUMP_MS;
-  streamOffset = target;
-
-  lineJumpAnimation?.cancel();
-  if (duration === 0) {
-    tasksElement().setStyle({ marginTop: `${target}px` });
-  } else {
-    lineJumpAnimation = tasksElement().animate({
-      marginTop: target,
-      duration,
-    });
-  }
-  // The caret is positioned against `#tasksWrapper`, so it needs the *delta* of
-  // this jump, not the absolute offset of the stream.
-  Caret.caret.handleLineJump({ newMarginTop: delta, duration });
+export function renderPrompt(prompt: string, index: number): void {
+  qs("#taskPrompt")?.setText(displayPrompt(prompt));
+  setTaskIndex(index);
 }
 
-/** Puts the stream back at line 0 with no animation in flight. */
-function resetStreamOffset(): void {
-  lineJumpAnimation?.cancel();
-  lineJumpAnimation = undefined;
-  streamOffset = 0;
-  tasksElement().setStyle({ marginTop: "0px" });
-  Caret.caret.clearMargins();
+/** TR-038 — remove the prompt from the document entirely. */
+export function clearPrompt(): void {
+  qs("#taskPrompt")?.setText("");
 }
 
 /**
- * Measures one line box — `offsetHeight` alone is the content box and misses
- * `.task`'s vertical margins, which are what actually separate two lines.
+ * TR-089 — `#answerInput.value` is a **mirror** of the engine's buffer, never
+ * the other way round, and TR-091 collapses the selection to the end after
+ * every write so the browser's native caret is always in the right place.
  */
-function measureLineHeight(task: HTMLElement): number {
-  const style = window.getComputedStyle(task);
-  const margins =
-    (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0);
-  return task.offsetHeight + margins;
+export function syncAnswer(buffer: string): void {
+  setInputValue(buffer);
 }
 
 /**
- * Clamps the **viewport** to `VISIBLE_LINES` lines — what makes it a stream.
- * `#tasks` itself stays `height: fit-content` so it can be scrolled inside it.
+ * TR-052 — the correct answer, shown only once the task is already committed,
+ * scored and logged.
+ *
+ * C29's single controlled disclosure point. Callers must pass the
+ * `answerDisplay` of the **just committed** task and nothing else; the engine's
+ * `viewAt` refuses to hand out an uncommitted answer, which is what makes that
+ * impossible to get wrong by accident (TR-155).
  */
-function applyGeometry(): void {
-  const wrapper = qs("#tasksWrapper");
-  wrapper?.setStyle({
+export function showReveal(answerDisplay: string): void {
+  qs("#taskReveal")?.setText(answerDisplay);
+}
+
+/**
+ * TR-157 — **emptied**, not merely hidden. A `display: none` element still
+ * holding the answer in its text content is a C29 violation.
+ */
+export function clearReveal(): void {
+  qs("#taskReveal")?.setText("");
+}
+
+/**
+ * TR-056 — the wrong answer cannot be edited once the correct one is on screen.
+ * The input keeps focus: a `readonly` input still receives `keydown`, which is
+ * how Enter continues.
+ */
+export function setAnswerReadonly(readonly: boolean): void {
+  const input = qs("#answerInput")?.native as HTMLInputElement | undefined;
+  if (input === undefined) return;
+  input.readOnly = readonly;
+}
+
+/**
+ * TR-023 / TR-025 — the two config keys that change the arena's geometry.
+ *
+ * `maxLineWidth` is retained under its existing key name (TR-246, TR-258): it
+ * has a real analogue here — it visibly controls the width of `#taskRule` —
+ * and renaming it would strand every stored and synced config for no
+ * user-visible gain.
+ */
+export function applyArenaStyles(): void {
+  const el = arena();
+  el.setStyle({
+    fontSize: `${getConfig.fontSize}rem`,
     maxWidth:
       getConfig.maxLineWidth === 0 ? "" : `${getConfig.maxLineWidth}rem`,
   });
 
-  const first = tasksElement().native.querySelector<HTMLElement>(".task");
-  // jsdom and a hidden page both report 0 — leave the last good measurement.
-  if (first === null || first.offsetHeight === 0) return;
-
-  lineHeight = measureLineHeight(first);
-  if (lineHeight <= 0) return;
-
-  const height = lineHeight * VISIBLE_LINES;
-  wrapper?.setStyle({ height: `${height}px` });
-  // CP-083 — the out-of-focus warning is clamped to the same box.
-  setOutOfFocusMaxHeight(height);
-}
-
-/**
- * Applies the four config keys that change how the stream is laid out or
- * coloured, then re-measures. `#tasks` inherits its size from `#tasksTest`,
- * exactly as upstream sizes its stream from the test container.
- */
-export function applyStreamStyles(): void {
-  const tasks = tasksElement();
-  qsa("#caret, #tasksTest, #tasksInput").setStyle({
-    fontSize: `${getConfig.fontSize}rem`,
-  });
-  if (getConfig.flipTestColors) tasks.addClass("flipped");
-  else tasks.removeClass("flipped");
-  if (getConfig.colorfulMode) tasks.addClass("colorfulMode");
-  else tasks.removeClass("colorfulMode");
-
-  applyGeometry();
-  const active =
-    tasksElement().native.querySelector<HTMLElement>(".task.active");
-  if (active !== null) scrollActiveIntoView(active, true);
+  // TR-247 — both keep a direct math analogue: which of the prompt and the
+  // answer is emphasised, and whether the palette is the colourful variant.
+  if (getConfig.flipTestColors) el.addClass("flipped");
+  else el.removeClass("flipped");
+  if (getConfig.colorfulMode) el.addClass("colorfulMode");
+  else el.removeClass("colorfulMode");
 }
 
 const STYLE_KEYS = new Set<string>([
@@ -420,31 +210,67 @@ const STYLE_KEYS = new Set<string>([
 
 configEvent.subscribe(({ key }) => {
   if (key === "fullConfigChangeFinished" || STYLE_KEYS.has(key ?? "")) {
-    applyStreamStyles();
+    applyArenaStyles();
   }
 });
 
-// A resize changes how many tasks fit on a line, so both the measured line box
-// and the active task's line index can move.
-window.addEventListener("resize", () => {
-  applyStreamStyles();
-});
-
-/** CP-083 — the out-of-focus blur, independent of `preStart` (CP-084). */
-export function setBlurred(blurred: boolean): void {
-  const tasks = tasksElement();
-  if (blurred) tasks.addClass("blurred");
-  else tasks.removeClass("blurred");
-}
-
-/** CP-085 — restatement for the focus path: refocusing never reveals. */
-export function isHidden(): boolean {
-  return isPreStart();
+/**
+ * TR-119 — entering any state cancels whatever the previous state left running.
+ * A restart during the dwell or the reveal fade lands cleanly in `preStart`
+ * with no residual `data-feedback`, no residual inline style and no leftover
+ * animation class.
+ */
+export function resetArena(): void {
+  const el = arena();
+  el.removeClass(["advance-out", "advance-in"]);
+  setFeedback("none");
+  setResult(undefined);
+  setAnswerReadonly(false);
+  clearPrompt();
+  clearReveal();
+  syncAnswer("");
+  setTaskIndex(0);
+  setTestState("preStart");
+  // TR-146 — mandatory: without it a screen reader re-reads the previous run's
+  // last prompt as if it were live.
+  announce("");
+  applyArenaStyles();
 }
 
 /**
- * Puts the keyboard back on the capture textarea. `event-handlers/global.ts`
- * (WP-08) is the one remaining caller of the pre-rename name.
+ * TR-109 — the leave half of the advance animation. Driven by a class rather
+ * than an inline style so the whole thing lives in `test.scss` and the global
+ * `prefers-reduced-motion` rule can suppress it without JS involvement
+ * (TR-121, TR-125).
+ */
+export function playAdvanceOut(): void {
+  arena().removeClass("advance-in");
+  arena().addClass("advance-out");
+}
+
+/** TR-109 / TR-115 — the enter half, played once the new prompt is in place. */
+export function playAdvanceIn(): void {
+  const el = arena();
+  el.removeClass("advance-out");
+  el.addClass("advance-in");
+  // Force a reflow so removing the class on the next frame actually transitions
+  // from the offset start state rather than being coalesced into a no-op.
+  void el.native.offsetHeight;
+  el.removeClass("advance-in");
+}
+
+/** CP-083 / TR-148 — the out-of-focus blur, over the whole arena. */
+export function setBlurred(blurred: boolean): void {
+  const el = arena();
+  if (blurred) el.addClass("blurred");
+  else el.removeClass("blurred");
+}
+
+/**
+ * TR-129 / TR-202 — put the keyboard back on `#answerInput`.
+ *
+ * `event-handlers/global.ts` (WP-08) is the caller that restores focus after a
+ * background click strands it on `<body>`.
  */
 export function focusTasks(): void {
   focusInputElement();

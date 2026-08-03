@@ -57,6 +57,10 @@ describe("config/utils.ts", () => {
         ads: "sellout",
         minWpm: "custom",
         keymapMode: "next",
+        // TR-203 — struck by the one-task-at-a-time redesign, which removed
+        // the custom caret these two configured.
+        smoothCaret: "medium",
+        caretStyle: "default",
       });
 
       for (const key of [
@@ -73,6 +77,8 @@ describe("config/utils.ts", () => {
         "ads",
         "minWpm",
         "keymapMode",
+        "smoothCaret",
+        "caretStyle",
       ]) {
         expect(result).not.toHaveProperty(key);
       }
@@ -192,8 +198,6 @@ describe("config/utils.ts", () => {
       it.for([
         { given: { quickTab: true }, expected: { quickRestart: "tab" } },
         { given: { swapEscAndTab: true }, expected: { quickRestart: "esc" } },
-        { given: { smoothCaret: true }, expected: { smoothCaret: "medium" } },
-        { given: { smoothCaret: false }, expected: { smoothCaret: "off" } },
         { given: { showAverage: "wpm" }, expected: { showAverage: "speed" } },
         {
           given: { showTimerProgress: false },

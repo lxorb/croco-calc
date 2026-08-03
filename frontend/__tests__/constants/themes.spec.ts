@@ -289,17 +289,47 @@ describe("theme stylesheets (C30, CP-164, INV-062, INV-119)", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("added nothing but the CP-020 rename (C30 edit class b)", async () => {
-    // `#tasks` is the one token these files gained. Any other theme file
-    // mentioning it would mean an unaudited edit.
+  it("added nothing but the TR-186 rename (C30 edit class b)", async () => {
+    // `#taskArena` is the one selector token these files gained (TR-186). Any
+    // other theme file mentioning it would mean an unaudited edit.
     const renamed: string[] = [];
     for (const { name, css } of await themeStylesheets()) {
-      if (css.includes("#tasks")) renamed.push(name);
+      if (css.includes("#taskArena")) renamed.push(name);
     }
 
     for (const name of renamed) {
       expect(Object.keys(C30_REMOVED_SELECTORS), name).toContain(name);
     }
+  });
+
+  it("TR-019 — carries no typing vocabulary in its custom properties", async () => {
+    // The rename is the point of TR-019: a live CSS custom property called
+    // `--correct-letter-color` in a math trainer is exactly the typing
+    // vocabulary the redesign was asked to purge. `--extra-letter-animation`
+    // had no math analogue at all and was deleted outright.
+    const offenders: string[] = [];
+    for (const { file, code } of await themeStylesheets()) {
+      if (/--\w+-letter-(color|animation)/.test(code)) offenders.push(file);
+      if (code.includes("#tasks")) offenders.push(`${file} (#tasks)`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("TR-020 — keeps --caret-color, which now themes the native caret", async () => {
+    // The custom caret element is gone, but the property is not: it colours the
+    // browser's own text caret inside `#answerInput`. Deleting it would have
+    // silently reverted five themes to the default caret colour.
+    const withCaret: string[] = [];
+    for (const { name, code } of await themeStylesheets()) {
+      if (code.includes("--caret-color")) withCaret.push(name);
+    }
+    expect(withCaret.sort()).toEqual([
+      "9009",
+      "bingsu",
+      "phantom",
+      "solarized_osaka",
+      "taro",
+    ]);
   });
 
   it("references no UI that croco calc deleted", async () => {

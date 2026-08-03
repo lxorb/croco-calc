@@ -6,9 +6,11 @@
  * booleans. Nothing here holds a `Task`, so master C29 cannot be violated
  * through a signal.
  *
- * Cut relative to upstream: passages, challenges, keymap resources,
- * IME composition, RTL/Korean flags, `bailedOut` (master C38) and the pace
- * caret (CP-071).
+ * Cut relative to upstream: passages, challenges, `bailedOut` (master C38), and
+ * — with the one-task-at-a-time redesign (doc 07) — the caret's position
+ * mirror, the pre-start mask flag and the out-of-focus height measurement.
+ * `getAnswerLength` existed only to position the custom caret and went with it
+ * (TR-191); the browser's native caret in `#answerInput` needs no help.
  */
 
 import { createMemo, createSignal } from "solid-js";
@@ -30,8 +32,8 @@ export const [getResultVisible, setResultVisible] = createSignal(false);
 export const [isResultCalculating, setResultCalculating] = createSignal(false);
 export const [getFocus, setFocus] = createSignal(false);
 
-// #tasks is vanilla DOM, so it is blurred imperatively (see test/test-ui);
-// the Solid-owned OutOfFocusWarning and PreStartHint read these signals.
+// #taskArena is vanilla DOM, so it is blurred imperatively (see test/test-ui);
+// the Solid-owned OutOfFocusWarning and StartGate read these signals.
 const outOfFocusTimeouts: (number | NodeJS.Timeout)[] = [];
 export type TestFocusState = "focused" | "unfocused" | "unfocusedWindow";
 export const [testFocusState, { setTestFocusState }] =
@@ -54,11 +56,6 @@ export const [testFocusState, { setTestFocusState }] =
 export const showOutOfFocusWarning = createMemo(
   () => getConfig.showOutOfFocusWarning && testFocusState() !== "focused",
 );
-
-// max-height of the warning, kept in sync with the tasks wrapper by test-ui.
-export const [outOfFocusMaxHeight, setOutOfFocusMaxHeight] = createSignal<
-  number | undefined
->(undefined);
 
 export const [isTestInvalid, setIsTestInvalid] = createSignal(false);
 export const [getLastResult, setLastResult] = createSignal<Omit<
@@ -88,10 +85,25 @@ export const [isTestActive, setTestActive] = createSignal(false);
 export const [isTestRestarting, setIsTestRestarting] = createSignal(false);
 
 /**
- * CP-046 / CP-052 — true from page load and from every restart until the first
- * accepted input symbol reveals the stream.
+ * TR-010 — the arena's four states, as a signal.
+ *
+ * This is the single source for both `#taskArena[data-state]` (written by
+ * `test/test-ui.ts`) and the Solid components that need to re-render on it, so
+ * the attribute and the components can never disagree. TR-059: it is a
+ * *projection* of engine phase plus the two presentation-only sub-states, and
+ * is never authoritative for anything the result payload is derived from.
  */
-export const [isPreStart, setPreStart] = createSignal(true);
+export type ArenaState =
+  | "preStart"
+  | "running"
+  | "awaitingContinue"
+  | "finished";
+
+export const [getArenaState, setArenaState] =
+  createSignal<ArenaState>("preStart");
+
+/** Convenience for the components that only care about the pre-start case. */
+export const isPreStart = (): boolean => getArenaState() === "preStart";
 
 export const [
   getActiveTaskIndex,
@@ -100,13 +112,6 @@ export const [
   set: (set, val: number) => set(val),
   reset: (set) => set(0),
 });
-
-/**
- * Length of the live answer buffer. The **contents** deliberately do not live
- * in a signal — the rendered `<letter>` elements are the display, and the
- * engine is the source of truth (C29 keeps everything else private).
- */
-export const [getAnswerLength, setAnswerLength] = createSignal(0);
 
 /**
  * Live test stats, rendered by the Solid live-stat displays (the mini and text

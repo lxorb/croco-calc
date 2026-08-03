@@ -127,10 +127,10 @@ vi.mock("../../src/ts/states/core", () => ({
 }));
 
 function setupDom(): void {
-  // `#tasksInput` is the capture textarea `input-element.ts` resolves at module
-  // scope; the results screen blurs it on every render (INV-088's un-blur path).
+  // `#answerInput` is the field `input-element.ts` resolves at module scope;
+  // the results screen blurs it on every render (INV-088's un-blur path).
   document.body.innerHTML = `<div class="page pageTest">
-    <div id="tasksWrapper"><textarea id="tasksInput"></textarea></div>
+    <div id="taskArena" data-state="preStart"><input id="answerInput" type="text" /></div>
     ${resultHtml}
     <div class="loading"></div>
   </div>`;

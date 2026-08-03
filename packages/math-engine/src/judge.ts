@@ -6,8 +6,18 @@
  *  - **No per-character validation or colouring** (ME-152). monkeytype colours
  *    each character as you type (`frontend/src/ts/input/helpers/validation.ts`);
  *    doing that here would leak the answer digit by digit.
- *  - **No auto-advance** when the typed value happens to equal the answer
+ *  - **No auto-advance** when the entered value happens to equal the answer
  *    (ME-153). `quickEnd` is not ported.
+ *
+ *    TR-135 — do not "fix back" the post-submit advance you will find in
+ *    `test-logic.ts`. ME-153 forbids a task advancing **without a submit
+ *    event**, because that reveals correctness (and the answer's digit count)
+ *    before the user commits. Advancing *after* a correct submit is a
+ *    different thing entirely: the submit has already happened, the judgement
+ *    has already been made and recorded, and the property ME-153 protects —
+ *    one clean, user-initiated event boundary per task, at which and only at
+ *    which correctness is revealed — is fully intact. The rule that survives
+ *    is: nothing may reveal correctness before an explicit Enter.
  *
  * Judging is therefore a single event at commit time, decided by exact rational
  * equality — never string comparison, never with an epsilon (ME-025, ME-147).

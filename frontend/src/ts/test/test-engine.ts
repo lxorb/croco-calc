@@ -17,9 +17,9 @@
  *
  * The only way an answer leaves the engine is {@link TestEngine.viewAt}, and it
  * populates `expected` **only for a task that has already been committed** —
- * exactly the scope C29 grants for the CP-041 hint and the CP-126 history. A
+ * exactly the scope C29 grants for the TR-052 reveal and the CP-126 history. A
  * task that is upcoming or active reports `expected: undefined`, so a renderer
- * cannot put it in the DOM even by accident.
+ * cannot put it in the DOM even by accident (TR-155).
  */
 
 import {
@@ -37,7 +37,15 @@ import type {
   TaskLogEntry,
 } from "@croco-calc/math-engine";
 
-/** CP-045: the stream must never visibly run dry. */
+/**
+ * ME-158 — the rolling generation batch: keep this many tasks materialised
+ * ahead of the active one.
+ *
+ * The CP-045 rationale this used to cite ("the stream must never visibly run
+ * dry") is gone with the stream — only one task is ever on screen. What
+ * survives is the generation rule itself: batching keeps `batcher.take()` off
+ * the critical path of a commit.
+ */
 export const MIN_MATERIALISED_AHEAD = 60;
 
 export type TestPhase = "idle" | "active" | "finished";
@@ -45,14 +53,24 @@ export type TestPhase = "idle" | "active" | "finished";
 /** How a task should be drawn. Never carries an uncommitted answer. */
 export type TaskView = {
   index: number;
-  /** `<span class="prompt">` — the expression plus a trailing ` = ` (CP-032). */
+  /**
+   * The expression, with the engine's trailing ` =` intact. TR-030: the arena
+   * strips that for **display only** — this string is what reaches the task log
+   * and `#taskAnnouncer`, and ME-174 regenerates and compares it server-side.
+   */
   prompt: string;
+  /**
+   * TR-155 — `upcoming` is deliberately retained. It is what lets `viewAt` be
+   * asked about a task that is not in play and answer honestly *without*
+   * disclosing anything: an upcoming task reports `expected: undefined`, which
+   * is the C29 guarantee the engine tests assert over a 20-task window.
+   */
   state: "upcoming" | "active" | "committed";
   /** Present only when `state === "committed"`. */
   result?: "correct" | "incorrect";
   /**
    * The canonical correct answer. **Only** set for a committed task (C29) —
-   * this is what CP-041 renders as the hint under a wrong answer.
+   * this is what `#taskReveal` shows during `awaitingContinue` (TR-052).
    */
   expected?: string;
   /** What the user entered. For the active task this is the live buffer. */
@@ -109,6 +127,19 @@ export type TestEngine = {
    * the {@link press} path (which starts the engine itself) is unaffected.
    */
   begin(nowMs: number): boolean;
+  /**
+   * TR-071 — records that the task now on screen *became visible* at `nowMs`,
+   * which is what ME-159's `tStart` has always meant ("ms from test start at
+   * which the task became active").
+   *
+   * Before the one-task-at-a-time redesign this was the same instant as the
+   * previous commit, so `commit()` set it itself. It no longer is: the
+   * correct-answer dwell and the wrong-answer pause sit between the two, and a
+   * user's response time for a task must not include the time they spent
+   * looking at the previous task's correct answer. `test-logic.ts` calls this
+   * from the single place a prompt reaches the screen.
+   */
+  markTaskShown(nowMs: number): void;
   /** CP-049 / CP-055: feed one keystroke. Starts the test on the first accepted one. */
   press(ch: string, nowMs: number): PressResult;
   /** CP-059: delete one symbol, or the whole answer with `whole`. Never crosses a task. */
@@ -245,6 +276,21 @@ export function createTestEngine(options: TestEngineOptions): TestEngine {
     return true;
   }
 
+  /**
+   * TR-071 / TR-073 — the whole of the new `tStart` semantics.
+   *
+   * TR-074 proves this is anti-cheat-safe: ME-180/ME-181 derive their
+   * inter-answer intervals from `tEnd` deltas and never read `tStart`, and the
+   * dwell and the pause only ever increase those deltas, which moves every
+   * plausibility check strictly *away* from its rejection boundary. ME-165's
+   * consistency is computed from the same submitted log on both client and
+   * server, so the two agree by construction.
+   */
+  function markTaskShown(nowMs: number): void {
+    if (phase !== "active" || startMs === undefined) return;
+    taskStartedAt = nowMs - startMs;
+  }
+
   function press(ch: string, nowMs: number): PressResult {
     if (phase === "finished") return "ignored";
     // CP-055 / CP-050: only a keystroke the filter accepts may start the test,
@@ -307,7 +353,10 @@ export function createTestEngine(options: TestEngineOptions): TestEngine {
     // CP-040: the pointer advances by exactly one.
     activeIndex++;
     buffer = "";
-    taskStartedAt = tEnd;
+    // TR-071 — `taskStartedAt` is NOT set here any more. The next task's
+    // `tStart` is stamped by `markTaskShown()` when its prompt actually
+    // renders, which is the dwell or the wrong-answer pause later. Setting it
+    // to `tEnd` here would fold that pause into the next task's response time.
     inputSinceTick = true;
     ensureRunway();
 
@@ -360,6 +409,7 @@ export function createTestEngine(options: TestEngineOptions): TestEngine {
     materialised: () => tasks.length,
     viewAt,
     begin,
+    markTaskShown,
     press,
     backspace,
     commit,

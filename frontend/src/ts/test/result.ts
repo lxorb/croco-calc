@@ -75,6 +75,7 @@ import * as Misc from "../utils/misc";
 import * as PbCrown from "./pb-crown";
 import * as TestLogic from "./test-logic";
 import type { TestResultPayload } from "./test-logic";
+import * as TestUI from "./test-ui";
 import * as TodayTracker from "./today-tracker";
 
 type PresentedResult = Omit<CompletedEvent, "hash" | "uid">;
@@ -633,7 +634,11 @@ function renderTaskHistory(): void {
   const html = taskLog
     .map((entry) => {
       const second = Math.max(1, Math.ceil(entry.tEnd / 1000));
-      const prompt = Misc.escapeHTML(entry.prompt);
+      // TR-030 — `entry.prompt` keeps the engine's trailing ` =` because ME-174
+      // regenerates and compares that exact string server-side. The history
+      // supplies its own ` = ` separator, so the display form drops it; without
+      // this the row reads `847 + 1293 = = 2140`.
+      const prompt = Misc.escapeHTML(TestUI.displayPrompt(entry.prompt));
       const given = Misc.escapeHTML(entry.given === "" ? "-" : entry.given);
       const expected = entry.correct
         ? ""
@@ -660,8 +665,8 @@ function taskListText(missedOnly: boolean): string {
     .filter((entry) => !missedOnly || !entry.correct)
     .map((entry) =>
       entry.correct
-        ? `${entry.prompt} = ${entry.given}`
-        : `${entry.prompt} = ${entry.given} (${entry.expected})`,
+        ? `${TestUI.displayPrompt(entry.prompt)} = ${entry.given}`
+        : `${TestUI.displayPrompt(entry.prompt)} = ${entry.given} (${entry.expected})`,
     )
     .join("\n");
 }

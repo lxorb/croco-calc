@@ -8,21 +8,8 @@ import {
   TestTimeSchema,
 } from "./math";
 
-export const SmoothCaretSchema = z.enum(["off", "slow", "medium", "fast"]);
-export type SmoothCaret = z.infer<typeof SmoothCaretSchema>;
-
 export const QuickRestartSchema = z.enum(["off", "esc", "tab", "enter"]);
 export type QuickRestart = z.infer<typeof QuickRestartSchema>;
-
-/** CP-069: the image carets (`carrot`, `banana`, `monkey`) are removed. */
-export const CaretStyleSchema = z.enum([
-  "off",
-  "default",
-  "block",
-  "outline",
-  "underline",
-]);
-export type CaretStyle = z.infer<typeof CaretStyleSchema>;
 
 export const TimerStyleSchema = z.enum([
   "off",
@@ -161,10 +148,6 @@ export const ConfigSchema = z
     resultSaving: z.boolean(),
     singleListCommandLine: SingleListCommandLineSchema,
 
-    // caret
-    smoothCaret: SmoothCaretSchema,
-    caretStyle: CaretStyleSchema,
-
     // appearance
     timerStyle: TimerStyleSchema,
     liveSpeedStyle: LiveStatStyleSchema,
@@ -214,7 +197,6 @@ export type PartialConfig = z.infer<typeof PartialConfigSchema>;
 export const ConfigGroupNameSchema = z.enum([
   "test",
   "behavior",
-  "caret",
   "appearance",
   "theme",
   "hideElements",

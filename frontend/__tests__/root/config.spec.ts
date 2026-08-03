@@ -8,7 +8,7 @@ import * as Env from "../../src/ts/utils/env";
 import {
   ConfigKey,
   Config as ConfigType,
-  CaretStyleSchema,
+  TimerStyleSchema,
 } from "@croco-calc/schemas/configs";
 import * as ConfigValidation from "../../src/ts/config/validation";
 import { configEvent } from "../../src/ts/events/config";
@@ -118,11 +118,11 @@ describe("Config", () => {
       isConfigValueValidMock.mockReturnValue(false);
 
       //WHEN / THEN
-      expect(Config.setConfig("caretStyle", "banana" as never)).toBe(false);
+      expect(Config.setConfig("timerStyle", "banana" as never)).toBe(false);
       expect(isConfigValueValidMock).toHaveBeenCalledWith(
-        "caret style",
+        "timer style",
         "banana",
-        CaretStyleSchema,
+        TimerStyleSchema,
       );
     });
 

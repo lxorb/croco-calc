@@ -157,14 +157,6 @@ function couplingOverride<
   };
 }
 
-const caretOptionsMetadata = {
-  block: {},
-  off: {},
-  default: {},
-  outline: {},
-  underline: {},
-};
-
 export const configMetadata: ConfigMetadataObject = {
   // ------------------------------------------------------------------
   // test — the eight settings-bar controls.
@@ -300,25 +292,6 @@ export const configMetadata: ConfigMetadataObject = {
     displayString: "single list command line",
     changeRequiresRestart: false,
     group: "behavior",
-  },
-
-  // ------------------------------------------------------------------
-  // caret (restored by master C11)
-  // ------------------------------------------------------------------
-  smoothCaret: {
-    key: "smoothCaret",
-    icon: "ph:cursor-text-bold",
-    displayString: "smooth caret",
-    changeRequiresRestart: false,
-    group: "caret",
-  },
-  caretStyle: {
-    key: "caretStyle",
-    icon: "ph:cursor-bold",
-    displayString: "caret style",
-    changeRequiresRestart: false,
-    group: "caret",
-    optionsMetadata: caretOptionsMetadata,
   },
 
   // ------------------------------------------------------------------

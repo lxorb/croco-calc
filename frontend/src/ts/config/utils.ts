@@ -45,7 +45,7 @@ function sanitizeConfig(
  * discarded. Two families of repair live here:
  *
  * 1. monkeytype's own legacy shapes for the keys croco calc kept
- *    (`quickTab`, `swapEscAndTab`, boolean `smoothCaret`, string `fontSize`, …).
+ *    (`quickTab`, `swapEscAndTab`, string `fontSize`, …).
  * 2. croco calc's own migration: a four-element `accountChart` is padded with a
  *    fifth `"on"` (§6.1 arity note, AC-085), monkeytype's second-based `time` is
  *    translated into croco calc's minutes (SB-012), and the `comfy` palette is
@@ -67,10 +67,6 @@ function replaceLegacyValues(
   //@ts-expect-error legacy configs
   if (configObj.quickTab === true && configObj.quickRestart === undefined) {
     configObj.quickRestart = "tab";
-  }
-
-  if (typeof configObj.smoothCaret === "boolean") {
-    configObj.smoothCaret = configObj.smoothCaret ? "medium" : "off";
   }
 
   if (

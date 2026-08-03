@@ -4,6 +4,7 @@ import { For, Show } from "solid-js";
 import { getConfig } from "../../../config/store";
 import { focusInputElement } from "../../../input/input-element";
 import { bp } from "../../../states/breakpoints";
+import { getArenaState } from "../../../states/test";
 import * as TestLogic from "../../../test/test-logic";
 import { Button } from "../../common/Button";
 
@@ -52,15 +53,29 @@ const SYMBOLS: AnswerSymbol[] = [
 
 export function AnswerSymbols() {
   const shown = () => SYMBOLS.filter((symbol) => symbol.visible());
-  // CP-191 — at and above `md` the row is not rendered at all, not merely hidden.
+  // CP-191 / TR-102 — at and above `md` the row is not rendered at all, not
+  // merely hidden.
   const isMobile = () => !bp().md;
 
+  /**
+   * TR-105 — the submit / continue button.
+   *
+   * On iOS the `inputmode="decimal"` keypad has **no return key at all**, so
+   * without this the run simply cannot be submitted on an iPhone. That is a
+   * functional necessity of exactly the same kind as the symbol row itself.
+   * It invokes the same `submitOrContinue()` handler Enter does, so the TR-118
+   * arming delay applies to it identically.
+   */
+  const state = () => getArenaState();
+  const showSubmit = () =>
+    state() === "running" || state() === "awaitingContinue";
+
   return (
-    <Show when={isMobile() && shown().length > 0}>
+    <Show when={isMobile() && (shown().length > 0 || showSubmit())}>
       <div
         id="answerSymbols"
         // CP-194 — swallowing the bubbled `mousedown`/`pointerdown` default is
-        // what stops focus leaving #tasksInput, so the on-screen keypad does
+        // what stops focus leaving #answerInput, so the on-screen keypad does
         // not close mid-answer. `tabindex="-1"` is deliberately NOT used:
         // CP-183's keyboard-reachability rule still applies.
         onMouseDown={(e) => {
@@ -78,15 +93,33 @@ export function AnswerSymbols() {
               balloon={{ text: symbol.ariaLabel, position: "up" }}
               dataset={{ "data-symbol": symbol.char }}
               onClick={() => {
-                // CP-193 / CP-195 — the exact same path as a physical
-                // keystroke, filter and all, so a press also starts the test
-                // and lifts the pre-start blur.
+                // CP-193 / CP-195 / TR-104 — the exact same engine path as a
+                // physical keystroke, filter and 16-character cap and all, so a
+                // press also starts the run from `preStart`.
                 TestLogic.pressCharacter(symbol.char);
                 focusInputElement(true);
               }}
             />
           )}
         </For>
+        <Show when={showSubmit()}>
+          <Button
+            variant="text"
+            icon={{ icon: "ph:arrow-elbow-down-left-bold", fixedWidth: true }}
+            balloon={{
+              // TR-105 — the accessible name follows the state, because the
+              // key does two different things in the two states.
+              text:
+                state() === "awaitingContinue" ? "continue" : "submit answer",
+              position: "up",
+            }}
+            dataset={{ "data-test-id": "submitAnswerButton" }}
+            onClick={() => {
+              TestLogic.submitOrContinue();
+              focusInputElement(true);
+            }}
+          />
+        </Show>
       </div>
     </Show>
   );

@@ -49,9 +49,9 @@
   }
 }
 
-#tasks {
-  --correct-letter-color: var(--text-color);
-  --untyped-letter-color: #565f89;
+#taskArena {
+  --task-active-color: var(--text-color);
+  --task-dim-color: #565f89;
 }
 
 header:not([data-focused]) [data-ui-element="logoText"] {

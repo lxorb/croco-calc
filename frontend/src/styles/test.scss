@@ -1,13 +1,13 @@
-// The test page: the task stream, its capture textarea, the pre-start blur and
-// the restart button. The `#result*` rules were split out into `result.scss`
-// (WP-06 → WP-07 hand-off, §6 "First action").
-
-// Renames applied per CP-020 / CP-031 / CP-032 / C30: the upstream stream id,
-// its wrapper, its capture textarea and its item class all became the `tasks*`
-// / `.task` set used below. The four `--*-letter-color` /
-// `--*-letter-animation` custom properties keep their upstream names because
-// all 52 theme files under `frontend/static/themes/` set them through
-// `#tasks` / `#tasks.flipped`.
+// The test page: the task arena, its readouts row, the feedback animations and
+// the restart button. The `#result*` rules live in `result.scss`.
+//
+// Doc 07 (TR-009 … TR-058) replaced the wrapping task stream with a single
+// centred task. The custom properties were renamed out of typing vocabulary
+// (TR-019) — `--task-active-color` / `--task-dim-color` / `--task-error-color`
+// and their three animation counterparts — and the eight theme files that set
+// them were updated in step (TR-186, a C30 edit-class-(b) extension).
+// `--caret-color` is KEPT (TR-020): it now themes the browser's own text caret
+// inside `#answerInput`, which is a real analogue rather than a leftover.
 
 .pageTest {
   position: relative;
@@ -46,19 +46,10 @@
   }
 }
 
-// CP-030: the upstream stream rule reused unchanged — this wrapping row is the
-// whole visual identity we are adapting.
-
-// CP-044: this element is the *content*, not the viewport. It must stay
-// `fit-content` and unclipped; `#tasksWrapper` below is what is clamped to
-// three lines. `test-ui.ts` scrolls the stream by animating `margin-top` here,
-// which is why the transition below names `opacity` and `filter` explicitly
-// rather than using the `all` shorthand — a transitioned margin would fight
-// the line-jump animation.
-// CP-183 — the live region that carries the active task's prompt to assistive
-// technology. Removed from the visual layout without being removed from the
-// accessibility tree: `display: none`, `visibility: hidden` and `hidden` would
-// all silence it, so it is clipped to a 1px box instead.
+// TR-013 / CP-183 — the live region carrying the active task's prompt to
+// assistive technology. Removed from the visual layout without being removed
+// from the accessibility tree: `display: none`, `visibility: hidden` and
+// `hidden` would all silence it, so it is clipped to a 1px box instead.
 #taskAnnouncer {
   position: absolute;
   width: 1px;
@@ -71,148 +62,294 @@
   white-space: nowrap;
 }
 
-#tasks {
-  height: fit-content;
-  padding-bottom: 0.5em; // to account for hints of the bottom line
-  display: flex;
-  flex-wrap: wrap;
+// ---------------------------------------------------------------------------
+// TR-021 — the arena: one centred column, everything on the same axis.
+// ---------------------------------------------------------------------------
+#taskArena {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0;
   width: 100%;
-  align-content: flex-start;
-  user-select: none;
-  // CP-051 / CP-083 — the reveal and the out-of-focus blur, same duration.
+  margin: 0 auto;
+  font-size: 2rem; // overwritten from `fontSize` by test-ui.ts
+  line-height: 1;
+
+  // TR-024 — a fixed minimum height equal to the tallest of the four states,
+  // so entering `awaitingContinue` cannot move the prompt, the rule or the
+  // input. The bounding rect of `#taskPrompt` is identical in `running` and in
+  // `awaitingContinue`; that is directly asserted by the arena spec.
+  min-height: 6em;
+
+  --task-active-color: var(--text-color);
+  --task-active-animation: none;
+  --task-dim-color: var(--sub-color);
+  --task-dim-animation: none;
+  --task-error-color: var(--error-color);
+  --task-error-animation: none;
+
+  // CP-083 / TR-148 — the out-of-focus blur, over the whole arena.
   transition:
     opacity 0.25s,
     filter 0.25s;
 
-  --correct-letter-color: var(--text-color);
-  --correct-letter-animation: none;
-  --untyped-letter-color: var(--sub-color);
-  --untyped-letter-animation: none;
-  --incorrect-letter-color: var(--error-color);
-  --incorrect-letter-animation: none;
-
-  // CP-035 — upcoming tasks are dim; the active task and every entered answer
-  // symbol is bright; a committed wrong task turns error-coloured; a
-  // committed correct task goes back to dim.
-  .task {
-    color: var(--untyped-letter-color);
-    animation: var(--untyped-letter-animation);
-
-    &.active,
-    .answer letter {
-      color: var(--correct-letter-color);
-      animation: var(--correct-letter-animation);
-    }
-
-    &.typed.correct {
-      color: var(--untyped-letter-color);
-      animation: var(--untyped-letter-animation);
-      .answer letter {
-        color: var(--untyped-letter-color);
-        animation: var(--untyped-letter-animation);
-      }
-    }
-
-    &.typed.incorrect {
-      color: var(--incorrect-letter-color);
-      animation: var(--incorrect-letter-animation);
-      border-bottom: 2px solid var(--error-color);
-      .answer letter {
-        color: var(--incorrect-letter-color);
-        animation: var(--incorrect-letter-animation);
-      }
-    }
-  }
-
-  // CP-041 — the correct answer of an already committed wrong task, shown
-  // beneath it. Identical geometry to the upstream stream-item hint.
-  .task .hints hint {
-    position: absolute;
-    bottom: -1.1em;
-    left: 50%;
-    color: var(--correct-letter-color);
-    animation: var(--correct-letter-animation);
-    line-height: initial;
-    font-size: 0.75em;
-    text-shadow: none;
-    padding: 1px;
-    opacity: 0.5;
-    text-align: center;
-    display: grid;
-    justify-content: center;
-    transform: translate(-50%);
-    white-space: nowrap;
-  }
-
-  // CP-046 — the pre-start blur. A separate class from `blurred` so the two
-  // compose independently and each can be asserted in isolation.
-  &.preStart {
-    opacity: 0.25;
-    filter: blur(4px);
-  }
-
-  // CP-083 — the out-of-focus blur.
   &.blurred {
     opacity: 0.25;
     filter: blur(4px);
   }
 
-  // CP-084 — when both apply the result must equal a single 4 px blur, not 8.
-  &.preStart.blurred {
-    opacity: 0.25;
-    filter: blur(4px);
-  }
-
-  &.noErrorBorder .task.typed.incorrect {
-    border-bottom-color: transparent;
-  }
-
+  // TR-247 — both keep a direct math analogue and simply bind to the renamed
+  // properties: which of the prompt and the answer is emphasised, and whether
+  // the palette is the colourful variant.
   &.flipped {
-    --correct-letter-color: var(--sub-color);
-    --untyped-letter-color: var(--text-color);
-    --incorrect-letter-color: var(--error-color);
+    --task-active-color: var(--sub-color);
+    --task-dim-color: var(--text-color);
   }
 
   &.colorfulMode {
-    --correct-letter-color: var(--main-color);
-    --untyped-letter-color: var(--sub-color);
-    --incorrect-letter-color: var(--colorful-error-color);
+    --task-active-color: var(--main-color);
+    --task-dim-color: var(--sub-color);
+    --task-error-color: var(--colorful-error-color);
   }
 
   &.flipped.colorfulMode {
-    --correct-letter-color: var(--sub-color);
-    --untyped-letter-color: var(--main-color);
-    --incorrect-letter-color: var(--colorful-error-color);
+    --task-active-color: var(--sub-color);
+    --task-dim-color: var(--main-color);
+    --task-error-color: var(--colorful-error-color);
   }
 }
 
-// CP-031 — one task is one inline-block that never breaks across two lines.
-.task {
-  position: relative;
-  display: inline-block;
-  white-space: nowrap;
-  font-size: 1em;
-  line-height: 1em;
-  margin: 0.25em 0.3em;
-  font-variant: no-common-ligatures;
-  border-bottom: 2px solid transparent;
+// TR-031 — timer, tpm, acc, in that fixed order, directly above the prompt.
+// TR-037 — a normal in-flow row: the oversized-number-behind-the-stream
+// treatment is struck along with the stream it sat behind.
+#taskReadouts {
+  font-size: 0.5em;
+  color: var(--main-color);
+  margin-bottom: 0.75em;
+  min-height: 1.2em;
+  user-select: none;
+}
 
-  .prompt {
-    white-space: pre;
+// TR-023 — the prompt, at `2 × fontSize`.
+#taskPrompt {
+  font-size: 2em;
+  line-height: 1.1;
+  color: var(--task-active-color);
+  animation: var(--task-active-animation);
+  text-align: center;
+  white-space: nowrap;
+  user-select: none;
+  font-variant: no-common-ligatures;
+}
+
+// TR-026 — 2px solid, `0.25em` of margin above and below, no shadow, no
+// gradient. TR-025: its width is the arena's content width, so `maxLineWidth`
+// visibly controls it.
+#taskRule {
+  width: 100%;
+  min-width: 6em;
+  height: 0;
+  border-bottom: 2px solid var(--task-dim-color);
+  margin: 0.25em 0;
+  border-radius: var(--roundness);
+  user-select: none;
+  transition: border-color 90ms ease-out; // TR-108
+}
+
+// TR-027 — no border, no background, no box-shadow, no outline at rest: the
+// rule above it is the only affordance.
+#answerInput {
+  font-family: inherit;
+  font-size: 2em;
+  line-height: 1.1;
+  width: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  text-align: center;
+  color: var(--task-active-color);
+  // TR-020 — the browser's own caret, themed. This is the only caret on the
+  // page now that the custom `#caret` element is gone.
+  caret-color: var(--caret-color);
+  // TR-028 — constant digit widths, so the caret does not jitter between
+  // digits. This is CP-043 kept: it is about numerals, not about typing.
+  font-variant-numeric: tabular-nums;
+  transition: color 90ms ease-out; // TR-108
+
+  &:focus,
+  &:focus-visible {
+    outline: none;
   }
 
-  // CP-043 — constant digit widths so the caret does not jitter.
-  .answer {
-    font-variant-numeric: tabular-nums;
-    letter {
-      display: inline-block;
+  // TR-027 — a visible treatment only when focus arrives by keyboard from
+  // outside the arena.
+  &:focus-visible:not(:focus) {
+    outline: 2px solid var(--sub-color);
+    outline-offset: 4px;
+  }
+}
+
+// TR-052 — the correct answer. `0.75em` of the prompt size, `--main-color` at
+// full opacity: after this change it is the primary information on the screen,
+// not the 50%-opacity decorative hint the committed-stream design used.
+#taskReveal {
+  font-size: 0.75em;
+  line-height: 1.2;
+  min-height: 1.2em;
+  margin-top: 0.5em;
+  color: var(--main-color);
+  text-align: center;
+  user-select: none;
+}
+
+// TR-053 — `press enter to continue`, unconditional (not gated on
+// `showKeyTips`): without it the run simply appears frozen.
+#taskContinueHint {
+  font-size: 0.6em;
+  line-height: 1.2;
+  min-height: 1.2em;
+  margin-top: 0.35em;
+  color: var(--sub-color);
+  text-align: center;
+  user-select: none;
+}
+
+// --- state visibility ------------------------------------------------------
+
+// TR-038 — in `preStart` the rule, the reveal and the hint are absent from the
+// layout entirely, and `#taskPrompt` holds no text node at all. The pre-start
+// guarantee is structural: there is nothing to read because nothing is
+// rendered.
+#taskArena[data-state="preStart"],
+#taskArena[data-state="finished"] {
+  #taskRule,
+  #taskReveal,
+  #taskContinueHint {
+    display: none;
+  }
+}
+
+// TR-024 — in `running` the reveal and the hint keep their space but show
+// nothing, so the prompt does not move when they appear.
+#taskArena[data-state="running"] {
+  #taskReveal,
+  #taskContinueHint {
+    visibility: hidden;
+    opacity: 0;
+  }
+}
+
+// TR-113 — they fade in over 120 ms, with **no translate**: they must not
+// appear to push the prompt around, and the reserved space above already
+// guarantees they cannot.
+#taskArena[data-state="awaitingContinue"] {
+  #taskReveal,
+  #taskContinueHint {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 120ms cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+// TR-108 / TR-112 — phase A. Exactly `color` and `border-color`, 90 ms,
+// `ease-out`. Nothing else animates in phase A.
+#taskArena[data-feedback="correct"] {
+  #answerInput {
+    color: var(--main-color);
+  }
+  #taskRule {
+    border-bottom-color: var(--main-color);
+  }
+}
+
+#taskArena[data-feedback="wrong"] {
+  #answerInput {
+    color: var(--task-error-color);
+    animation: var(--task-error-animation);
+  }
+  #taskRule {
+    border-bottom-color: var(--task-error-color);
+  }
+}
+
+// CP-078-era `noErrorBorder` — the rule keeps its resting colour on a wrong
+// answer when the theme asks for no error border.
+#taskArena.noErrorBorder[data-feedback="wrong"] #taskRule {
+  border-bottom-color: var(--task-dim-color);
+}
+
+// TR-109 — the advance. Phase B: the outgoing prompt, rule and input translate
+// `-0.35em` on Y and fade out over 90 ms; the incoming pair enters from
+// `translateY(0.35em)` / `opacity: 0`. Nothing else moves — `#taskReadouts` and
+// `#restartTestButton` are static.
+#taskArena {
+  #taskPrompt,
+  #taskRule,
+  #answerInput {
+    transition:
+      transform 90ms cubic-bezier(0, 0, 0.2, 1),
+      opacity 90ms cubic-bezier(0, 0, 0.2, 1),
+      color 90ms ease-out,
+      border-color 90ms ease-out;
+  }
+
+  &.advance-out {
+    #taskPrompt,
+    #taskRule,
+    #answerInput {
+      transform: translateY(-0.35em);
+      opacity: 0;
+      transition:
+        transform 90ms cubic-bezier(0.4, 0, 1, 1),
+        opacity 90ms cubic-bezier(0.4, 0, 1, 1);
+    }
+  }
+
+  &.advance-in {
+    #taskPrompt,
+    #taskRule,
+    #answerInput {
+      transform: translateY(0.35em);
+      opacity: 0;
+      transition: none;
     }
   }
 }
 
-// CP-048 — the centred affordance over the blurred stream. Geometry copied
-// from `OutOfFocusWarning.tsx` so the two occupy the same box.
-#preStartHint {
+// TR-121 / TR-125 — under `prefers-reduced-motion` the transform and opacity
+// transitions are suppressed and the prompt is replaced instantly. The global
+// rule in `media-queries.scss` already does this for everything outside its
+// allowlist; the arena is deliberately NOT added to that allowlist and does not
+// carry `ignore-reduced-motion`.
+//
+// TR-123 — timing is NOT reduced: `CORRECT_DWELL_MS` stays 180 ms and
+// `CONTINUE_ARM_MS` stays 210 ms. Reduced motion means less movement, not less
+// feedback; collapsing the dwell would remove the affirmative signal entirely
+// for the users who most need it to be unambiguous. That is why the two
+// constants live in `test-ui.ts` and are never routed through
+// `applyReducedMotion()`, which returns 0.
+@media (prefers-reduced-motion: reduce) {
+  #taskArena {
+    &.advance-out,
+    &.advance-in {
+      #taskPrompt,
+      #taskRule,
+      #answerInput {
+        transform: none;
+        opacity: 1;
+      }
+    }
+  }
+}
+
+// TR-040 — the `start test` control that owns the `preStart` arena. Geometry is
+// `OutOfFocusWarning`'s, so the two occupy the same box and one yields to the
+// other rather than stacking two centred messages.
+#startGate {
   position: absolute;
   inset: 0;
   display: grid;
@@ -236,35 +373,11 @@
   }
 }
 
-// CP-053 — the hidden capture textarea. Kept byte-identical in behaviour to
-// the upstream capture field; only the id changed.
-#tasksInput {
-  width: 0;
-  font-size: 1em;
-  height: 1em;
-  opacity: 0;
-  padding: 0;
-  margin: 0 auto;
-  border: none;
-  outline: none;
-  display: block;
-  resize: none;
-  position: absolute;
-  z-index: -1;
-  cursor: default;
-  pointer-events: none;
-  border-radius: 0;
-  caret-color: transparent;
-  overflow: hidden;
-  // if the text wraps, ctrl backspace will not work on firefox >:|
-  // and holy shit do not use white-space: nowrap here because the hellspawn that is safari
-  // is TRIMMING the value on focus when using that
-  text-wrap-mode: nowrap;
-  contain: strict;
-}
-
-// CP-191 … CP-196 — the mobile answer symbol row. Rendered only below `md`,
-// and deliberately *not* blurred by `preStart`: it is chrome, not task content.
+// CP-191 … CP-196 / TR-101 … TR-106 — the mobile answer symbol row. Rendered
+// only below `md`. It exists because the `inputmode="decimal"` keypad has no
+// `/` and no `-`, and all three of `fractionAddition`, `fractionMultiplication`
+// and `negatives` are ON by default — so without it the shipped default
+// configuration is literally unplayable on a phone.
 #answerSymbols {
   display: flex;
   justify-content: center;
@@ -272,6 +385,7 @@
   margin-top: 0.5rem;
 
   button {
+    // CP-196 — the 44×44 minimum hit target.
     min-width: 44px;
     min-height: 44px;
     font-size: 1.25rem;
@@ -295,7 +409,7 @@
   }
 }
 
-// CP-086 — centred, directly below the task stream.
+// CP-086 — centred, directly below the arena.
 #restartTestButton {
   font-size: 1rem;
   margin: 1rem auto 0 auto;
@@ -307,17 +421,25 @@
   height: 100%;
   display: grid;
   grid-template-rows: 1fr auto 1fr;
+}
 
-  // CP-044 — the viewport. `test-ui.ts` gives it a fixed height of exactly
-  // three line boxes; the vertical `clip` is what turns the stream into a
-  // three-line window. `overflow-x` stays `visible` so the caret and the
-  // hints of a long task are not cut off sideways.
-  #tasksWrapper {
-    position: relative;
-    overflow: visible clip;
+// TR-023 / TR-100 — the arena scales down at `sm` and below so CP-180's 320 px
+// requirement holds with no horizontal scrollbar.
+@media (max-width: 768px) {
+  #taskArena {
+    font-size: 1.5rem;
   }
 }
 
+@media (max-width: 480px) {
+  #taskArena {
+    font-size: 1.1rem;
+    min-height: 7em;
+  }
+}
+
+// TR-138 — kept, including the `:focus-visible` override, so tabbing to the
+// restart button makes it visible even while the rest of the chrome is dimmed.
 main.focus .pageTest {
   #restartTestButton {
     opacity: 0 !important;

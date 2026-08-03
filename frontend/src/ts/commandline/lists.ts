@@ -107,9 +107,6 @@ export const commands: CommandsSubgroup = {
     //behavior
     ...buildCommands("resultSaving", "quickRestart", "singleListCommandLine"),
 
-    //caret (restored by master C11)
-    ...buildCommands("smoothCaret", "caretStyle"),
-
     //appearance
     ...buildCommands(
       "timerStyle",

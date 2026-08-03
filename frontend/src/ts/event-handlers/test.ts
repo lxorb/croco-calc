@@ -25,7 +25,7 @@ testPage?.onChild("click", "#testInitFailed .restart", () => {
 });
 
 /** Clicking the stream focuses the hidden capture textarea (CP-083). */
-testPage?.onChild("click", "#tasksWrapper", () => {
+testPage?.onChild("click", "#taskArena", () => {
   focusInputElement();
 });
 

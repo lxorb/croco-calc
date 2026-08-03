@@ -28,29 +28,6 @@
   }
 }
 
-@keyframes caretFlashSmooth {
-  0%,
-  100% {
-    opacity: 0;
-  }
-
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes caretFlashHard {
-  0%,
-  50% {
-    opacity: 1;
-  }
-
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-
 @keyframes shake {
   0% {
     transform: translate(2px, 0) rotate(0deg);

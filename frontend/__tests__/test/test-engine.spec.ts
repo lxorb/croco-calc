@@ -372,7 +372,10 @@ describe("createTestEngine", () => {
       const engine = makeEngine();
       engine.press("2", 0);
       engine.commit(1_500);
-      engine.press("9", 1_600);
+      // TR-071 — task 1 becomes active when its prompt is *rendered*, which is
+      // after the correct-answer dwell, not at the instant task 0 committed.
+      engine.markTaskShown(1_680);
+      engine.press("9", 1_800);
       engine.commit(4_000);
 
       const log = engine.taskLog();
@@ -391,9 +394,64 @@ describe("createTestEngine", () => {
         expected: "3",
         given: "9",
         correct: false,
-        tStart: 1_500,
+        tStart: 1_680,
         tEnd: 4_000,
       });
+    });
+
+    it("TR-071 — tStart is the render time, so tEnd(n) < tStart(n+1)", () => {
+      const engine = makeEngine();
+      engine.press("2", 0);
+      engine.commit(1_000);
+      // A long wrong-answer pause: the user sat reading the correct answer.
+      engine.markTaskShown(6_000);
+      engine.press("9", 6_100);
+      engine.commit(7_000);
+
+      const log = engine.taskLog();
+      const first = log[0];
+      const second = log[1];
+      if (first === undefined || second === undefined) {
+        throw new Error("expected two committed tasks");
+      }
+      // The gap between the two is the pause, and it is deliberately *not*
+      // charged to task 1's response time — which is what ME-159 always meant
+      // by "ms from test start at which the task became active", and what
+      // ME-165's consistency metric needs to be meaningful.
+      expect(first.tEnd).toBe(1_000);
+      expect(second.tStart).toBe(6_000);
+      expect(second.tStart).toBeGreaterThan(first.tEnd);
+      // Task 1's measured response time excludes the 5 s pause entirely.
+      expect(second.tEnd - second.tStart).toBe(1_000);
+    });
+
+    it("TR-074 — the plausibility intervals are unaffected by the pause", () => {
+      // ME-180/ME-181 compute their inter-answer intervals from `tEnd` deltas
+      // and never read `tStart`, so the new timing semantics cannot move a
+      // threshold. The pause can only *increase* a delta, which moves every
+      // check strictly away from its rejection boundary.
+      const withPause = makeEngine();
+      withPause.press("2", 0);
+      withPause.commit(1_000);
+      withPause.markTaskShown(6_000);
+      withPause.press("9", 6_100);
+      withPause.commit(7_000);
+
+      const withoutPause = makeEngine();
+      withoutPause.press("2", 0);
+      withoutPause.commit(1_000);
+      withoutPause.markTaskShown(1_000);
+      withoutPause.press("9", 1_100);
+      withoutPause.commit(7_000);
+
+      const deltas = (log: readonly { tEnd: number }[]): number[] =>
+        log.map((entry, i) => entry.tEnd - (log[i - 1]?.tEnd ?? 0));
+
+      expect(deltas(withPause.taskLog())).toEqual(
+        deltas(withoutPause.taskLog()),
+      );
+      // ME-182(b) still holds either way.
+      expect(withPause.taskLog()[0]?.tStart).toBeGreaterThanOrEqual(0);
     });
 
     it("logs nothing for a no-op commit", () => {

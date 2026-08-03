@@ -1,4 +1,3 @@
-import * as Caret from "./caret";
 import * as PageTransition from "../legacy-states/page-transition";
 import { requestDebouncedAnimationFrame } from "../utils/debounced-animation-frame";
 import { getFocus, setFocus } from "../states/test";
@@ -43,8 +42,6 @@ export function set(value: boolean, withCursor = false): void {
       if (!withCursor && cache.cursor !== undefined) {
         cache.cursor.setStyle({ cursor: "none" });
       }
-
-      Caret.stopAnimation();
     } else if (!value && getFocus()) {
       setFocus(false);
 
@@ -54,8 +51,6 @@ export function set(value: boolean, withCursor = false): void {
       if (cache.cursor !== undefined) {
         cache.cursor.setStyle({ cursor: "" });
       }
-
-      Caret.startAnimation();
     }
   });
 }

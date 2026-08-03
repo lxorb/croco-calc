@@ -29,7 +29,7 @@ export function createHotkey(
       callback(e, context);
     },
     () => ({
-      ignoreInputs: false, //hotkeys are active on the answer input (#tasksInput), but not on other interactive elements
+      ignoreInputs: false, //hotkeys are active on the answer input (#answerInput), but not on other interactive elements
       stopPropagation: false, //we set stopPropagation in the callback if the hotkey executes
       preventDefault: false, //we set preventDefault in the callback if the hotkey executes
       requireReset: true,
@@ -56,20 +56,40 @@ function isInteractiveElementFocused(): boolean {
 }
 
 /**
+ * TR-140 — the Enter collision.
+ *
+ * When `quickRestart === "enter"`, Enter has two meanings: restart the test,
+ * and submit / continue inside the arena. The ruling is keyed on the arena's
+ * `data-state`:
+ *
+ * - in `running` and `awaitingContinue`, Enter belongs to the arena and MUST
+ *   NOT trigger quick-restart;
+ * - in `preStart` and `finished`, Enter triggers quick-restart as configured.
+ *
+ * Without this guard `quickRestart: "enter"` makes the app unusable — every
+ * answer submission would restart the run instead of submitting.
+ */
+function arenaOwnsEnter(): boolean {
+  const state = document
+    .querySelector("#taskArena")
+    ?.getAttribute("data-state");
+  return state === "running" || state === "awaitingContinue";
+}
+
+/**
  * Whether the hotkey should yield to whatever currently has focus.
  *
- * Upstream had a third branch here: `Escape` was swallowed while the test input
- * held an in-progress IME composition, so the first `Escape` cancelled the
- * candidate window rather than the test. `#tasksInput` (CP-053) only ever takes
- * digits and the operator keys, which no IME composes, so
- * `legacy-states/composition` was deleted with the rest of the composition
- * pipeline (CP-064) and `Escape` now always reaches the hotkey.
+ * The composition branch upstream had here is gone with the word stream:
+ * `#answerInput` only ever takes digits and the operator keys, which no IME
+ * composes, so `Escape` now always reaches the hotkey (TR-095).
  */
 function handleHotkeyOnInteractiveElement(
   e: KeyboardEvent,
   { hotkey }: HotkeyCallbackContext,
 ): boolean {
-  if (
+  if (hotkey === "Enter" && arenaOwnsEnter()) {
+    return true;
+  } else if (
     (hotkey === "Tab" || hotkey === "Enter") &&
     isInteractiveElementFocused()
   ) {

@@ -6,39 +6,34 @@ import * as TestLogic from "../../../test/test-logic";
 import { Button } from "../../common/Button";
 
 /**
- * CP-048 — the affordance over the hidden stream.
+ * TR-040 — the `start test` control that owns the `preStart` arena.
  *
- * This used to be the passive hint `type a digit to start`. That made starting
- * a run depend entirely on the hidden capture textarea holding focus, and
- * nothing reliably restored that focus once a click moved it to `<body>` — the
- * page then looked live but swallowed every keystroke. The primary affordance
- * is now a real button, which cannot be defeated by focus living elsewhere.
+ * This was a passive `type a digit to start` hint. That made starting a run
+ * depend entirely on a hidden field holding focus, and nothing reliably
+ * restored that focus once a click moved it to `<body>` — the page then looked
+ * live but swallowed every keystroke. A real, focusable button cannot be
+ * defeated by focus living elsewhere, and that fix is preserved here verbatim.
  *
- * Typing an accepted symbol still starts the test (see `input/listeners/key.ts`
- * and `event-handlers/global.ts`), because it is faster for repeat users, but
- * it is now a shortcut rather than the only way in.
+ * TR-041 — typing an accepted answer character still starts the run, and that
+ * character still enters the buffer (it is not consumed by the start). The
+ * button is the discoverable path; the keystroke is the fast path for repeat
+ * users. Both funnel through the same `TestLogic.startTest()` routine.
  *
- * Geometry is `OutOfFocusWarning`'s, so the two occupy the same box. It yields
- * to that warning rather than stacking two centred messages.
- *
- * CP-051 — the control fades out over the same 0.25 s the reveal takes, so it
- * cannot simply be unmounted when `preStart` drops. `hidden-hint` drives the
- * `opacity` transition declared in `test.scss`; the node is removed only once
- * that has played out.
+ * It yields to the out-of-focus warning rather than stacking two centred
+ * messages in the same box.
  */
 const FADE_MS = 250;
 
 /**
- * The one place the button's start path lives: reveal + clock, then hand the
- * keyboard to the capture textarea so the user types the first answer without
- * a second click.
+ * The button's start path: start the run, then hand the keyboard to
+ * `#answerInput` so the user types the first answer without a second click.
  */
 export function startTestFromButton(): void {
   TestLogic.startTest();
   focusInputElement(true);
 }
 
-export function PreStartHint() {
+export function StartGate() {
   const wanted = (): boolean => isPreStart() && !showOutOfFocusWarning();
   const [mounted, setMounted] = createSignal(wanted());
   const [fading, setFading] = createSignal(false);
@@ -74,7 +69,7 @@ export function PreStartHint() {
   return (
     <Show when={mounted()}>
       <div
-        id="preStartHint"
+        id="startGate"
         classList={{ "hidden-hint": fading() }}
         class="pointer-events-none absolute z-999 flex h-full w-full place-content-center items-center gap-2 text-center text-base select-none"
       >

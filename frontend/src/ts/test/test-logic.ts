@@ -25,6 +25,7 @@ import { Config } from "../config/store";
 import { restartTestEvent } from "../events/test";
 import {
   currentLiveStats,
+  getArenaState,
   getIncompleteSeconds,
   getIncompleteTests,
   getRestartCount,
@@ -35,7 +36,6 @@ import {
   resetIncompleteTests,
   resetLiveStats,
   setActiveTaskIndex,
-  setAnswerLength,
   setIsRepeated,
   setIsTestInvalid,
   setIsTestRestarting,
@@ -44,14 +44,14 @@ import {
   setResultVisible,
   setTestActive,
 } from "../states/test";
-import * as Caret from "./caret";
 import {
   logTestEvent,
   resetTestEvents,
   setEventLogContext,
 } from "./events/data";
+import * as Focus from "./focus";
 import { createTestEngine } from "./test-engine";
-import type { TaskView, TestEngine } from "./test-engine";
+import type { TestEngine } from "./test-engine";
 import * as TestTimer from "./test-timer";
 import * as TestUI from "./test-ui";
 
@@ -138,16 +138,25 @@ function settingsId(settings: MathSettings): string {
   });
 }
 
-/** The window of tasks the renderer should currently show. */
-function currentViews(active: number): TaskView[] {
-  if (engine === undefined) return [];
-  const { from, to } = TestUI.getRenderWindow(active);
-  const views: TaskView[] = [];
-  for (let i = from; i <= to; i++) {
-    const view = engine.viewAt(i);
-    if (view !== undefined) views.push(view);
+/**
+ * The presentation-only sub-state timers (TR-059).
+ *
+ * `dwellHandle` is the 180 ms correct-answer confirmation; `wrongAt` is when
+ * the current `awaitingContinue` began, for the TR-118 arming delay. Neither
+ * gates correctness, scoring, the task log, the chart samples or the timer —
+ * `engine.commit()` has already run synchronously by the time either is set
+ * (TR-060, TR-117). If an animation is dropped, the run is still correct.
+ */
+let dwellHandle: ReturnType<typeof setTimeout> | undefined;
+let wrongAt: number | undefined;
+
+/** TR-119 — entering any state cancels whatever the last one left in flight. */
+function cancelPending(): void {
+  if (dwellHandle !== undefined) {
+    clearTimeout(dwellHandle);
+    dwellHandle = undefined;
   }
-  return views;
+  wrongAt = undefined;
 }
 
 /** True while a test is running — the input layer's gate. */
@@ -165,9 +174,12 @@ export function getDurationSeconds(): number {
 }
 
 /**
- * CP-088 — reset the timer to the full duration, discard all committed tasks,
- * generate a fresh task stream, re-apply `preStart`, reset the caret to task 0 /
- * char 0, and record the abandoned run as an incomplete test.
+ * CP-088 / TR-174 — reset the timer to the full duration, discard all committed
+ * tasks, generate a fresh sequence, return to `preStart`, and record the
+ * abandoned run as an incomplete test.
+ *
+ * TR-063 — reachable from every state, including mid-dwell and mid-reveal, and
+ * always lands in `preStart` with nothing left in flight.
  */
 export function restart(options?: {
   /** CP-089 — replay the identical sequence. */
@@ -176,6 +188,7 @@ export function restart(options?: {
   initial?: boolean;
 }): void {
   setIsTestRestarting(true);
+  cancelPending();
 
   const isInitial = options?.initial ?? false;
   const previous = engine;
@@ -199,7 +212,6 @@ export function restart(options?: {
   setResultCalculating(false);
   resetLiveStats();
   resetActiveTaskIndex();
-  setAnswerLength(0);
   resetTestEvents();
 
   const settings = readMathSettings();
@@ -227,87 +239,229 @@ export function restart(options?: {
     settingsId: settingsId(settings),
   });
 
-  // CP-046 / CP-052 — the stream goes back behind the mask, every time.
-  TestUI.applyPreStart();
+  // TR-038 / TR-039 — back to `preStart`, which means the arena is *emptied*.
+  // There is no mask to re-apply and no blur to restore: the pre-start
+  // guarantee is that nothing is rendered, so there is nothing to read.
+  TestUI.resetArena();
   TestTimer.reset(engine);
-  Caret.resetPosition();
-  Caret.show(true);
   setIsTestRestarting(false);
 }
 
 /**
- * CP-049 — the reveal and the clock start are the same event. Reached from two
- * places: the input pipeline (an accepted answer symbol, where the engine has
- * already started itself inside `press`) and the start button, which has no
- * keystroke to feed in. `engine.begin` covers the second case and is a no-op
- * for the first, so both paths start the clock exactly once.
+ * TR-071 / TR-077 — render task `index` and record that it became active *now*.
+ *
+ * This is the single place a prompt reaches the screen, so it is also the
+ * single place `tStart` and the `taskShown` event are stamped. ME-159 always
+ * defined `tStart` as "ms from test start at which the task became active", and
+ * before this redesign that was the same instant as the previous commit. It no
+ * longer is: the dwell and the wrong-answer pause sit in between, and a user's
+ * response time must not include the time they spent reading the previous
+ * task's correct answer.
+ *
+ * TR-074 — this is anti-cheat-safe, and provably so: ME-180/ME-181 compute
+ * their intervals from `tEnd` deltas and never read `tStart`, and the dwell and
+ * the pause only ever *increase* those deltas, moving every plausibility check
+ * strictly away from its rejection boundary.
+ */
+function showTask(index: number, nowMs: number): void {
+  if (engine === undefined) return;
+  const view = engine.viewAt(index);
+  if (view === undefined) return;
+
+  engine.markTaskShown(nowMs);
+  // TR-030 — the DOM gets the display form (no trailing `=`); the log and the
+  // announcer get `task.prompt` verbatim, because ME-174 regenerates and
+  // compares that exact string server-side.
+  TestUI.renderPrompt(view.prompt, index);
+  setActiveTaskIndex(index);
+  logTestEvent("taskShown", nowMs, { taskIndex: index, prompt: view.prompt });
+}
+
+/**
+ * TR-066 — the clock starts on the same event that first renders a task, and
+ * never on page load, focus, restart, modal close or any other input.
+ *
+ * Reached from two places: the input pipeline (an accepted answer character,
+ * where the engine has already started itself inside `press`) and the start
+ * button, which has no keystroke to feed in. `engine.begin` covers the second
+ * case and is a no-op for the first, so both paths start the clock exactly once.
  */
 export function startTest(): void {
   if (engine === undefined || !isPreStart()) return;
   const now = performance.now();
   engine.begin(now);
   setTestActive(true);
-  TestUI.revealStream(currentViews(0));
-  TestUI.updateActiveElement(0);
-  logTestEvent("taskShown", now, {
-    taskIndex: 0,
-    prompt: engine.viewAt(0)?.prompt ?? "",
-  });
+  // CP-081 / TR-036 — the readouts are gated on `isTestActive() && getFocus()`.
+  // Starting a run *is* entering focus mode: without this the countdown, the
+  // live tpm and the live acc never render at all, because nothing else in the
+  // app turns the signal back on after `page-controller` clears it on
+  // navigation.
+  Focus.set(true);
+  TestUI.setTestState("running");
+  TestUI.setFeedback("none");
+  showTask(0, now);
+  // TR-145 — a fresh prompt is announced verbatim.
+  TestUI.announce(engine.viewAt(0)?.prompt ?? "");
   TestTimer.start(engine, () => {
     void finish();
   });
 }
 
-/** Feeds one accepted symbol in and re-renders the active answer. */
+/**
+ * Feeds one accepted character in and mirrors the engine's buffer back into
+ * `#answerInput` (TR-089).
+ */
 export function pressCharacter(ch: string): void {
   if (engine === undefined) return;
+
+  // TR-136 — a digit typed during `awaitingContinue` is **discarded**, not
+  // buffered for the next task. The pause exists to make the user read the
+  // correct answer; silently banking their keystrokes would defeat it.
+  if (getArenaState() === "awaitingContinue") return;
+
+  // TR-110 — the dwell is cancellable. A fast user never waits: the pending
+  // advance completes immediately and this character lands in the new task's
+  // buffer. No keystroke may be dropped by an animation.
+  if (dwellHandle !== undefined) finishDwell();
+
   const result = engine.press(ch, performance.now());
   if (result === "ignored") return;
   if (result === "started") startTest();
-  setAnswerLength(engine.buffer().length);
-  TestUI.updateActiveAnswer(engine.buffer());
+  TestUI.syncAnswer(engine.buffer());
 }
 
 /** CP-059 — backspace, never crossing a task boundary (CP-042). */
 export function deleteCharacter(whole: boolean): void {
   if (engine === undefined) return;
+  // TR-056 — the wrong answer is `readonly` once the correct one is on screen.
+  if (getArenaState() === "awaitingContinue") return;
   if (!engine.backspace(whole)) return;
-  setAnswerLength(engine.buffer().length);
-  TestUI.updateActiveAnswer(engine.buffer());
+  TestUI.syncAnswer(engine.buffer());
 }
 
-/** CP-037 / CP-038 — commit on Enter or Space; an empty commit is a no-op. */
+/**
+ * TR-131 / TR-136 — Enter's two meanings, resolved by state.
+ *
+ * This is the only entry point for Enter, so the TR-118 arming delay cannot be
+ * bypassed by any caller.
+ */
+export function submitOrContinue(): void {
+  if (getArenaState() === "awaitingContinue") {
+    // TR-118 — an Enter that arrives less than CONTINUE_ARM_MS after the wrong
+    // submit is ignored. Without it a user who double-taps Enter blows straight
+    // past the correct answer and never sees it, which defeats the feature.
+    if (
+      wrongAt !== undefined &&
+      performance.now() - wrongAt < TestUI.CONTINUE_ARM_MS
+    ) {
+      return;
+    }
+    continueAfterWrong();
+    return;
+  }
+  // TR-111 — Enter during the dwell is ignored. The new buffer is empty, so a
+  // commit would be a no-op anyway (TR-061), but this is explicit so the
+  // behaviour is not accidental.
+  if (dwellHandle !== undefined) return;
+  commitAnswer();
+}
+
+/** TR-115 — leave `awaitingContinue` and render the next task. */
+function continueAfterWrong(): void {
+  if (engine === undefined) return;
+  cancelPending();
+  const now = performance.now();
+
+  // TR-157 — emptied, not hidden, and *before* the next prompt renders.
+  TestUI.clearReveal();
+  TestUI.setAnswerReadonly(false);
+  TestUI.setFeedback("none");
+  TestUI.setResult(undefined);
+  TestUI.setTestState("running");
+  TestUI.syncAnswer("");
+
+  const next = engine.snapshot().activeIndex;
+  showTask(next, now);
+  TestUI.announce(engine.viewAt(next)?.prompt ?? "");
+  TestUI.playAdvanceIn();
+}
+
+/** TR-107 — the correct-answer dwell has elapsed (or been cancelled short). */
+function finishDwell(): void {
+  if (engine === undefined) return;
+  if (dwellHandle !== undefined) {
+    clearTimeout(dwellHandle);
+    dwellHandle = undefined;
+  }
+  const now = performance.now();
+
+  TestUI.setFeedback("none");
+  TestUI.setResult(undefined);
+  TestUI.syncAnswer("");
+
+  const next = engine.snapshot().activeIndex;
+  const view = engine.viewAt(next);
+  showTask(next, now);
+  // TR-145 — after a correct answer the confirmation is spoken with the prompt.
+  TestUI.announce(`correct. ${view?.prompt ?? ""}`);
+  TestUI.playAdvanceIn();
+}
+
+/**
+ * TR-060 — `engine.commit()` runs **exactly once per submit, synchronously,
+ * before any animation starts**. The engine advances `activeIndex` at that
+ * moment; everything below is presentation.
+ */
 export function commitAnswer(): void {
   if (engine === undefined) return;
   const index = engine.snapshot().activeIndex;
   const now = performance.now();
   const outcome = engine.commit(now);
+  // TR-061 — a no-op commit changes nothing: no state, no animation, no
+  // advance, no count. The arena stays in `running` awaiting an answer.
   if (outcome === "noop") return;
 
   const committed = engine.viewAt(index);
-  const next = engine.snapshot().activeIndex;
 
+  // TR-077 / TR-158 — records what the user entered and whether it was right,
+  // never what was right. The event log stays answer-free at every moment.
   logTestEvent("answerSubmitted", now, {
     taskIndex: index,
     given: committed?.given ?? "",
     correct: outcome === "correct",
   });
 
-  if (committed !== undefined) TestUI.commitTask(committed, next);
-  setActiveTaskIndex(next);
-  setAnswerLength(0);
-  TestUI.updateActiveAnswer("");
-
-  const upcoming = engine.viewAt(next);
-  if (upcoming !== undefined) {
-    logTestEvent("taskShown", now, {
-      taskIndex: next,
-      prompt: upcoming.prompt,
-    });
+  if (outcome === "correct") {
+    // TR-047 / TR-049 — the submitted answer stays on screen and turns
+    // `--main-color`. No correct answer is revealed: the user produced it.
+    TestUI.setFeedback("correct");
+    TestUI.setResult("correct");
+    dwellHandle = setTimeout(() => {
+      dwellHandle = undefined;
+      TestUI.playAdvanceOut();
+      dwellHandle = setTimeout(finishDwell, TestUI.FEEDBACK_PHASE_MS);
+    }, TestUI.FEEDBACK_PHASE_MS);
+    return;
   }
 
-  // Keep the runway rendered so the stream never visibly runs dry (CP-045).
-  if (next > 0 && next % 20 === 0) TestUI.renderStream(currentViews(next));
+  // TR-050 … TR-056 — the wrong-answer pause. The user's answer stays on
+  // screen in the error colour, the correct answer appears below it, and the
+  // run waits indefinitely for an explicit continue.
+  //
+  // TR-062 — the timer is NOT paused here, and must never be. The cost of an
+  // error is time; that is the entire point of the design.
+  wrongAt = now;
+  TestUI.setFeedback("wrong");
+  TestUI.setResult("wrong");
+  TestUI.setTestState("awaitingContinue");
+  TestUI.setAnswerReadonly(true);
+  // C29 — `committed.expected` is populated by the engine only for a task that
+  // has already been committed, so this cannot reveal an answer still in play.
+  const expected = committed?.expected ?? "";
+  TestUI.showReveal(expected);
+  TestUI.announce(
+    `incorrect. correct answer ${expected}. press enter to continue.`,
+  );
 }
 
 /** Builds the complete, seed-carrying payload (ME-169, ME-173, ME-177). */
@@ -394,9 +548,17 @@ export async function finish(): Promise<void> {
 
   setResultCalculating(true);
   TestTimer.stop();
+  // TR-058 — if the timer expires mid-dwell or mid-reveal the run finishes
+  // immediately: the dwell is cancelled and the reveal is discarded. TR-172:
+  // a task committed *before* the pause still counts — only a task with an
+  // uncommitted buffer is discarded (ME-157), and the engine owns that.
+  cancelPending();
   active.finish(performance.now());
+  TestUI.clearReveal();
+  TestUI.setAnswerReadonly(false);
+  TestUI.setFeedback("none");
+  TestUI.setResult(undefined);
   TestUI.setTestState("finished");
-  Caret.hide();
   setTestActive(false);
 
   const completedEvent = buildCompletedEvent(active);

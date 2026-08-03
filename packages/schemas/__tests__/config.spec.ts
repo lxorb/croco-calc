@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   AccountChartSchema,
-  CaretStyleSchema,
   ConfigGroupNameSchema,
   ConfigSchema,
   CustomBackgroundSchema,
@@ -24,8 +23,6 @@ const EXPECTED_CONFIG_KEYS = [
   "resultSaving",
   "singleListCommandLine",
   // caret (restored by master C11)
-  "smoothCaret",
-  "caretStyle",
   // appearance
   "timerStyle",
   "liveSpeedStyle",
@@ -95,21 +92,19 @@ describe("config schema", () => {
     );
   });
 
-  it("drops the image caret styles (CP-069)", () => {
-    expect(CaretStyleSchema.options).toEqual([
-      "off",
-      "default",
-      "block",
-      "outline",
-      "underline",
-    ]);
+  it("TR-203 — the caret config keys are struck", () => {
+    // The custom caret element existed only because the old design hid the
+    // input, so there was no native caret to see. `#answerInput` is visible and
+    // has one, themed with `--caret-color` (TR-020), so neither key has
+    // anything left to control.
+    expect(ConfigSchema.shape).not.toHaveProperty("smoothCaret");
+    expect(ConfigSchema.shape).not.toHaveProperty("caretStyle");
   });
 
   it("has config groups without sound, input or ads", () => {
     expect(ConfigGroupNameSchema.options).toEqual([
       "test",
       "behavior",
-      "caret",
       "appearance",
       "theme",
       "hideElements",

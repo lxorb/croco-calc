@@ -52,17 +52,15 @@ footer button:hover {
   transition: all 1s ease;
 }
 
-#tasks {
-  --correct-letter-animation: rainbow-infinite-loop 5s linear infinite;
-  --incorrect-letter-animation: rainbow-error-infinite-loop 1s alternate
-    ease-in-out infinite;
-  --extra-letter-animation: rainbow-error-infinite-loop 1s alternate ease-in-out
+#taskArena {
+  --task-active-animation: rainbow-infinite-loop 5s linear infinite;
+  --task-error-animation: rainbow-error-infinite-loop 1s alternate ease-in-out
     infinite;
 }
 
-#tasks.flipped {
-  --correct-letter-animation: none;
-  --untyped-letter-animation: rainbow-infinite-loop 5s linear infinite;
+#taskArena.flipped {
+  --task-active-animation: none;
+  --task-dim-animation: rainbow-infinite-loop 5s linear infinite;
 }
 
 footer button:hover {

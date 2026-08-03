@@ -1,9 +1,9 @@
 import { cleanup, render } from "@solidjs/testing-library";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PreStartHint } from "../../../../src/ts/components/pages/test/PreStartHint";
+import { StartGate } from "../../../../src/ts/components/pages/test/StartGate";
 import { focusInputElement } from "../../../../src/ts/input/input-element";
-import { setPreStart } from "../../../../src/ts/states/test";
+import { setArenaState } from "../../../../src/ts/states/test";
 import { startTest } from "../../../../src/ts/test/test-logic";
 
 // The button's job is to call these two; the engine and the real textarea are
@@ -16,23 +16,23 @@ vi.mock("../../../../src/ts/input/input-element", () => ({
 }));
 
 /**
- * CP-048 / CP-051 — the hint over the hidden stream, and its fade.
+ * TR-040 / CP-051 — the hint over the hidden stream, and its fade.
  *
  * CP-051 is explicit that the hint "MUST fade out over the same 0.25 s" as the
  * reveal. Unmounting it the instant `preStart` drops satisfies neither the
- * requirement nor the `transition` declared for `#preStartHint` in `test.scss`,
+ * requirement nor the `transition` declared for `#startGate` in `test.scss`,
  * so the node has to outlive the signal by exactly one transition.
  *
  * Note: the shared jsx harness replaces `document.querySelector` with a stub,
  * so everything below queries through the render container instead.
  */
-describe("PreStartHint", () => {
+describe("StartGate", () => {
   let container: HTMLElement;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    setPreStart(true);
-    container = render(() => <PreStartHint />).container;
+    setArenaState("preStart");
+    container = render(() => <StartGate />).container;
   });
 
   afterEach(() => {
@@ -41,10 +41,10 @@ describe("PreStartHint", () => {
   });
 
   function hint(): HTMLElement | null {
-    return container.querySelector<HTMLElement>("#preStartHint");
+    return container.querySelector<HTMLElement>("#startGate");
   }
 
-  it("is shown, fully opaque, while the stream is hidden (CP-048)", () => {
+  it("is shown, fully opaque, while the stream is hidden (TR-040)", () => {
     expect(hint()).not.toBeNull();
     expect(hint()?.classList.contains("hidden-hint")).toBe(false);
     expect(hint()?.textContent).toContain("start test");
@@ -73,7 +73,7 @@ describe("PreStartHint", () => {
   });
 
   it("fades for 0.25 s before it leaves the document (CP-051)", () => {
-    setPreStart(false);
+    setArenaState("running");
     // Still mounted, now transparent — this is the fade the requirement asks
     // for; a bare `<Show>` on `isPreStart()` would already have removed it.
     expect(hint()).not.toBeNull();
@@ -87,19 +87,19 @@ describe("PreStartHint", () => {
   });
 
   it("comes back fully opaque when the test restarts (CP-052)", () => {
-    setPreStart(false);
+    setArenaState("running");
     vi.advanceTimersByTime(250);
     expect(hint()).toBeNull();
 
-    setPreStart(true);
+    setArenaState("preStart");
     expect(hint()).not.toBeNull();
     expect(hint()?.classList.contains("hidden-hint")).toBe(false);
   });
 
   it("cancels a pending fade if the stream is re-hidden mid-transition", () => {
-    setPreStart(false);
+    setArenaState("running");
     vi.advanceTimersByTime(100);
-    setPreStart(true);
+    setArenaState("preStart");
     expect(hint()?.classList.contains("hidden-hint")).toBe(false);
 
     // The cancelled timeout must not fire and unmount a visible hint.
