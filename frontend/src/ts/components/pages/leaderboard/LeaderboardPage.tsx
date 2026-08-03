@@ -1,5 +1,12 @@
 import { useQuery } from "@tanstack/solid-query";
-import { createEffect, createSignal, JSXElement, Show } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  JSXElement,
+  Match,
+  Show,
+  Switch,
+} from "solid-js";
 
 import { getSnapshot, updateLbMemory } from "../../../db";
 import { createEffectOn } from "../../../hooks/effects";
@@ -23,6 +30,7 @@ import {
   updateGetParameters,
 } from "../../../states/leaderboard-selection";
 import { cn } from "../../../utils/cn";
+import { createErrorMessage } from "../../../utils/error";
 import { scrollToTop } from "../../../utils/misc";
 import AsyncContent from "../../common/AsyncContent";
 import { LoadingCircle } from "../../common/LoadingCircle";
@@ -239,15 +247,37 @@ export function LeaderboardPage(): JSXElement {
             </AsyncContent>
           </Show>
 
-          <AsyncContent
-            queries={{ entriesQuery }}
-            loader={
+          {/*
+            The three states are spelled out here rather than delegated to
+            `AsyncContent`. When `GET /leaderboards/xp/weekly` answered 503
+            (weekly XP was switched off in the server configuration) this block
+            rendered *nothing at all* — no spinner, no message, no empty state —
+            because `AsyncContent`'s deferred branch only renders children once a
+            value has resolved, and a query that never resolves never gets there.
+            The user saw a leaderboard page that loaded forever.
+
+            `Switch` is exhaustive: error wins, then data, and the fallback is
+            the loader. "No entries" is *not* an error — `Table` renders the
+            AC-136 empty row for it — so a board with no users yet shows the
+            empty state rather than a spinner or a failure.
+          */}
+          <Switch
+            fallback={
               <div class="flex justify-center pt-4 text-4xl">
                 <LoadingCircle />
               </div>
             }
           >
-            {({ entriesQueryData }) => (
+            <Match when={entriesQuery.isError}>
+              <div class="flex flex-row items-center justify-center rounded bg-sub-alt p-4 text-text">
+                {createErrorMessage(
+                  entriesQuery.error,
+                  "Could not load the leaderboard",
+                )}
+              </div>
+            </Match>
+
+            <Match when={entriesQuery.data !== undefined}>
               <div>
                 <div
                   class={cn(
@@ -262,7 +292,7 @@ export function LeaderboardPage(): JSXElement {
                       entriesQuery.isRefetching
                     }
                     lastPage={Math.ceil(
-                      (entriesQueryData()?.count ?? 0) / pageSize,
+                      (entriesQuery.data?.count ?? 0) / pageSize,
                     )}
                     userPage={userPage()}
                     currentPage={getPage()}
@@ -275,7 +305,7 @@ export function LeaderboardPage(): JSXElement {
                 <div>
                   <Table
                     type={getSelection().type === "weekly" ? "xp" : "speed"}
-                    entries={entriesQueryData()?.entries ?? []}
+                    entries={entriesQuery.data?.entries ?? []}
                     friendsOnly={getSelection().friendsOnly}
                     scrollToUser={scrollToUser}
                     onScrolledToUser={() => setScrollToUser(false)}
@@ -285,7 +315,7 @@ export function LeaderboardPage(): JSXElement {
                 <div class="mt-4 grid grid-cols-1 items-center justify-between text-sm sm:text-base">
                   <Navigation
                     lastPage={Math.ceil(
-                      (entriesQueryData()?.count ?? 0) / pageSize,
+                      (entriesQuery.data?.count ?? 0) / pageSize,
                     )}
                     currentPage={getPage()}
                     onPageChange={(page) => {
@@ -297,8 +327,8 @@ export function LeaderboardPage(): JSXElement {
                   />
                 </div>
               </div>
-            )}
-          </AsyncContent>
+            </Match>
+          </Switch>
         </div>
       </div>
     </Page>

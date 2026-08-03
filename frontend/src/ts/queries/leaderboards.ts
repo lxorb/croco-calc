@@ -6,6 +6,39 @@ import { queryOptions } from "@tanstack/solid-query";
 import Ape from "../ape";
 import { pageSize, Selection, setPage } from "../states/leaderboard-selection";
 
+/**
+ * Carries the HTTP status so `shouldRetry` can tell a verdict from a blip.
+ */
+class LeaderboardRequestError extends Error {
+  public readonly status: number;
+
+  public constructor(message: string, status: number) {
+    super(message);
+    this.name = "LeaderboardRequestError";
+    this.status = status;
+  }
+}
+
+/**
+ * A leaderboard that is switched off in the server configuration answers 503 on
+ * every call, and a 4xx will not fix itself either. Retrying those three times
+ * with exponential backoff only means the page spins for ~7 s before it can show
+ * the failure, which is most of why a disabled weekly-XP board looked like an
+ * infinite load. 500/502/504 and transport failures (which
+ * `ape/adapters/ts-rest-adapter.ts` reports as 500) stay retryable.
+ */
+function shouldRetry(failureCount: number, error: Error): boolean {
+  if (
+    error instanceof LeaderboardRequestError &&
+    error.status !== 500 &&
+    error.status !== 502 &&
+    error.status !== 504
+  ) {
+    return false;
+  }
+  return failureCount < 3;
+}
+
 const queryKeys = {
   root: (options: Selection & { userSpecific?: true }) => [
     //don't use baseKey, we require the key to have the options at the same position for user and non user specific
@@ -73,10 +106,11 @@ export const getLeaderboardQueryOptions = (
 
       const response = await request;
       if (response.status !== 200) {
-        throw new Error(
+        throw new LeaderboardRequestError(
           `Failed to get ${options.type} leaderboard data: ${
             response.body.message
           }`,
+          response.status,
         );
       }
 
@@ -93,6 +127,7 @@ export const getLeaderboardQueryOptions = (
     },
     //5 minutes for alltime, one minute for others
     staleTime: options.type === "allTime" ? 1000 * 60 * 5 : 1000 * 60,
+    retry: shouldRetry,
   });
 
 // oxlint-disable-next-line typescript/explicit-function-return-type
@@ -128,14 +163,16 @@ export const getRankQueryOptions = (options: Selection) =>
 
       const response = await request;
       if (response.status !== 200) {
-        throw new Error(
+        throw new LeaderboardRequestError(
           `Failed to get ${options.type} leaderboard rank: ${
             response.body.message
           }`,
+          response.status,
         );
       }
       return response.body.data;
     },
     //5 minutes for alltime, one minute for others
     staleTime: options.type === "allTime" ? 1000 * 60 * 5 : 1000 * 60,
+    retry: shouldRetry,
   });
