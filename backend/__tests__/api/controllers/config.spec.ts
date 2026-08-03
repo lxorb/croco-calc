@@ -65,22 +65,39 @@ describe("ConfigController", () => {
         addition: "1000",
       });
     });
-    it("should fail with unknown config", async () => {
-      //WHEN
+    /**
+     * TR-210 / TR-260 — rewritten, not deleted. This case used to assert a 422
+     * on an unknown key. That behaviour is struck: a browser holding a cached
+     * SPA build keeps sending keys that build knew about, so rejecting the
+     * whole request means the user cannot save *any* setting — including the
+     * ones that still exist — until they hard-refresh.
+     *
+     * The replacement assertion is stronger than the one it replaces. It is not
+     * enough that the request succeeds; the stale key must not reach Mongo
+     * either, which `saveConfig`'s dotted `$set` would otherwise persist
+     * forever. So the argument the DAL receives is checked exactly.
+     */
+    it("strips a removed config key instead of rejecting the save", async () => {
+      //GIVEN
+      saveConfigMock.mockResolvedValue({} as any);
+
+      //WHEN — `smoothCaret` is a real key a cached build still sends (TR-203).
       const { body } = await mockApp
         .patch("/configs")
         .set("Authorization", `Bearer ${uid}`)
         .accept("application/json")
-        .send({ unknownValue: "unknown" })
-        .expect(422);
+        .send({ addition: "1000", smoothCaret: "medium", unknownValue: "x" })
+        .expect(200);
 
       //THEN
       expect(body).toStrictEqual({
-        message: "Invalid request data schema",
-        validationErrors: [`Unrecognized key(s) in object: 'unknownValue'`],
+        message: "Config updated",
+        data: null,
       });
 
-      expect(saveConfigMock).not.toHaveBeenCalled();
+      expect(saveConfigMock).toHaveBeenCalledWith(uid, {
+        addition: "1000",
+      });
     });
     it("should fail with invalid configs", async () => {
       //WHEN

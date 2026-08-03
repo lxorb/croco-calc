@@ -36,21 +36,31 @@ export const configsContract = c.router(
       method: "PATCH",
       path: "",
       /**
-       * TR-210 / TR-260 — deliberately NOT `.strict()`.
+       * TR-210 / TR-260 — deliberately NOT strict. Note the **explicit**
+       * `.strip()`: it is load-bearing, not decoration.
        *
-       * Deploy-ordering hazard, and a permanent one: a browser holding a
-       * cached SPA build still sends the config keys that build knew about. The
-       * moment a key is removed server-side, `.strict()` answers that client's
-       * next config save with a 422 — so the user silently stops being able to
-       * save *any* setting until they hard-refresh. Removing the two struck
-       * caret keys (TR-203) would have done exactly that.
+       * `ConfigSchema` is `.strict()`, and zod's `.partial()` carries the
+       * `unknownKeys` setting through to the derived schema. So bare
+       * `PartialConfigSchema` is *also* strict, and writing `body:
+       * PartialConfigSchema` here silently kept the very behaviour TR-260
+       * struck. `.strip()` is what actually relaxes it.
        *
-       * A non-strict object schema strips unknown keys instead, which is the
-       * behaviour that makes key removal survivable. The frontend already
-       * `.strip()`s on read, so strictness on write protected nothing; it only
-       * turned every future removal into a coordinated-deploy problem.
+       * Why it must be relaxed: a browser holding a cached SPA build still
+       * sends the config keys that build knew about. The moment a key is
+       * removed server-side, a strict body answers that client's next config
+       * save with a 422 — so the user silently stops being able to save *any*
+       * setting until they hard-refresh. Removing the two struck caret keys
+       * (TR-203) would have done exactly that.
+       *
+       * Stripping unknown keys instead is what makes key removal survivable.
+       * The frontend already `.strip()`s on read, so strictness on write
+       * protected nothing; it only turned every future removal into a
+       * coordinated-deploy problem.
+       *
+       * `ConfigSchema` itself stays strict — a removed key still cannot be
+       * smuggled back into the *type*. This relaxes the wire, not the model.
        */
-      body: PartialConfigSchema,
+      body: PartialConfigSchema.strip(),
       responses: {
         200: MonkeyResponseSchema,
       },
