@@ -35,7 +35,12 @@ const obj: Config = {
   // appearance
   timerStyle: "mini",
   liveSpeedStyle: "off",
-  liveAccStyle: "off",
+  // TR-345 — `mini`, not monkeytype's `off`. The user's approved sketch of the
+  // new arena is `(timer) 7:42   acc 96%` and the brief reads "timer and live
+  // accuracy at the top", so a first-time visitor has to see both without
+  // touching a setting. tpm stays `off`: the sketch shows two readouts, and
+  // TR-031 caps the row at the three C13 readouts rather than requiring them.
+  liveAccStyle: "mini",
   timerColor: "main",
   timerOpacity: "1",
   alwaysShowDecimalPlaces: false,
