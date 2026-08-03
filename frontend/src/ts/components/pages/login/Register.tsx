@@ -71,10 +71,14 @@ export function Register(): JSXElement {
   };
 
   const form = createForm(() => ({
+    // No `emailVerify`: the confirm-your-email box was removed at the user's
+    // request. This is the *form field* only — Firebase still sends its
+    // verification mail on sign-up and `email-handler.html` still handles the
+    // link. `allFieldsMandatory()` below walks these values, so dropping the
+    // key is also what stops an always-empty field from blocking submit.
     defaultValues: {
       username: "",
       email: "",
-      emailVerify: "",
       password: "",
       passwordVerify: "",
     },
@@ -199,24 +203,6 @@ export function Register(): JSXElement {
                     });
                 }
               }}
-            />
-          )}
-        />
-        <form.Field
-          name="emailVerify"
-          validators={{
-            onChangeListenTo: ["email"],
-            onChange: (field) =>
-              field.value === field.fieldApi.form.getFieldValue("email")
-                ? undefined
-                : "verify email not matching email",
-          }}
-          children={(field) => (
-            <InputField
-              field={field}
-              autocomplete="verify-email"
-              placeholder="verify email"
-              disabled={!getLoginPageInputsEnabled()}
             />
           )}
         />
