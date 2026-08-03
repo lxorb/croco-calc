@@ -31,6 +31,7 @@ jobs:
   pre-ci:
     name: pre-ci
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       should-build-be: ${{ steps.export-changes.outputs.should-build-be }}
       should-build-fe: ${{ steps.export-changes.outputs.should-build-fe }}
@@ -70,6 +71,7 @@ jobs:
   prime-cache:
     name: prime-cache
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [pre-ci]
     steps:
       - name: Checkout pnpm-lock
@@ -110,7 +112,7 @@ jobs:
 
       - if: ${{ steps.cache-pnpm.outputs.cache-hit != 'true' }}
         name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
   # INF-089: a credential must never reach the repository. This runs on every
   # push and pull request, independently of pre-ci's path filters — a secret can
@@ -118,6 +120,7 @@ jobs:
   secret-scan:
     name: secret-scan
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
@@ -143,6 +146,7 @@ jobs:
   check-format:
     name: check-format
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [prime-cache]
     steps:
       - uses: actions/checkout@v6
@@ -171,7 +175,7 @@ jobs:
           key: ${{ runner.os }}-${{ env.NODE_VERSION }}-build-${{ env.cache-name }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Check formatting
         run: pnpm run format-check
@@ -179,6 +183,7 @@ jobs:
   ci-pkg:
     name: ci-pkg
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [pre-ci, prime-cache]
     if: needs.pre-ci.outputs.should-build-pkg == 'true'
     steps:
@@ -211,7 +216,7 @@ jobs:
           key: ${{ runner.os }}-${{ env.NODE_VERSION }}-build-${{ env.cache-name }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Check lint
         run: pnpm run lint-fast-pkg && pnpm run lint-pkg
@@ -228,6 +233,7 @@ jobs:
   ci-be:
     name: ci-be
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [pre-ci, prime-cache]
     if: needs.pre-ci.outputs.should-build-be == 'true' || needs.pre-ci.outputs.should-build-pkg == 'true'
     steps:
@@ -261,7 +267,7 @@ jobs:
           key: ${{ runner.os }}-${{ env.NODE_VERSION }}-build-${{ env.cache-name }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Check lint
         run: pnpm run lint-fast-be && pnpm run lint-be
@@ -278,6 +284,7 @@ jobs:
   ci-fe:
     name: ci-fe
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [pre-ci, prime-cache]
     if: needs.pre-ci.outputs.should-build-fe == 'true' || needs.pre-ci.outputs.should-build-pkg == 'true'
     steps:
@@ -315,7 +322,7 @@ jobs:
           key: ${{ runner.os }}-${{ env.NODE_VERSION }}-build-${{ env.cache-name }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Check lint
         run: pnpm run lint-fast-fe && pnpm run lint-fe
@@ -341,6 +348,7 @@ jobs:
   ci-assets:
     name: ci-assets
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [pre-ci, prime-cache]
     if: needs.pre-ci.outputs.styles == 'true' || needs.pre-ci.outputs.should-build-pkg == 'true'
     steps:
@@ -374,7 +382,7 @@ jobs:
           key: ${{ runner.os }}-${{ env.NODE_VERSION }}-build-${{ env.cache-name }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Lint styles
         run: pnpm run lint-styles

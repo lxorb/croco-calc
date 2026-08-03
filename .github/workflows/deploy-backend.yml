@@ -12,6 +12,9 @@ on:
       - "packages/**"
       - "docker/**"
       - "pnpm-lock.yaml"
+      # onlyBuiltDependencies lives here, so this file changes what `pnpm
+      # install` does inside the image build. A change to it has to reach prod.
+      - "pnpm-workspace.yaml"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
 
@@ -35,6 +38,9 @@ jobs:
     name: build, push and roll forward
     runs-on: ubuntu-latest
     environment: prod
+    # The image build dominates; 45 minutes is generous but still far below the
+    # six-hour default a wedged buildx step would otherwise consume.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
 
@@ -67,6 +73,7 @@ jobs:
       # INF-042: prove the published image carries no BYPASS_* escape hatch.
       - name: Assert no BYPASS_* in the image
         run: |
+          set -euo pipefail
           docker pull "$IMAGE:${{ github.sha }}"
           env_json=$(docker inspect --format '{{json .Config.Env}}' "$IMAGE:${{ github.sha }}")
           echo "$env_json"
@@ -83,8 +90,22 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # Recorded BEFORE the update so the smoke check has something concrete to
+      # roll back to. Without this the rollback below could only print advice.
+      - name: Record the currently deployed image
+        id: previous
+        run: |
+          set -euo pipefail
+          prev=$(az containerapp show \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "properties.template.containers[0].image" -o tsv)
+          echo "previously deployed image: $prev"
+          echo "image=$prev" >> "$GITHUB_OUTPUT"
+
       - name: Update the Container App
         run: |
+          set -euo pipefail
           az containerapp update \
             --name "$CONTAINER_APP" \
             --resource-group "$RESOURCE_GROUP" \
@@ -111,7 +132,26 @@ jobs:
             sleep 10
           done
           echo "::error::$BACKEND_URL/ did not return {\"message\":\"ok\"} within 2 minutes."
-          echo "Roll back with the previous revision:"
-          echo "  az containerapp revision list -n $CONTAINER_APP -g $RESOURCE_GROUP -o table"
-          echo "  az containerapp revision activate -n $CONTAINER_APP -g $RESOURCE_GROUP --revision <previous-revision>"
           exit 1
+
+      # An automatic rollback, not a printed suggestion. This runs only when a
+      # previous step failed, so a bad image does not stay live while somebody
+      # reads the logs. The job still reports failure regardless of whether this
+      # step succeeds — once a step has failed the job outcome is sealed, and a
+      # successful rollback must never look like a successful deploy.
+      - name: Roll back to the previous image
+        if: failure() && steps.previous.outputs.image != ''
+        env:
+          PREVIOUS_IMAGE: ${{ steps.previous.outputs.image }}
+        run: |
+          set -euo pipefail
+          if [ "$PREVIOUS_IMAGE" = "$IMAGE:${{ github.sha }}" ]; then
+            echo "previous image is the one just deployed; nothing to roll back to"
+            exit 0
+          fi
+          echo "::warning::rolling $CONTAINER_APP back to $PREVIOUS_IMAGE"
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$PREVIOUS_IMAGE"
+          echo "rolled back to $PREVIOUS_IMAGE"

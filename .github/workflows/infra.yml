@@ -37,6 +37,7 @@ jobs:
     name: terraform plan
     if: github.event_name == 'pull_request' || inputs.action == 'plan'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
@@ -128,6 +129,7 @@ jobs:
     # carry a required reviewer — that is where the approval gate lives.
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'apply' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: prod-infra
     steps:
       - uses: actions/checkout@v6

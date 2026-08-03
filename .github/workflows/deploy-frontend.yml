@@ -10,6 +10,9 @@ on:
       - "frontend/**"
       - "packages/**"
       - "pnpm-lock.yaml"
+      # onlyBuiltDependencies lives here, so this file changes what `pnpm
+      # install` actually does. A change to it has to be able to reach prod.
+      - "pnpm-workspace.yaml"
       - ".github/workflows/deploy-frontend.yml"
   workflow_dispatch:
 
@@ -30,6 +33,9 @@ jobs:
     name: build and deploy
     runs-on: ubuntu-latest
     environment: prod
+    # A hung install or a wrangler call waiting on a prompt would otherwise hold
+    # a runner for the default six hours.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
 
@@ -55,8 +61,11 @@ jobs:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-${{ env.NODE_VERSION }}-build-${{ env.cache-name }}-${{ hashFiles('pnpm-lock.yaml') }}
 
+      # --frozen-lockfile so a lockfile that no longer matches package.json is a
+      # hard failure instead of a silent re-resolve that ships an unreviewed
+      # dependency tree to production.
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       # INF-101: the deploy build must never fall back to CI's stub firebase
       # config, and INF-013 forbids a build without a real BACKEND_URL. Both are
@@ -90,6 +99,37 @@ jobs:
               ;;
           esac
 
+      # Ordering gate. deploy-backend and deploy-frontend are separate workflows
+      # on separate path filters, so a commit touching packages/** starts both
+      # at once and nothing otherwise stops the SPA going live against an API
+      # that is still rolling. BACKEND_URL is baked into the bundle at build
+      # time and cannot be corrected afterwards without a rebuild, so the URL
+      # has to be serving BEFORE the build, not merely non-empty.
+      #
+      # This waits rather than failing fast: a concurrent backend deploy is the
+      # expected case, not an error. It fails only if the API is still not
+      # answering after 5 minutes, which means the backend deploy itself failed
+      # and shipping a frontend against it would just spread the outage.
+      - name: Wait for the backend to be healthy
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 300))
+          while [ $SECONDS -lt $deadline ]; do
+            body=$(curl -sf --max-time 10 "$BACKEND_URL/" || true)
+            case "$body" in
+              *'"message":"ok"'*)
+                echo "$BACKEND_URL/ is healthy"
+                exit 0
+                ;;
+            esac
+            echo "backend not ready yet, retrying"
+            sleep 10
+          done
+          echo "::error::$BACKEND_URL/ did not return {\"message\":\"ok\"} within 5 minutes; refusing to build a frontend against an unhealthy API"
+          exit 1
+
       # firebase-config-live.ts is generated inside the build from these
       # variables (INF-090, INF-099, INF-100) and is never committed.
       - name: Build
@@ -106,6 +146,7 @@ jobs:
 
       - name: Check build output
         run: |
+          set -euo pipefail
           test -f frontend/dist/index.html || { echo "::error::frontend/dist/index.html was not produced"; exit 1; }
           test -f frontend/dist/_headers   || { echo "::error::frontend/dist/_headers is missing — cache and security headers would not be applied"; exit 1; }
 
@@ -117,18 +158,40 @@ jobs:
           workingDirectory: frontend
           command: deploy --config wrangler.jsonc
 
-      # INF-018 / INF-148 item 4.
+      # INF-018 / INF-148 item 4. Both custom domains are checked: wrangler.jsonc
+      # binds crococalc.com AND www.crococalc.com as Custom Domains, and a
+      # half-applied route change is exactly the kind of failure that otherwise
+      # only surfaces in production.
       - name: Smoke check
         run: |
-          for attempt in $(seq 1 10); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' https://crococalc.com/ || true)
-            if [ "$code" = "200" ]; then
-              echo "https://crococalc.com/ -> 200"
-              curl -sI https://crococalc.com/ | tr -d '\r' | grep -i -E '^(cache-control|x-frame-options|x-content-type-options|referrer-policy):'
-              exit 0
+          set -euo pipefail
+          for host in crococalc.com www.crococalc.com; do
+            ok=""
+            for attempt in $(seq 1 10); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "https://$host/" || true)
+              # 2xx, or a redirect (www -> apex is a legitimate configuration).
+              case "$code" in
+                200|301|302|308) echo "https://$host/ -> $code"; ok=yes; break ;;
+              esac
+              echo "attempt $attempt for $host: got $code, retrying"
+              sleep 15
+            done
+            if [ -z "$ok" ]; then
+              echo "::error::https://$host/ did not respond within ~2.5 minutes"
+              exit 1
             fi
-            echo "attempt $attempt: got $code, retrying"
-            sleep 15
           done
-          echo "::error::crococalc.com did not return 200 within ~2.5 minutes"
-          exit 1
+          # The _headers file is only useful if Cloudflare actually applies it,
+          # so assert the security headers instead of printing them. The old
+          # version piped into grep and then unconditionally exited 0, which
+          # meant a missing header could never fail this step.
+          headers=$(curl -sSI https://crococalc.com/ | tr -d '\r')
+          echo "$headers"
+          missing=""
+          for h in x-frame-options x-content-type-options referrer-policy; do
+            if ! echo "$headers" | grep -qi "^$h:"; then missing="$missing $h"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::crococalc.com is missing security header(s):$missing — check frontend/dist/_headers"
+            exit 1
+          fi
