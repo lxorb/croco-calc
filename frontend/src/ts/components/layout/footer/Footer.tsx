@@ -2,7 +2,9 @@ import { JSXElement, Show } from "solid-js";
 
 import {
   COMING_SOON_TOOLTIP,
+  DEFERRED_FEATURES,
   GITHUB_REPO_URL,
+  MONKEYTYPE_REPO_URL,
   SOCIAL_LINKS,
 } from "../../../constants/links";
 import { getIsScreenshotting } from "../../../states/core";
@@ -13,11 +15,17 @@ import { Balloon } from "../../common/Balloon";
 import { Button } from "../../common/Button";
 import { Keytips } from "./Keytips";
 import { ThemeIndicator } from "./ThemeIndicator";
-import { VersionButton } from "./VersionButton";
 
 /**
- * CP-012 — exactly seven buttons, in this order, each with a fixed-width
- * leading icon. The upstream `twitter` button is gone (CP-013).
+ * CP-012 — a fixed button order, each with a fixed-width leading icon. The
+ * upstream `twitter` button is gone (CP-013); `support` and `discord` are
+ * hidden behind `DEFERRED_FEATURES`, leaving contact / github / terms /
+ * security / privacy.
+ *
+ * The bottom-right cluster is the theme indicator preceded by the upstream
+ * credit. The upstream version/commit button that used to follow the theme
+ * name is gone — the version check itself still runs on boot from
+ * `ts/index.ts`.
  */
 export function Footer(): JSXElement {
   const discordUrl = (): string | null => SOCIAL_LINKS.discord;
@@ -46,15 +54,17 @@ export function Footer(): JSXElement {
             }}
             onClick={() => showModal("Contact")}
           />
-          <Button
-            variant="text"
-            text="support"
-            icon={{
-              icon: "ph:hand-heart-bold",
-              fixedWidth: true,
-            }}
-            onClick={() => showModal("Support")}
-          />
+          <Show when={DEFERRED_FEATURES.support}>
+            <Button
+              variant="text"
+              text="support"
+              icon={{
+                icon: "ph:hand-heart-bold",
+                fixedWidth: true,
+              }}
+              onClick={() => showModal("Support")}
+            />
+          </Show>
           <Button
             variant="text"
             text="github"
@@ -65,15 +75,31 @@ export function Footer(): JSXElement {
             href={GITHUB_REPO_URL}
           />
           {/*
-            CP-017: the discord invite does not exist yet, so the button renders
-            disabled with a `coming soon` tooltip rather than linking nowhere.
-            The tooltip lives on a wrapper because a disabled button sets
+            CP-017, as amended: there is no discord server, so the button is not
+            rendered at all. With `DEFERRED_FEATURES.discord` back on it falls
+            back to the D4 treatment — a disabled button behind a `coming soon`
+            tooltip while `SOCIAL_LINKS.discord` is still `null`. The tooltip
+            lives on a wrapper because a disabled button sets
             `pointer-events: none` and would never see the hover itself.
           */}
-          <Show
-            when={discordUrl()}
-            fallback={
-              <Balloon text={COMING_SOON_TOOLTIP} position="up" inline>
+          <Show when={DEFERRED_FEATURES.discord}>
+            <Show
+              when={discordUrl()}
+              fallback={
+                <Balloon text={COMING_SOON_TOOLTIP} position="up" inline>
+                  <Button
+                    variant="text"
+                    text="discord"
+                    icon={{
+                      icon: "ph:discord-logo-bold",
+                      fixedWidth: true,
+                    }}
+                    disabled
+                  />
+                </Balloon>
+              }
+            >
+              {(url) => (
                 <Button
                   variant="text"
                   text="discord"
@@ -81,22 +107,10 @@ export function Footer(): JSXElement {
                     icon: "ph:discord-logo-bold",
                     fixedWidth: true,
                   }}
-                  disabled
+                  href={url()}
                 />
-              </Balloon>
-            }
-          >
-            {(url) => (
-              <Button
-                variant="text"
-                text="discord"
-                icon={{
-                  icon: "ph:discord-logo-bold",
-                  fixedWidth: true,
-                }}
-                href={url()}
-              />
-            )}
+              )}
+            </Show>
           </Show>
           <Button
             variant="text"
@@ -126,9 +140,21 @@ export function Footer(): JSXElement {
             }}
           />
         </div>
+        {/*
+          The credit sits before the theme name so it reads as a trailing note
+          rather than a call to action: on `lg` the cluster is a row and the two
+          share a line, below that it stacks and the credit is the line above.
+          It inherits the footer's `text-xs text-sub`, and `variant="text"`
+          keeps it at sub colour until it is hovered, exactly like every other
+          control down here.
+        */}
         <div class="flex flex-col items-end text-right lg:flex-row">
+          <Button
+            variant="text"
+            text={"Thanks to Miodec <3"}
+            href={MONKEYTYPE_REPO_URL}
+          />
           <ThemeIndicator />
-          <VersionButton />
         </div>
       </div>
     </footer>
