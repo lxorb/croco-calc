@@ -1,19 +1,26 @@
 # croco calc — Authoritative Requirements Specification
 
-**Status:** authoritative. Supersedes the six source documents wherever this file rules on a conflict.
-**Date:** 2026-08-02
-**Revision:** **2** — incorporates an adversarial completeness review. 23 new requirements were added to the
+**Status:** authoritative. Supersedes the seven source documents wherever this file rules on a conflict.
+**Date:** 2026-08-03
+**Revision:** **5** — records **C45**, the user's in-run test screen redesign (decision **D3**), and adds
+`docs/requirements/07-test-screen-redesign.md` (`TR-001 … TR-262`) as a seventh source document, authoritative
+for the in-run experience. Every requirement C45 withdraws is struck **in §2.31 with a pointer**, never edited
+away; the earlier rulings C11 and C12 keep their original text in §2 and are marked struck there too. The
+chrome (header, settings bar, footer, results page, account pages, themes) is unchanged, and CP-036 / ME-152,
+ME-153 and C29 are explicitly upheld.
+**Revision history (earlier revisions, retained):**
+**Revision 2** — incorporates an adversarial completeness review. 23 new requirements were added to the
 source documents (ME-179…184, SB-215, CP-058a, CP-191…196, AC-187, INF-058a, INF-086a, INF-151…156), seven
 new contradiction rulings (C36…C42), two new open questions (OQ-15, OQ-16), a residual-ownership section
 (§6.2), a full coverage map (§6.3) and ten new DoD items (DoD-04a, DoD-13a, DoD-19a, DoD-45a, DoD-45b,
 DoD-49…DoD-53). All original IDs are unchanged; four existing DoD items (02, 04, 07, 19) and the exit criteria
 of WP-03, WP-08, WP-11 and WP-12 were corrected in place.
-**Sources:** `docs/requirements/01-math-engine.md` … `docs/requirements/06-infra-and-ops.md`
-**Total requirements consolidated:** **1111**
+**Sources:** `docs/requirements/01-math-engine.md` … `docs/requirements/07-test-screen-redesign.md`
+**Total requirements consolidated:** **1375** (1113 after revision 3's correction, plus doc 07's 262)
 
 This document does three things and nothing else:
 
-1. It **indexes** every requirement ID from the six source documents and declares them all binding.
+1. It **indexes** every requirement ID from the seven source documents and declares them all binding.
 2. It **resolves** every contradiction between those documents, by ID, with a ruling and a reason.
 3. It defines the **assumptions**, **blockers**, **deferred work**, **work breakdown** and **definition of done**
    for the next stage.
@@ -33,7 +40,8 @@ MUST be read by implementers. Where this document rules against a source require
 | `04-pages-account.md` | `AC-` | AC-001 … AC-187 | **187** | User stats, leaderboard, friends, public profile, account settings, profile menu, XP/level system, persisted result/user schema |
 | `05-monkeytype-inventory.md` | `ME-` → **`INV-`** | INV-000 … INV-208 (+ 11 lettered) | **220** | Keep/adapt/delete disposition for every file inherited from monkeytype |
 | `06-infra-and-ops.md` | `INF-` | INF-001 … INF-156 (+ INF-058a, INF-086a) | **158** | Hosting, Terraform, database, secrets, job locking, Firebase auth, reCAPTCHA, app icon, repo, CI/CD, observability, cost |
-| | | | **1111** | |
+| `07-test-screen-redesign.md` | `TR-` | TR-001 … TR-262 | **262** | The in-run test screen: layout per state, the state machine and the timer, the answer input, the feedback animations, keyboard-only operation, the C29 proof, the results payload confirmation, the typing-machinery deletion inventory (added in revision 5 by **C45**) |
+| | | | **1375** | |
 
 **Revision-2 additions, by document** (all appended; no existing ID was renumbered):
 `ME-179`…`ME-183` (plausibility thresholds, review gap 8), `ME-184` (engine-version/compatibility bump,
@@ -59,13 +67,23 @@ Doc 05 MUST be updated in place with the new prefix as the first task of WP-01.
 Every ID listed above is **binding** on stage 2 **except** the IDs explicitly overruled in §2. The complete
 overruled list is §2.31. An implementer who finds a source requirement not listed as overruled MUST implement it.
 
+**Precedence, after revision 5.** For the **in-run test screen only**,
+`docs/requirements/07-test-screen-redesign.md` (`TR-`) outranks this document and docs 01–06, but **only for
+the IDs its §13 names**. Everything else — the chrome, the results page, the account pages, the math engine,
+the backend and the infrastructure — is governed by this document and docs 01–06 exactly as before. When in
+doubt: if the requirement describes what happens on screen between "start" and "the timer expires", read
+doc 07 first.
+
 ---
 
 ## 2. Contradiction register
 
 Forty-one conflicts were found (C2 … C42). Each states the conflict, the ruling, and the reason. Rulings
 are binding. **C36 … C42 were added in revision 2**, in response to an adversarial completeness review; the
-review's numbered gaps are cited so the two documents can be read side by side.
+review's numbered gaps are cited so the two documents can be read side by side. **C43 and C44 were added in
+revision 4**; **C45 was added in revision 5** and is not a conflict between the source documents at all — it
+records a user design decision that overrides them, and it strikes C11 and (in part) C12, both of which keep
+their original text above their strike notice.
 
 ### C2 — Config value literals for the arithmetic settings
 
@@ -208,7 +226,14 @@ that keeps 52 theme files untouched without inventing a dead link. *Flagged for 
 not a design choice. The bar's exception is already argued (SB-061) and is internally consistent.
 *Flagged for sign-off — see OQ-7.*
 
-### C11 — Caret: keep or delete
+### ~~C11 — Caret: keep or delete~~ — **STRUCK by C45**
+
+> **STRUCK 2026-08-03 by C45.** The ruling below is preserved verbatim for the audit trail and is **no longer
+> binding**. Its reason clause presupposed CP-053's hidden capture textarea, which C45 struck; with a visible
+> `<input id="answerInput">` there *is* a native caret to see. **INV-068 and INV-160 are reinstated**: the
+> caret element, `caret.scss`, `elements/caret.ts`, `test/caret.ts` and the `smoothCaret` / `caretStyle`
+> config keys are all deleted. `--caret-color` is **kept** and is applied to the native caret. See
+> `docs/requirements/07-test-screen-redesign.md` TR-020, TR-091, TR-178 … TR-180, TR-203 … TR-209.
 
 **Conflict.** INV-068 / INV-160 delete `caret.scss`, `elements/caret.ts`, `test/caret.ts` and the
 `smoothCaret` / `caretStyle` config keys, on the reasoning that "the answer field uses the browser's native
@@ -219,7 +244,17 @@ and keep the shape options and blink behaviour.
 **Reason.** INV-068 presupposes a visible `<input>`. CP-053 keeps monkeytype's hidden capture textarea with
 per-character `<letter>` rendering, so there is no native caret to see.
 
-### C12 — Answer input model
+### ~~C12 — Answer input model~~ — **STRUCK IN PART by C45**
+
+> **STRUCK IN PART 2026-08-03 by C45.** The ruling below is preserved verbatim for the audit trail.
+> **No longer binding:** "hidden-textarea capture + rendered `.answer` letters is normative (CP-053, CP-032)".
+> **INV-051 is reinstated on its "a single numeric answer input" clause** — the in-run screen uses a visible
+> `<input id="answerInput">` with `inputmode="decimal"` and no per-character `<letter>` rendering.
+> **Still binding, and explicitly re-affirmed by C45:** INV-090's "submit on Enter **or on unique-match**"
+> remains **OVERRULED** — auto-advance on unique match is rejected in every form; and ME-153 (no
+> auto-advance, `quickEnd` not ported) and ME-152 / CP-036 (no per-character feedback) remain binding
+> anti-cheat requirements. C45 additionally strikes `Space` as a second commit key. See
+> `docs/requirements/07-test-screen-redesign.md` TR-079 … TR-098, TR-131 … TR-135.
 
 **Conflict.** INV-051 replaces the capture textarea with "a single numeric answer input"; INV-090 replaces the
 input pipeline with a module that submits "on Enter **or on unique-match**". CP-053 keeps the hidden
@@ -746,6 +781,37 @@ rule that cannot be satisfied is not a rule; a grep that does not implement the 
 | §1 index total (**1111**) | **corrected** | revision 3 added `INF-053a` and `INF-062a`; the true total is **1113**, INF 158 → 160. Evidence: `docs/coverage/requirement-coverage.md` |
 | INF-037 total vs doc 06 range | **corrected, then re-opened 2026-08-03, then re-based** | the single figure ≈ $39.42/mo is withdrawn; doc 06 carries a measured range, which is a range because the ACA vCPU row genuinely is one. After INF-144's sizing lever that range is **≈ $30.5 – 35.6/mo**; the intermediate ≈ $38.4 – 48.6 figure is superseded |
 | INF-143a (subscription budget) | **new, created 2026-08-03** | `budget-azure-subscription-total`, **CHF 500**, subscription scope, **Actual 80 % / 100 % only — no Forecasted** (a forecast alert is what produced the 2026-08-03 false alarm). Declared in `infra/terraform/bootstrap/`, **not** `prod/`, so a `terraform destroy` of croco calc cannot delete the user's subscription-wide guard; carries `prevent_destroy`. It is **not** croco calc's budget |
+| **Rows below added in revision 5 — the in-run screen redesign (C45, user decision D3, 2026-08-03)** | | |
+| ~~CP-030, CP-031, CP-032~~ | **struck** | C45 → one task at a time; `#tasks` flex-wrap stream, `div.task[data-taskindex]` and the `<letter>` answer rendering are all deleted. See `07-…` TR-016, TR-079, §13.1 |
+| ~~CP-041~~ | **struck** | C45 → the 0.5-opacity committed-task hint is replaced by `#taskReveal`, which is primary information, not decoration (TR-052) |
+| ~~CP-044~~ | **struck** | C45 → no three-line window, no line jump, no `activeWordTop` bookkeeping (TR-022) |
+| ~~CP-046, CP-047, CP-051~~ | **struck** | C45 → nothing is rendered pre-start, so there is nothing to blur or reveal. The *requirement* (no pre-reading advantage) is preserved structurally (TR-038, TR-039) |
+| ~~CP-048~~ | **struck** | C45 → the `type a digit to start` hint is replaced by a real `start test` button (TR-040) |
+| ~~CP-053~~ | **struck** | C45 → the hidden `<textarea id="tasksInput">` becomes a visible `<input id="answerInput">` (TR-079). The anti-interference attributes are kept (TR-083) |
+| ~~CP-067, CP-068, CP-069, CP-070, CP-072~~ | **struck** | C45 → the custom caret is deleted; the browser's native caret is used, themed with `--caret-color` (TR-020, TR-091) |
+| ~~CP-037 (the `Space` half)~~, ~~ME-140 (the `Space` half)~~ | **struck** | C45 → submit is Enter only; Space's stated rationale was monkeytype muscle memory (TR-131, TR-132) |
+| ~~**C11**~~ (caret kept; INV-068 / INV-160 overruled; `smoothCaret` + `caretStyle` restored) | **struck** | C45 → C11's own reason clause presupposed CP-053's hidden textarea, which is now struck. **INV-068 and INV-160 are reinstated**; `smoothCaret` and `caretStyle` are removed from §6.1's retained key set. `--caret-color` is **kept** (TR-020) |
+| ~~**C12**~~ (hidden-textarea capture + `.answer` letters normative) | **struck** | C45 → **INV-051 is reinstated on its "single numeric answer input" clause**. C12's other half survives: INV-090's "submit on Enter **or on unique-match**" stays **OVERRULED**, and ME-153 / ME-152 / CP-036 remain binding anti-cheat requirements (TR-134, TR-135) |
+| CP-019, CP-020 | amended | C45 → the child list becomes `07-…` TR-012's element set |
+| CP-033, CP-034, CP-035 | amended | C45 → binding, applied to `#taskPrompt`; the four `--*-letter-*` custom properties are renamed to math vocabulary (TR-019) |
+| CP-036 / ME-152 | **upheld, unchanged, still critical** | C45 → no pre-commit feedback of any kind. The post-submit animation complies because judgement has already happened (TR-046, TR-135) |
+| ME-153 | **upheld, unchanged** | C45 → TR-134/TR-135 state exactly what it forbids (advance *without* a submit event) and why the post-submit advance is not that. `quickEnd` still MUST NOT be ported |
+| **C29** | **upheld, unchanged, and easier to satisfy** | C45 → one task exists at a time; `07-…` §7 is the proof, including the exact moment the answer enters the DOM |
+| **C13** | **upheld** | C45 → timer + live acc + live tpm, no fourth readout. Only the layout moves (TR-031) |
+| **C30** | **extended by one edit class** | C45 → the TR-019 property rename in 8 of the 52 theme files, with the same PR-listing obligation C30 already imposes (TR-186) |
+| **C33** | **upheld** | C45 → TR-097/TR-098 state exactly where U+2212 appears and where the ASCII buffer legitimately does not |
+| CP-040, CP-042, CP-043, CP-045, CP-049, CP-050, CP-052, CP-054 … CP-059, CP-058a, CP-073 … CP-089, CP-183, CP-184, CP-191 … CP-196 | amended in placement only | C45 → binding in substance; see `07-…` §13.2 for the per-ID amendment |
+| CP-186, CP-187 | amended | C45 → `data-state` gains `awaitingContinue` (TR-010); `data-taskindex` / `data-result` move to `#taskArena` (TR-015) |
+| ME-136 | amended | C45 → the first task is generated but **not rendered** pre-start, rather than rendered-and-blurred (TR-038) |
+| ME-154, ME-156 | amended | C45 → a wrong answer still commits, scores and advances with no retry and no penalty time; the advance now requires an explicit continue. The timer runs throughout, so this is not penalty time (TR-062, `07-…` §13.2) |
+| ME-159 | clarified | C45 → `tStart` is recorded when the prompt is **rendered**, which is what ME-159 already said. TR-074 proves ME-165 / ME-179 … ME-182 are unaffected |
+| ME-158 | **upheld** | C45 → CP-045's *rendering* rationale is struck, but the rolling-batch *generation* rule survives here (TR-190) |
+| ME-174 … ME-177, ME-179 … ME-184 | **upheld, unchanged** | C45 → the payload, the seeded regeneration and the plausibility thresholds do not change. **No engine version bump may be issued for this redesign** (`07-…` TR-165) |
+| DoD-05 | amended | C45 → `frontend/src/ts/elements/caret.ts` and `frontend/src/styles/caret.scss` move from the "these do exist" list to the "these do not exist" list (TR-255) |
+| §6.1 (`smoothCaret`, `caretStyle`) | **struck** | C45 → both keys removed from the schema, the defaults, the metadata, the palette and the migration path (TR-203 … TR-208) |
+| §6.1 (`maxLineWidth`) | retained, retargeted | C45 → the key name is kept for stored-config compatibility; it now bounds the task arena's width (TR-025, TR-258) |
+| §6.1 (`flipTestColors`, `colorfulMode`) | retained, rebound | C45 → they bind to the renamed math properties (TR-247) |
+| §1 index total | **extended** | C45 → `07-test-screen-redesign.md` adds `TR-001 … TR-262` (**262**), taking the consolidated total to **1375** |
 
 Everything not in this table is binding as written.
 
@@ -765,6 +831,14 @@ documents, and they are recorded here so the citation resolves.
 - **D2 — two mailboxes on that domain.** `contact@crococalc.com` (CP-156) and `support@crococalc.com`,
   received through Cloudflare Email Routing (C24). Sending stays Firebase-only. BL-7 tracks the dashboard
   side, which the user is enabling themselves.
+- **D3 — the in-run screen is one task at a time, and all typing machinery is purged.** The premise "the
+  test screen must look EXACTLY like monkeytype" is withdrawn **for the in-run screen only**; the chrome
+  stays monkeytype-like. Submit is Enter; a correct answer plays a brief affirmative animation and advances;
+  a wrong answer shows the correct result and waits for an explicit continue, **with the timer still
+  running**. The caret, the `<letter>` rendering, the hidden capture textarea, the task-stream geometry and
+  the first-task blur are deleted; the requirement the blur served is preserved by not rendering a task
+  before the run starts. Ruled in **C45**; specified in full in
+  `docs/requirements/07-test-screen-redesign.md` (`TR-001 … TR-262`). Code cites this as **D3**.
 
 ### C43 — ME-088's "one config-change event" vs SB-090's mandated mechanism
 
@@ -808,6 +882,53 @@ inherited commits, which INF-136 preserves and `NOTICE` clause 3 forbids rewriti
   excluding comment lines. Doc comments recording that C38/C41 struck them are required by C38 itself.
 - **DoD-14** — scope to post-fork history: `git log --format=%B f0c57c5c..HEAD`. As written it can never pass
   and contradicts INF-135's own INF-136.
+
+### C45 — the in-run screen is no longer a typing-test stream (user decision D3, 2026-08-03)
+
+**This is not a contradiction between the source documents.** It is a **user design decision that overrides
+them**, recorded here so that every ruling it withdraws keeps its audit trail. Nothing below is edited in
+place in §2's earlier entries; C45 is additive, and §2.31 gains a corresponding block of rows.
+
+**The decision, verbatim.** "You need to fully redo the tests themselves. I based this on monkeytype because
+I liked the interface. But this has nothing to do with typing, so all the typing related stuff can be fully
+removed from the codebase. The whole interface while we're in a run needs to be different. It should be one
+task at a time. And not with all the typing interface stuff, that just doesn't make sense."
+
+**The premise that is withdrawn.** CP-030 … CP-089, and the §2 rulings C11 and C12 that were made under
+them, all rest on "the test screen must look EXACTLY like monkeytype in design". That premise is withdrawn
+**for the in-run screen only**. C11's ruling text says so explicitly in its own reason clause — "INV-068
+presupposes a visible `<input>`. CP-053 keeps monkeytype's hidden capture textarea … so there is no native
+caret to see" — and CP-053 is now struck, so C11's stated ground is gone with it.
+
+**What is NOT withdrawn.** The chrome stays monkeytype-like: the header, the settings bar, the modes-notice
+strip, the footer, the results page, the account pages, the 52 themes and the overall minimalism are
+unchanged and remain the reference. CP-036 / ME-152 (no per-character feedback), ME-153 (no auto-advance)
+and master C29 (answers not in the DOM) are **all preserved**, and the new document restates each with its
+proof.
+
+**Ruling.** A seventh source document, **`docs/requirements/07-test-screen-redesign.md`**, is authoritative
+for the in-run experience. It numbers **TR-001 … TR-262** and it wins over every requirement it names in
+its §13, and over none other. Its §13 is the normative supersession map; the summary rows are mirrored into
+§2.31 below.
+
+- The in-run screen is **one task at a time**, large and centred, with the timer / live tpm / live acc row
+  above it and the answer entered directly below it. No stream, no upcoming tasks, no committed tasks, no
+  scroll geometry, no line jump.
+- Submit is **Enter**. `Space` as a second commit key is struck (its own rationale was monkeytype muscle
+  memory). Auto-advance on unique match remains **rejected** (ME-153).
+- A correct answer plays a brief affirmative animation and advances automatically. A wrong answer plays a
+  brief negative animation, **displays the correct answer**, and waits for an explicit continue (Enter).
+  **The timer keeps running during that pause** — the cost of an error is time, which is the point.
+- The custom caret, the `<letter>` rendering, the hidden capture textarea, the task-stream geometry and the
+  first-task blur/mask machinery are all deleted. The *requirement* the blur served — a user must not be
+  able to read the first task before starting — is preserved and is satisfied structurally: no task is
+  rendered until the run begins.
+- Every remaining typing-test concept is purged from the codebase. `docs/requirements/07-…` §10 is the
+  deletion inventory, by verified path.
+- The math engine is untouched. **No engine version bump is issued**, because generation, mixing and judging
+  do not change and a bump would reject every cached client mid-flight (ME-177 / ME-184).
+- The result payload, the seeded regeneration (ME-174), the task log (ME-159) and the plausibility
+  thresholds (ME-179 … ME-182) are unchanged. `07-…` §8 carries the proof.
 
 ---
 
@@ -1168,9 +1289,19 @@ anonymous users (SB-207).
 
 ### WP-06 — Test page and test engine
 
+> **Revision 5 (C45).** WP-06 additionally covers **all of `docs/requirements/07-test-screen-redesign.md`**
+> (`TR-001 … TR-262`), which supersedes the stream-side half of the coverage below. Read doc 07 **first**;
+> its §13 is the map of what in CP-030 … CP-089, C11 and C12 still applies. Carve-outs to other work
+> packages, all named in doc 07 §10: **WP-03** owns the `smoothCaret` / `caretStyle` schema removal
+> (TR-203) and the `PATCH /configs` strictness decision (TR-210); **WP-04** owns the 8 theme files and the
+> custom-property rename (TR-186, a C30 edit-class-(b) extension with the same PR-listing obligation);
+> **WP-05** owns the config metadata and palette removals (TR-205 … TR-208); **WP-07** owns nothing but a
+> confirmation that its payload is unchanged (TR-176).
+
 **Covers:** CP-018 … CP-089 (excluding CP-023 … CP-029, owned by WP-05); ME-129 … ME-159 (UI obligations),
 ME-135 as scoped by C29; INV-050, INV-051, INV-056, INV-057, INV-058, INV-059, INV-067, INV-083 … INV-100,
-INV-153 … INV-184 (test-side deletions), INV-197; C11, C12, C13, C19 (test side), C29, C30, C32, C33.
+INV-153 … INV-184 (test-side deletions), INV-197; ~~C11~~, ~~C12~~ (both struck by C45), C13, C19 (test
+side), C29, C30, C32, C33; **and TR-001 … TR-262**.
 
 **Owns:** `frontend/src/html/pages/test.html`; `frontend/src/ts/components/pages/test/**` **except**
 `TestConfig.tsx` and `modes-notice/**`; `frontend/src/ts/test/**` **except** `result.ts`, `pb-crown.ts`,
@@ -1185,9 +1316,15 @@ INV-153 … INV-184 (test-side deletions), INV-197; C11, C12, C13, C19 (test sid
 **First action:** extract every `#result*` rule from `test.scss` into a new `frontend/src/styles/result.scss`
 and hand that file to WP-07. This is the one deliberate file split; it MUST happen before WP-07 starts.
 
-**Exit criteria:** CP-186/CP-187 test hooks present; `#tasks` carries `data-state`; no `#words` selector or
-identifier remains anywhere; the pre-start blur cannot be lifted by any of CP-050's inputs; no answer of an
-uncommitted task appears in the DOM (C29); the input filter matches CP-055 … CP-059 plus C32.
+**Exit criteria (revision 5, restated for C45):** `#taskArena` carries `data-state` ∈
+`{preStart, running, awaitingContinue, finished}` and `data-feedback` ∈ `{none, correct, wrong}`
+(TR-010, TR-011, amending CP-186/CP-187); no `#words`, `#tasks`, `#tasksWrapper`, `#tasksInput`, `#caret`,
+`<letter>` or `--*-letter-*` selector or identifier remains anywhere (TR-254); nothing that could be read as
+a task is rendered before the run starts, and no input listed in CP-050 can start it; no answer of an
+un-submitted task appears in the DOM at any point of a run (C29, TR-160/TR-161); the input filter still
+matches CP-055 … CP-059 plus C32 and is still enforced by the engine alone; submit is Enter only and the
+wrong-answer pause does not stop the timer (TR-062, TR-131); doc 07 §12's ten acceptance items pass with
+real, pasted command output.
 
 ---
 
@@ -1385,10 +1522,18 @@ The `ConfigSchema` MUST contain exactly:
   requires both: `liveSpeedStyle` drives the live **tpm** readout and `liveAccStyle` the live **acc** readout.
   Without them in this list, WP-03's exit criterion "exactly the eight bar keys plus the retained appearance
   keys" fails on contact with WP-06).
-* **Restored by a ruling:** `smoothCaret`, `caretStyle` (C11); `singleListCommandLine` (C8).
+* **Restored by a ruling:** ~~`smoothCaret`, `caretStyle` (C11)~~ — **struck again by C45**, which struck C11
+  itself; both keys are removed from the schema, the defaults, the metadata, the palette and the migration
+  path (`07-…` TR-203 … TR-208). `--caret-color` and `customThemeColors`' 10-tuple are **unaffected**: the
+  theme colour is kept and now themes the browser's native caret (TR-020). `singleListCommandLine` (C8) is
+  unaffected and stays.
 * **Struck by a ruling:** `blindMode` (C41 — retained in revision 1 with no defined behaviour; CP-036 already
   forbids all pre-commit feedback, so nothing is left for it to suppress except the only feedback the user
   ever gets).
+* **Retained but retargeted by C45:** `maxLineWidth` keeps its key name for stored-config compatibility and
+  now bounds the task arena's width rather than a wrapping stream's (`07-…` TR-025, TR-258).
+  `flipTestColors` and `colorfulMode` are kept and bind to the renamed math custom properties (TR-019,
+  TR-247).
 
 **Arity note (revision 2, review gap 3):** `accountChart` is a **5-element** array, not monkeytype's 4 —
 AC-085 adds the `Per minute` toggle. The schema MUST be `["on"|"off"] × 5`, defaulting to all `"on"`, with a
@@ -1529,9 +1674,17 @@ A validation stage MUST be able to verify every line below mechanically or by di
       `backend/src/anticheat/` exports a real implementation of ME-179 … ME-183 whose `validateResult` can
       return `false` (proven by DoD-49).
 - [ ] **DoD-05** These **do** exist: `packages/math-engine/`, `frontend/src/ts/components/common/Icon.tsx`,
-      `frontend/src/ts/commandline/`, `frontend/src/ts/elements/caret.ts`, `frontend/src/styles/caret.scss`,
+      `frontend/src/ts/commandline/`, ~~`frontend/src/ts/elements/caret.ts`~~, ~~`frontend/src/styles/caret.scss`~~,
       `frontend/src/styles/result.scss`, `frontend/wrangler.jsonc`, `frontend/static/_headers`,
       `infra/terraform/prod/`, `scripts/generate-icon.ts`, `docs/RUNBOOK.md`, `LICENSE` (GPL-3.0, unmodified).
+      **Amended by C45 (`07-…` TR-255):** the two struck caret paths move to DoD-04 — they MUST NOT exist.
+- [ ] **DoD-05a (added by C45)** These do **not** exist: `frontend/src/ts/elements/caret.ts`,
+      `frontend/src/styles/caret.scss`, `frontend/src/ts/test/caret.ts`,
+      `frontend/__tests__/test/task-stream-geometry.jsdom-spec.ts`. And these greps return nothing
+      (`07-…` TR-254): `grep -rn "tasksInput\|#tasksWrapper\|paceCaret\|<letter\|letter>" frontend/src`;
+      `grep -rn "letter-color\|letter-animation" frontend/src frontend/static`;
+      `grep -rn "smoothCaret\|caretStyle" frontend/src packages/*/src`. `grep -rn "caret" frontend/src`
+      returns only `caret-color` occurrences.
 - [ ] **DoD-06** All 52 files under `frontend/static/themes/` exist, and the WP-04 PR lists every edited file
       and every removed selector (C30).
 
