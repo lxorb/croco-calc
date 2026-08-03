@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -238,6 +238,61 @@ describe("TR-296 / TR-325 — layout stability across task kinds", () => {
   });
 });
 
+/**
+ * Every rule head in the styles tree that mentions `#restartTestButton`, paired
+ * with the (flat) declaration block it opens.
+ *
+ * Deliberately a scan rather than another consumer of `parseScss`: the rule that
+ * caused the trouble lives inside an `@media` block in a *different* file, and
+ * teaching the toy parser about at-rules and multi-file resolution is exactly
+ * the "grow it into a real CSS parser" this spec's header rules out.
+ */
+function restartButtonRules(): { selector: string; body: string }[] {
+  const dir = path.resolve(__dirname, "../../src/styles");
+  const found: { selector: string; body: string }[] = [];
+
+  for (const file of readdirSync(dir).filter((it) => it.endsWith(".scss"))) {
+    const source = readFileSync(path.join(dir, file), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|\s)\/\/[^\n]*/g, "$1");
+
+    const pattern = /([^{}();]*#restartTestButton[^{}]*)\{([^{}]*)\}/g;
+    for (const match of source.matchAll(pattern)) {
+      found.push({
+        selector: (match[1] ?? "").trim(),
+        body: match[2] ?? "",
+      });
+    }
+  }
+  return found;
+}
+
+describe("the restart control's `preStart` hiding survives the cascade", () => {
+  it("finds the rules it is supposed to be checking", () => {
+    // A scan that silently matches nothing would make every assertion below
+    // vacuous.
+    expect(restartButtonRules().length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("never forces `display` on it with `!important` without excusing `.hidden`", () => {
+    // The defect this pins: `media-queries-blue.scss` carried a bare
+    // `#restartTestButton { display: block !important }` under
+    // `(pointer: coarse) and (max-width: 778px)`. An important declaration beats
+    // a normal one from any layer, so `.hidden`'s `display: none` lost and the
+    // restart button was back on screen before the run had started — on phones
+    // and tablets only, which is precisely where it would go unnoticed.
+    for (const { selector, body } of restartButtonRules()) {
+      const forcesDisplay = /display\s*:[^;]*!important/.test(body);
+      if (!forcesDisplay) continue;
+
+      expect(
+        selector,
+        `\`${selector}\` forces \`display\` with \`!important\` and would override \`.hidden\``,
+      ).toContain(":not(.hidden)");
+    }
+  });
+});
+
 describe("TR-057 — the arena is hidden once the results own the page", () => {
   it("hides `#taskArena` itself, not its children one by one", () => {
     expect(declaration('#taskArena[data-state="finished"]', "display")).toBe(
@@ -260,6 +315,19 @@ describe("TR-057 — the arena is hidden once the results own the page", () => {
         `\`${child}\` is hidden by a descendant rule a utility class can beat`,
       ).toBe(false);
     }
+  });
+
+  it("lets `.hidden` win on `#restartTestButton`", () => {
+    // `test-ui.ts` hides the restart control in `preStart` by adding `.hidden`,
+    // and `test.scss` gives the same button a `display`. That only works
+    // because this stylesheet's declaration is *normal*: `head.html` orders the
+    // `hidden` layer after `custom-styles`, so the later layer wins without
+    // specificity entering into it. Add an `!important` here and the button
+    // reappears before the run — important declarations outrank normal ones
+    // whatever their layer.
+    expect(declaration("#restartTestButton", "display")).not.toMatch(
+      /!important/,
+    );
   });
 
   it("keeps `preStart` hiding only the three elements TR-038 names", () => {

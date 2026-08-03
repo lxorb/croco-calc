@@ -25,8 +25,19 @@
     }
   }
 }
+// On a touch device the restart button is laid out as a block rather than the
+// centred flex box `test.scss` gives it everywhere else.
+// `:not(.hidden)` is load-bearing, not decoration. `test-ui.ts` hides the button
+// in `preStart` by adding `.hidden`, whose `display: none` lives in the `hidden`
+// cascade layer — and `head.html` orders that layer *after* `custom-styles`, so
+// it wins over any normal declaration in here on specificity-free grounds. An
+// `!important` does not play by those rules: important declarations outrank
+// normal ones outright, whatever the layer. So the bare `#restartTestButton`
+// this replaces re-showed the button in `preStart` on every phone and tablet —
+// exactly the "restart button before a test" the change was made to remove,
+// surviving on precisely the devices least likely to be checked.
 @media (pointer: coarse) and (max-width: 778px) {
-  #restartTestButton {
+  #restartTestButton:not(.hidden) {
     display: block !important;
   }
 }
