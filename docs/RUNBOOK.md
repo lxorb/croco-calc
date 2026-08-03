@@ -166,25 +166,30 @@ requires a GitHub **environment** named `prod-infra` with a required reviewer �
 that is where INF-079's manual approval gate actually lives. `deploy-frontend`
 and `deploy-backend` use an environment named `prod`.
 
+This is the complete set consumed by the five workflows — nothing else is read.
+Status verified 2026-08-03.
+
 ### Secrets
 
-| Name | Used by | Where the value comes from |
-|---|---|---|
-| `AZURE_CLIENT_ID` | deploy-backend, infra, backup-db | `terraform output cicd_client_id` from `infra/terraform/bootstrap` |
-| `AZURE_TENANT_ID` | same | `f2fb90a0-b1c1-4048-8959-038f203720ad` (INF-009) |
-| `AZURE_SUBSCRIPTION_ID` | same | `48317e81-bf0f-4424-8f69-c8513c91c001` (INF-009) |
-| `CLOUDFLARE_API_TOKEN` | deploy-frontend | `C:\Users\me\agent-secrets\cloudflare.txt`. Needs Account → Workers Scripts → Edit, Account → Account Settings → Read, User → User Details → Read (INF-029) |
-| `CLOUDFLARE_ACCOUNT_ID` | deploy-frontend | `b0e98c15b1f905a394ecd6a849e8e99f` |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | infra (`TF_VAR_firebase_service_account_json`) | Firebase console → Project settings → Service accounts → Generate new private key, minified to one line. Terraform writes it to Key Vault as `firebase-service-account`. Not in INF-086's list; INF-097 requires it |
-| `RECAPTCHA_SITE_KEY` | deploy-frontend | reCAPTCHA v2 admin console — **blocked on BL-3** |
-| `RECAPTCHA_SECRET` | infra (`TF_VAR_recaptcha_secret`) | same console; Terraform writes it to Key Vault as `recaptcha-secret` |
-| `FIREBASE_APIKEY` | deploy-frontend | Firebase web-app config (project `croco-calc`) |
-| `FIREBASE_AUTHDOMAIN` | deploy-frontend | `croco-calc.firebaseapp.com` |
-| `FIREBASE_PROJECTID` | deploy-frontend | `croco-calc` |
-| `FIREBASE_STORAGEBUCKET` | deploy-frontend | Firebase web-app config |
-| `FIREBASE_MESSAGINGSENDERID` | deploy-frontend | `993399579889` |
-| `FIREBASE_APPID` | deploy-frontend | Firebase web-app config |
-| `GH_VARIABLES_TOKEN` | infra | Fine-grained PAT on this repository with **Variables: read and write**. `GITHUB_TOKEN` cannot write repository variables, and INF-086a requires `infra.yml` to publish `vars.BACKEND_URL` |
+| Name | Used by | Status | Where the value comes from |
+|---|---|---|---|
+| `AZURE_CLIENT_ID` | deploy-backend, infra, backup-db | **MISSING** | `terraform output cicd_client_id` from `infra/terraform/bootstrap`. Cannot be set until that module is applied — the identity does not exist yet |
+| `AZURE_TENANT_ID` | same | set | `f2fb90a0-b1c1-4048-8959-038f203720ad` (INF-009) |
+| `AZURE_SUBSCRIPTION_ID` | same | set | `48317e81-bf0f-4424-8f69-c8513c91c001` (INF-009) |
+| `CLOUDFLARE_API_TOKEN` | deploy-frontend | set | `C:\Users\me\agent-secrets\cloudflare.txt`. Needs Account → Workers Scripts → Edit, Account → Account Settings → Read, User → User Details → Read (INF-029) |
+| `CLOUDFLARE_ACCOUNT_ID` | deploy-frontend | set | `b0e98c15b1f905a394ecd6a849e8e99f`. Also present in `wrangler.jsonc`, so the secret is belt-and-braces |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | infra (`TF_VAR_firebase_service_account_json`) | set | `C:\Users\me\agent-secrets\croco-calc-firebase-admin.json`. Terraform writes it to Key Vault as `firebase-service-account`. Not in INF-086's list; INF-097 requires it |
+| `RECAPTCHA_SECRET` | infra (`TF_VAR_recaptcha_secret`) | set | `croco-calc-recaptcha.json` → `secretKey`; Terraform writes it to Key Vault as `recaptcha-secret` |
+| `FIREBASE_APIKEY` | deploy-frontend | set | Firebase web-app config (project `croco-calc`) |
+| `FIREBASE_AUTHDOMAIN` | deploy-frontend | set | `croco-calc.firebaseapp.com` |
+| `FIREBASE_PROJECTID` | deploy-frontend | set | `croco-calc` |
+| `FIREBASE_STORAGEBUCKET` | deploy-frontend | set | Firebase web-app config |
+| `FIREBASE_MESSAGINGSENDERID` | deploy-frontend | set | Firebase web-app config |
+| `FIREBASE_APPID` | deploy-frontend | set | Firebase web-app config |
+| `GH_VARIABLES_TOKEN` | infra | **MISSING** | Fine-grained PAT on this repository with **Variables: read and write**. `GITHUB_TOKEN` cannot write repository variables, and INF-086a requires `infra.yml` to publish `vars.BACKEND_URL`. A PAT cannot be minted non-interactively — this one is unavoidably manual |
+
+`GITHUB_TOKEN` (deploy-backend, for ghcr) is provided by Actions automatically
+and is not configured anywhere.
 
 The six `FIREBASE_*` web-app values are not individually secret — they ship in
 the bundle — but they are stored as secrets so a missing one fails the workflow
@@ -192,9 +197,22 @@ loudly rather than baking an empty auth config into a deploy (INF-101).
 
 ### Variables
 
-| Name | Written by | Consumed by |
-|---|---|---|
-| `BACKEND_URL` | `infra.yml`, from `terraform output -raw api_base_url` (INF-086a) | `deploy-frontend.yml` (the build), `deploy-backend.yml` (the smoke check). Also the value to put in the backend's CORS allowlist and the frontend's preconnect |
+| Name | Written by | Status | Consumed by |
+|---|---|---|---|
+| `BACKEND_URL` | `infra.yml`, from `terraform output -raw api_base_url` (INF-086a) | **MISSING** | `deploy-frontend.yml` (the build and the health gate), `deploy-backend.yml` (the smoke check). Also the value to put in the backend's CORS allowlist and the frontend's preconnect. Only exists once `infra` apply has run |
+| `RECAPTCHA_SITE_KEY` | operator, from `croco-calc-recaptcha.json` → `siteKey` | set | `deploy-frontend.yml` (the build) |
+
+**Why the site key is a variable and the secret key is a secret.** The reCAPTCHA
+site key is public by construction — it is embedded in the served JavaScript, so
+treating it as a secret buys nothing and costs real debuggability, because
+Actions would mask it in every log line it appears in. The *secret* key is the
+security boundary: it is referenced only by `infra.yml`, which writes it into
+Key Vault for the backend to read. `deploy-frontend.yml` does not reference
+`RECAPTCHA_SECRET` at all, so it can never reach the bundle.
+
+The site key is registered for `crococalc.com` and `localhost`. reCAPTCHA admits
+subdomains of a registered domain by default, so `www.crococalc.com` is covered
+without a separate entry.
 
 ### INF-086a decision — the backup credential source
 
@@ -229,11 +247,42 @@ build whose `RECAPTCHA_SITE_KEY` is empty or is that test key.
 
 ## 3. Deploy
 
-| What | How |
-|---|---|
-| Frontend | Push to `main` touching `frontend/**` or `packages/**`, or run `deploy-frontend` manually. It builds with the real config and runs `wrangler deploy` |
-| Backend | Push to `main` touching `backend/**`, `packages/**` or `docker/**`, or run `deploy-backend` manually. It pushes `ghcr.io/lxorb/croco-calc-api:<sha>` and `az containerapp update`s to that SHA |
-| Infrastructure | `infra` workflow. `plan` on any PR touching `infra/**`; `apply` only via `workflow_dispatch` with `action=apply` on `main`, behind the `prod-infra` approval |
+### What triggers what
+
+| Workflow | Trigger | Path filter |
+|---|---|---|
+| `ci` | every push to `main`, every PR to `main` | none — CI always runs. Individual jobs are then gated by `dorny/paths-filter`, except `secret-scan` and `check-format`, which always run |
+| `deploy-frontend` | push to `main`, or `workflow_dispatch` | `frontend/**`, `packages/**`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, own workflow file |
+| `deploy-backend` | push to `main`, or `workflow_dispatch` | `backend/**`, `packages/**`, `docker/**`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, own workflow file |
+| `infra` | `plan` on any PR touching `infra/**`; `apply` only via `workflow_dispatch` with `action=apply` on `main`, behind the `prod-infra` approval | `infra/**`, own workflow file |
+| `backup-db` | `03:17 UTC` every Sunday, or `workflow_dispatch` | n/a |
+
+A docs-only commit (`docs/**`, `README.md`) matches **no** deploy path filter, so
+it runs CI and deploys nothing. `pnpm-workspace.yaml` is in both deploy filters
+deliberately: it carries `onlyBuiltDependencies`, so it changes what `pnpm
+install` actually does, both on the runner and inside the image build.
+
+Every workflow has a `concurrency` group (`deploy-backend`, `deploy-frontend`,
+`infra`, `backup-db`, and per-ref for `ci`). The deploy groups use
+`cancel-in-progress: false` on purpose — cancelling a half-finished
+`containerapp update` or `wrangler deploy` is worse than queueing behind it, so
+two rapid pushes to `main` deploy in order rather than racing. `ci` is the one
+that cancels in progress, because a superseded CI run has no side effects.
+
+### Ordering: backend before frontend
+
+`BACKEND_URL` is baked into the SPA bundle at build time and cannot be corrected
+without a rebuild. The two deploy workflows are independent and a commit
+touching `packages/**` starts both at once, so `deploy-frontend` has a **health
+gate** before its build step: it polls `$BACKEND_URL/` for `{"message":"ok"}` and
+waits up to five minutes. A concurrent backend deploy is the expected case, so it
+waits rather than failing fast; it fails only if the API is genuinely not
+serving, on the grounds that shipping a frontend against a dead API only spreads
+the outage.
+
+`deploy-frontend` also refuses to build when `BACKEND_URL`, the site key or any
+`FIREBASE_*` value is empty (INF-013, INF-101), and `vite.config.ts` enforces the
+same thing inside the build. Keep both — the workflow check just fails faster.
 
 First-time order: create the two GitHub environments → `bootstrap` (manual,
 local) → **push an API image** → `infra` apply → `deploy-backend` →
@@ -265,6 +314,15 @@ GitHub will mint:
 gh api -X PUT repos/lxorb/croco-calc/environments/prod
 gh api -X PUT repos/lxorb/croco-calc/environments/prod-infra
 # then add a required reviewer to prod-infra in the repo settings UI (INF-079)
+```
+
+**Both environments now exist (verified 2026-08-03).** `prod-infra` carries
+`lxorb` as a required reviewer and a protected-branches deployment policy, which
+is INF-079's approval gate. Confirm with:
+
+```bash
+gh api repos/lxorb/croco-calc/environments --jq '.environments[].name'
+gh api repos/lxorb/croco-calc/environments/prod-infra --jq '.protection_rules[].type'
 ```
 
 ```bash
@@ -315,7 +373,25 @@ records that every provider croco calc needs is already registered.
 
 ## 4. Rollback
 
-### Backend
+### Backend — automatic
+
+`deploy-backend.yml` records the currently deployed image *before* it calls
+`az containerapp update`, and an `if: failure()` step rolls back to it when any
+later step fails — including the smoke check, which polls `$BACKEND_URL/` for
+`{"message":"ok"}` for two minutes. So a bad image does not stay live while
+somebody reads the logs.
+
+The job still reports **failure** after a successful rollback. Once a step has
+failed the job outcome is sealed, and that is the intended behaviour: a rollback
+is not a successful deploy, and the run must stay red so it is noticed.
+
+The rollback is skipped, with a log line, when the recorded previous image is the
+same tag that was just deployed — that is a re-run of an already-failed deploy,
+where rolling "back" would be a no-op.
+
+### Backend — manual
+
+If the automatic rollback itself fails, or a bad deploy was only noticed later:
 
 ```bash
 az containerapp revision list -n ca-croco-calc-api -g rg-croco-calc-prod -o table
@@ -508,13 +584,13 @@ by the same `terraform apply` as the rest of the stack. **Status: not yet run**
 | # | Action | Blocks |
 |---|---|---|
 | ~~1~~ | ~~Create a MongoDB Atlas organisation and API key pair (BL-4)~~ — **STRUCK 2026-08-02.** The user's decision to host MongoDB on Azure removed the Atlas provider. The cluster is created by the same Azure credentials as everything else, so there is **no Atlas account to create and no human action here at all** | ~~everything~~ — nothing |
-| 2 | Register a reCAPTCHA v2 ("I'm not a robot") site at <https://www.google.com/recaptcha/admin> for `crococalc.com`, `www.crococalc.com` and `localhost`; set `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET` (BL-3) | the production frontend build |
-| 3 | Generate the Firebase service-account key and set `FIREBASE_SERVICE_ACCOUNT_JSON`; set the six `FIREBASE_*` web-app values | backend token verification, sign-in |
+| ~~2~~ | ~~Register a reCAPTCHA v2 site; set `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET` (BL-3)~~ — **DONE 2026-08-03.** The site is registered for `crococalc.com` and `localhost`; `vars.RECAPTCHA_SITE_KEY` and `secrets.RECAPTCHA_SECRET` are set. **BL-3 is cleared** | ~~the production frontend build~~ — nothing |
+| ~~3~~ | ~~Generate the Firebase service-account key and set `FIREBASE_SERVICE_ACCOUNT_JSON`; set the six `FIREBASE_*` web-app values~~ — **DONE 2026-08-03.** All seven are set | ~~backend token verification, sign-in~~ — nothing |
 | 4 | Set the Firebase email action URL to `https://crococalc.com/verify` (INF-102) | verification and password-reset links |
-| 5 | Create the `prod` and `prod-infra` GitHub environments **before** running `bootstrap`, and put a required reviewer on `prod-infra`. `bootstrap` issues a federated credential per environment (section 3) — without both halves, `azure/login` fails with AADSTS70021 in `infra.yml`'s apply job and in `deploy-backend.yml` | INF-079's approval gate, and the backend deploying at all |
+| ~~5~~ | ~~Create the `prod` and `prod-infra` GitHub environments, and put a required reviewer on `prod-infra`~~ — **DONE 2026-08-03.** Both exist; `prod-infra` has `lxorb` as a required reviewer plus a protected-branches policy | ~~INF-079's approval gate~~ — nothing |
 | ~~5a~~ | ~~Transcribe the verified rate card into INF-037's `source` column~~ — **DONE 2026-08-02.** INF-037 is filled in and cited, the two wrong arithmetic rows are corrected, and the `infra.yml` gate was made precise so it can actually pass. INF-156 is cleared | ~~`terraform apply`~~ — nothing |
 | 6 | Create the fine-grained PAT for `GH_VARIABLES_TOKEN` (Variables: read and write on this repository) | `infra.yml` publishing `vars.BACKEND_URL` |
-| 7 | Run `infra/terraform/bootstrap` once, locally, with an operator identity | everything |
+| 7 | Run `infra/terraform/bootstrap` once, locally, with an operator identity, **then set `AZURE_CLIENT_ID`** from its output: `gh secret set AZURE_CLIENT_ID --body "$(terraform output -raw cicd_client_id)"`. As of 2026-08-03 no croco-calc resource exists in the subscription, so the `id-croco-calc-cicd` identity that OIDC authenticates as does not exist either — this is the single blocker for `azure/login` in `deploy-backend`, `infra` and `backup-db` | everything Azure: the backend deploy, `infra` apply, the weekly backup |
 | 8 | **Enable Cloudflare Email Routing** on `crococalc.com` (dashboard → Email → Email Routing is simplest; the API token lacks the scope), add `contact@` and `support@` forwarding to `me@emilvinu.de`, and **click the destination-verification link** Cloudflare mails there. The user has taken this on. The zone holds **zero DNS records** (re-verified 2026-08-02), so Cloudflare's MX/SPF land in a clean zone with nothing to conflict against. Sending needs nothing: Firebase Auth sends all user-facing mail from its own domain | `contact@crococalc.com` and `support@crococalc.com` delivering anything |
 | 9 | Add `croco-calc.<account>.workers.dev` to Firebase authorised domains **only if** sign-in is to be tested on the workers.dev URL. The five custom-domain entries are already in place | workers.dev sign-in testing |
 | 10 | Seven days after go-live, check actual spend and record it against section 1 (INF-144). **Now mandatory, not advisory** — the M10 default leaves only ~20–27 % headroom under the $50 ceiling, so this is the control that catches a breach | the credibility of the whole cost model |
