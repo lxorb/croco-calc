@@ -1,6 +1,5 @@
 import { roundTo2 } from "@croco-calc/util/numbers";
 import * as db from "../init/db";
-import CrocoError from "../utils/error";
 import { TrainingStats, ScoreHistogram } from "@croco-calc/schemas/public";
 import { LEADERBOARD_TIMES } from "@croco-calc/schemas/math";
 
@@ -69,21 +68,21 @@ export async function getScoreHistogram(
 /**
  * CP-135 — site-wide training stats behind `GET /public/trainingStats`.
  * Returns the wire shape, not the stored one.
+ *
+ * "No test has ever been completed" is a legitimate state, not an error: the
+ * counter document is only created by the first `updateStats` upsert. monkeytype
+ * threw a 404 here, which made the CP-134 hero fail on a fresh database. Zeros
+ * are the honest answer and match the sibling `getScoreHistogram`, which already
+ * degrades to an empty histogram.
  */
 export async function getTrainingStats(): Promise<TrainingStats> {
   const stats = await db
     .collection<PublicTrainingStatsDB>("public")
     .findOne({ _id: "stats" }, { projection: { _id: 0 } });
-  if (!stats) {
-    throw new CrocoError(
-      404,
-      "Public training stats not found",
-      "get training stats",
-    );
-  }
+
   return {
-    timeTraining: stats.timeSpent,
-    testsCompleted: stats.testsCompleted,
-    testsStarted: stats.testsStarted,
+    timeTraining: stats?.timeSpent ?? 0,
+    testsCompleted: stats?.testsCompleted ?? 0,
+    testsStarted: stats?.testsStarted ?? 0,
   };
 }

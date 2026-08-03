@@ -2,6 +2,17 @@ import { describe, it, expect } from "vitest";
 import * as PublicDAL from "../../../src/dal/public";
 
 describe("PublicDAL", function () {
+  // Runs before any `updateStats` call, so the counter document does not exist
+  // yet -- the state of a freshly deployed site. It must read as zeros, not 404.
+  it("should return zeroed training stats when no test has been completed", async function () {
+    const trainingStats = await PublicDAL.getTrainingStats();
+    expect(trainingStats).toEqual({
+      timeTraining: 0,
+      testsCompleted: 0,
+      testsStarted: 0,
+    });
+  });
+
   it("should be able to update stats", async function () {
     // checks it doesn't throw an error. the actual values are checked in another test.
     await PublicDAL.updateStats(1, 15);
