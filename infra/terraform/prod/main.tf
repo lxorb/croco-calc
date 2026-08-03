@@ -105,8 +105,11 @@ module "container_app" {
 module "budget" {
   source = "../modules/budget"
 
-  subscription_id = var.subscription_id
-  amount          = var.budget_amount
-  start_date      = var.budget_start_date
-  contact_email   = var.alert_email
+  # INF-143 measures croco calc, so the budget is scoped to croco calc's
+  # resource group — not to the subscription, which also holds ~11 unrelated
+  # projects whose spend used to be counted against this ceiling.
+  resource_group_id = data.azurerm_resource_group.prod.id
+  amount            = var.budget_amount
+  start_date        = var.budget_start_date
+  contact_email     = var.alert_email
 }
