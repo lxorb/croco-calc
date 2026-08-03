@@ -119,11 +119,19 @@
 
     <mount data-component="answersymbols"></mount>
 
+    <!--
+      Ships hidden, because the page opens in `preStart` and there is nothing
+      to restart before a run has started. `test-ui.ts` (`setTestState`) is the
+      single owner of this class from then on: hidden in `preStart`, shown in
+      `running`, `awaitingContinue` and `finished`. Starting hidden here rather
+      than waiting for the first state write also means it can never flash into
+      the first paint.
+    -->
     <button
       id="restartTestButton"
       aria-label="Restart Test"
       data-balloon-pos="down"
-      class="text"
+      class="text hidden"
     >
       <mount data-component="restarticon" class="contents"></mount>
     </button>

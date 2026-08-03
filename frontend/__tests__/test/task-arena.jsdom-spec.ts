@@ -393,6 +393,70 @@ describe("the task arena state machine", () => {
     });
   });
 
+  /**
+   * The user's report: "the restart test button should only be there during a
+   * test, not before". In `preStart` the arena offers `start test` (TR-040) and
+   * there is nothing to restart; the control belongs to the states that have a
+   * run behind them. TR-063's "reachable from every state" is unaffected in
+   * substance — the quick-restart hotkey and the command palette still reach it
+   * from `preStart`, where it is a no-op anyway.
+   */
+  describe("the restart control is a during-the-run affordance", () => {
+    const restartButton = (): HTMLElement =>
+      document.querySelector("#restartTestButton") as HTMLElement;
+    const restartShown = (): boolean =>
+      !restartButton().classList.contains("hidden");
+
+    it("is absent before the run starts", async () => {
+      expect(state()).toBe("preStart");
+      expect(restartShown()).toBe(false);
+    });
+
+    it("appears as soon as the run starts", async () => {
+      const { logic } = await load();
+      logic.pressCharacter("4");
+
+      expect(state()).toBe("running");
+      expect(restartShown()).toBe(true);
+    });
+
+    it("stays available while a wrong answer is on screen", async () => {
+      const { logic } = await load();
+      for (const ch of "999999") logic.pressCharacter(ch);
+      logic.submitOrContinue();
+
+      expect(state()).toBe("awaitingContinue");
+      expect(restartShown()).toBe(true);
+    });
+
+    it("goes away again when a restart lands back in preStart", async () => {
+      const { logic } = await load();
+      logic.pressCharacter("4");
+      expect(restartShown()).toBe(true);
+
+      logic.restart();
+
+      expect(state()).toBe("preStart");
+      expect(restartShown()).toBe(false);
+    });
+
+    it("is still in the DOM order that TR-137's `tab > enter` needs", async () => {
+      const { logic } = await load();
+      logic.pressCharacter("4");
+
+      // Not `display: none` while running, so it is focusable, and it follows
+      // `#answerInput` in document order.
+      const order = [
+        ...document.querySelectorAll("#answerInput, #restartTestButton"),
+      ];
+      expect(order.map((el) => el.id)).toEqual([
+        "answerInput",
+        "restartTestButton",
+      ]);
+      expect(restartShown()).toBe(true);
+    });
+  });
+
   describe("TR-061 — a no-op commit changes nothing", () => {
     it("ignores Enter on an empty buffer", async () => {
       const { logic } = await load();

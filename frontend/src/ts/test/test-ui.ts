@@ -79,9 +79,32 @@ export function displayPrompt(prompt: string): string {
   return prompt.replace(/\s*=\s*$/, "");
 }
 
+/**
+ * The restart control belongs to the states that have a run behind them.
+ *
+ * Reported by the user as "the restart test button should only be there during
+ * a test, not before": in `preStart` the arena already offers the `start test`
+ * button (TR-040) and there is, literally, nothing to restart — a second button
+ * offering to discard a run that has not begun is noise. It comes back for
+ * `running`, the dwell / `awaitingContinue` pause and `finished` (where the
+ * results screen sits above it and restarting is the obvious next move).
+ *
+ * Driven from here rather than from a stylesheet so that it is a single choke
+ * point with the `data-state` write it belongs to, and so that `display: none`
+ * takes the button out of the tab order in `preStart` — Tab there should reach
+ * the start button, not an affordance for a run that does not exist. TR-137's
+ * `tab > enter` restart is unaffected: it is specified for a *running* test,
+ * where the button is present, focusable and revealed by `:focus-visible`
+ * (TR-138).
+ */
+function syncRestartButton(state: TestDomState): void {
+  qs("#restartTestButton")?.toggleClass("hidden", state === "preStart");
+}
+
 export function setTestState(state: TestDomState): void {
   setArenaState(state);
   arena().native.dataset["state"] = state;
+  syncRestartButton(state);
 }
 
 export function getTestState(): TestDomState {
