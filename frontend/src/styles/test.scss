@@ -1,6 +1,6 @@
 // The test page: the task arena, its readouts row, the feedback animations and
 // the restart button. The `#result*` rules live in `result.scss`.
-//
+
 // Doc 07 (TR-009 … TR-058) replaced the wrapping task stream with a single
 // centred task. The custom properties were renamed out of typing vocabulary
 // (TR-019) — `--task-active-color` / `--task-dim-color` / `--task-error-color`
@@ -325,7 +325,7 @@
 // rule in `media-queries.scss` already does this for everything outside its
 // allowlist; the arena is deliberately NOT added to that allowlist and does not
 // carry `ignore-reduced-motion`.
-//
+
 // TR-123 — timing is NOT reduced: `CORRECT_DWELL_MS` stays 180 ms and
 // `CONTINUE_ARM_MS` stays 210 ms. Reduced motion means less movement, not less
 // feedback; collapsing the dwell would remove the affirmative signal entirely
